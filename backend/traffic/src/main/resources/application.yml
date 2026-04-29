@@ -3,9 +3,9 @@ spring:
     name: traffic
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://localhost:5432/traffic_db
+    url: jdbc:postgresql://localhost:5432/traffic
     username: postgres
-    password: password
+    password: 1004
 
   jpa:
     hibernate:
