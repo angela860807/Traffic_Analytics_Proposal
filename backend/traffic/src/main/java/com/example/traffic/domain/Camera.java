@@ -40,6 +40,14 @@ public class Camera {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    public void update(String cameraName, String cameraCode, String streamUrl, String directionType, boolean isActive) {
+        this.cameraName = cameraName;
+        this.cameraCode = cameraCode;
+        this.streamUrl = streamUrl;
+        this.directionType = directionType;
+        this.isActive = isActive;
+    }
+
     @Builder
     public Camera(Zone zone, String cameraCode, String cameraName, String streamUrl, String directionType) {
         this.zone = zone;

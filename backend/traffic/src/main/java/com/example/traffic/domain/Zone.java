@@ -33,6 +33,13 @@ public class Zone {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    public void update(String zoneName, String zoneCode, String zoneType, boolean isActive) {
+        this.zoneName = zoneName;
+        this.zoneCode = zoneCode;
+        this.zoneType = zoneType;
+        this.isActive = isActive;
+    }
+
     @Builder
     public Zone(String zoneCode, String zoneName, String zoneType) {
         this.zoneCode = zoneCode;
