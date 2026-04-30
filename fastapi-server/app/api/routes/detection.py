@@ -1,0 +1,68 @@
+import httpx
+from fastapi import APIRouter, HTTPException, status
+
+from app.schemas.detection import DetectionResponse, RaspberryFrameRequest
+from app.services.backend_client import BackendClient
+from app.services.inference_service import InferenceService
+
+router = APIRouter(prefix="/api/detections", tags=["detections"])
+
+inference_service = InferenceService()
+backend_client = BackendClient()
+
+
+@router.post(
+    "/mock",
+    response_model=DetectionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def create_mock_detection(
+    request: RaspberryFrameRequest,
+) -> DetectionResponse:
+    try:
+        result = await inference_service.detect_from_frame(request)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="imageBase64 must be valid base64",
+        ) from exc
+
+    return DetectionResponse(
+        accepted=True,
+        message="Mock detection result created",
+        data=result,
+    )
+
+
+@router.post(
+    "/mock/send",
+    response_model=DetectionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def create_and_send_mock_detection(
+    request: RaspberryFrameRequest,
+) -> DetectionResponse:
+    try:
+        result = await inference_service.detect_from_frame(request)
+        await backend_client.send_detection(result)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="imageBase64 must be valid base64",
+        ) from exc
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Spring Boot API returned error: {exc.response.status_code}",
+        ) from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Spring Boot API is not reachable",
+        ) from exc
+
+    return DetectionResponse(
+        accepted=True,
+        message="Mock detection result sent to backend",
+        data=result,
+    )

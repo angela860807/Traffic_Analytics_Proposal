@@ -1,4 +1,5 @@
 import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -7,8 +8,8 @@ APP_NAME = os.getenv("APP_NAME", "traffic-ai-server")
 APP_ENV = os.getenv("APP_ENV", "local")
 
 SPRING_BACKEND_BASE_URL = os.getenv(
-    "SRPING_BACKEND_BASE_URL",
-    "http://localhost:8000",
+    "SPRING_BACKEND_BASE_URL",
+    "http://127.0.0.1:8080",
 )
 
 SPRING_DETECTION_PATH = os.getenv(
