@@ -17,5 +17,20 @@ SPRING_DETECTION_PATH = os.getenv(
     "/api/detections",
 )
 
+DEFAULT_TIMEZONE = os.getenv("DEFAULT_TIMEZONE", "Asia/Seoul")
+
+DETECTION_CONFIDENCE_THRESHOLD = float(
+    os.getenv("DETECTION_CONFIDENCE_THRESHOLD", "0.7")
+)
+
+DUPLICATE_WINDOW_SECONDS = int(
+    os.getenv("DUPLICATE_WINDOW_SECONDS", "10")
+)
+
+IMAGE_STORAGE_DIR = os.getenv(
+    "IMAGE_STORAGE_DIR",
+    "storage/detections",
+)
+
 MODEL_PATH = os.getenv("MODEL_PATH", "")
 OCR_LANG = os.getenv("OCR_LANG", "korean")

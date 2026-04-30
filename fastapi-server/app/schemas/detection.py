@@ -12,7 +12,7 @@ class RaspberryFrameRequest(BaseModel):
     camera_code: str = Field(
         alias="cameraCode",
         min_length=1,
-        examples=["CAM_ENTRY_01"],
+        examples=["CAM_001"],
     )
     captured_at: datetime = Field(
         alias="capturedAt",
@@ -30,9 +30,10 @@ class RaspberryFrameRequest(BaseModel):
 class DetectionResult(BaseModel):
     camera_code: str = Field(
         alias="cameraCode",
-        examples=["CAM_ENTRY_01"],
+        examples=["CAM_001"],
     )
-    plate_number: str = Field(
+    plate_number: str | None = Field(
+        default=None,
         alias="plateNumber",
         examples=["123가4567"],
     )
@@ -53,7 +54,7 @@ class DetectionResult(BaseModel):
     image_path: str | None = Field(
         default=None,
         alias="imagePath",
-        examples=["/images/2026/04/30/CAM_ENTRY_01_103000.jpg"],
+        examples=["storage/detections/2026/04/30/CAM_001_103000_plate_01.jpg"],
     )
     detected_at: datetime = Field(
         alias="detectedAt",

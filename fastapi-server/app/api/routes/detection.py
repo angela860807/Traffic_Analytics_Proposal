@@ -11,6 +11,7 @@ inference_service = InferenceService()
 backend_client = BackendClient()
 
 
+# 백엔드 협약 전 테스트용
 @router.post(
     "/mock",
     response_model=DetectionResponse,

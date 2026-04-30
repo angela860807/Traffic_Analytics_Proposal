@@ -15,3 +15,7 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
+
+backend/traffic/build/
+backend/traffic/out/
+backend/traffic/.gradle/
