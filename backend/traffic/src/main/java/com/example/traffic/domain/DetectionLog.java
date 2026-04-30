@@ -12,7 +12,8 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "detection_logs", indexes = {
-        @Index(name = "idx_plate_number", columnList = "plate_number"),
+        // 복합 인덱스로 조회 성능 최적화 (차량번호 + 인식시간)
+        @Index(name = "idx_plate_detected", columnList = "plate_number, detected_at"),
         @Index(name = "idx_detected_at", columnList = "detected_at")
 })
 @Getter

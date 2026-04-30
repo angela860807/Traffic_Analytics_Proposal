@@ -1,5 +1,6 @@
 package com.example.traffic.domain;
 
+import com.example.traffic.common.enums.ZoneType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -24,8 +25,9 @@ public class Zone {
     @Column(nullable = false, length = 100)
     private String zoneName;
 
-    @Column(nullable = false, length = 30)
-    private String zoneType;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private ZoneType zoneType;
 
     @Column(nullable = false)
     private boolean isActive;
@@ -33,7 +35,7 @@ public class Zone {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    public void update(String zoneName, String zoneCode, String zoneType, boolean isActive) {
+    public void update(String zoneName, String zoneCode, ZoneType zoneType, boolean isActive) {
         this.zoneName = zoneName;
         this.zoneCode = zoneCode;
         this.zoneType = zoneType;
@@ -41,7 +43,7 @@ public class Zone {
     }
 
     @Builder
-    public Zone(String zoneCode, String zoneName, String zoneType) {
+    public Zone(String zoneCode, String zoneName, ZoneType zoneType) {
         this.zoneCode = zoneCode;
         this.zoneName = zoneName;
         this.zoneType = zoneType;

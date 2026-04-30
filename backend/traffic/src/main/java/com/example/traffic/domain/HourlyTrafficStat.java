@@ -2,6 +2,7 @@ package com.example.traffic.domain;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -40,6 +41,7 @@ public class HourlyTrafficStat {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Builder // 다른 엔티티와 일관성을 위해 추가
     public HourlyTrafficStat(Zone zone, LocalDate statDate, Integer statHour, Integer inCount, Integer outCount) {
         this.zone = zone;
         this.statDate = statDate;
@@ -50,6 +52,7 @@ public class HourlyTrafficStat {
         this.createdAt = LocalDateTime.now();
     }
 
+    // 통계 갱신 로직 (더하기 방식으로 수정하는 것이 실무적일 수 있음)
     public void updateCounts(Integer inCount, Integer outCount) {
         this.inCount = inCount;
         this.outCount = outCount;

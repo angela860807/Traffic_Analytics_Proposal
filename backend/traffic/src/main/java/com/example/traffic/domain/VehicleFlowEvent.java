@@ -1,5 +1,6 @@
 package com.example.traffic.domain;
 
+import com.example.traffic.common.enums.Direction;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -31,8 +32,9 @@ public class VehicleFlowEvent {
     @JoinColumn(name = "zone_id", nullable = false)
     private Zone zone;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "flow_direction", nullable = false, length = 20)
-    private String flowDirection;
+    private Direction flowDirection;
 
     @Column(name = "event_at", nullable = false)
     private LocalDateTime eventAt;
@@ -45,7 +47,7 @@ public class VehicleFlowEvent {
     private LocalDateTime createdAt;
 
     @Builder
-    public VehicleFlowEvent(Vehicle vehicle, Camera camera, Zone zone, String flowDirection,
+    public VehicleFlowEvent(Vehicle vehicle, Camera camera, Zone zone, Direction flowDirection,
                             LocalDateTime eventAt, DetectionLog sourceDetectionLog) {
         this.vehicle = vehicle;
         this.camera = camera;
