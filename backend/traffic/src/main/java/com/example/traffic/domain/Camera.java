@@ -1,5 +1,6 @@
 package com.example.traffic.domain;
 
+import com.example.traffic.common.enums.Direction;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -31,8 +32,9 @@ public class Camera {
     @Column(length = 255)
     private String streamUrl;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private String directionType;
+    private Direction directionType;
 
     @Column(nullable = false)
     private boolean isActive;
@@ -40,7 +42,7 @@ public class Camera {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    public void update(String cameraName, String cameraCode, String streamUrl, String directionType, boolean isActive) {
+    public void update(String cameraName, String cameraCode, String streamUrl, Direction directionType, boolean isActive) {
         this.cameraName = cameraName;
         this.cameraCode = cameraCode;
         this.streamUrl = streamUrl;
@@ -49,7 +51,7 @@ public class Camera {
     }
 
     @Builder
-    public Camera(Zone zone, String cameraCode, String cameraName, String streamUrl, String directionType) {
+    public Camera(Zone zone, String cameraCode, String cameraName, String streamUrl, Direction directionType) {
         this.zone = zone;
         this.cameraCode = cameraCode;
         this.cameraName = cameraName;

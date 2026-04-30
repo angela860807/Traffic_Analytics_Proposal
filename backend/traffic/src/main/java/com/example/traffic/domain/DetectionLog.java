@@ -1,5 +1,6 @@
 package com.example.traffic.domain;
 
+import com.example.traffic.common.enums.DetectionType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -10,13 +11,17 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "detection_logs")
+@Table(name = "detection_logs", indexes = {
+        @Index(name = "idx_plate_number", columnList = "plate_number"),
+        @Index(name = "idx_detected_at", columnList = "detected_at")
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class DetectionLog {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "detection_log_id")
     private Long logId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -30,8 +35,9 @@ public class DetectionLog {
     @Column(nullable = false, length = 20)
     private String plateNumber;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private String detectionType;
+    private DetectionType detectionType;
 
     @Column(precision = 5, scale = 4)
     private BigDecimal confidenceScore;
@@ -46,7 +52,7 @@ public class DetectionLog {
     private LocalDateTime createdAt;
 
     @Builder
-    public DetectionLog(Camera camera, Vehicle vehicle, String plateNumber, String detectionType,
+    public DetectionLog(Camera camera, Vehicle vehicle, String plateNumber, DetectionType detectionType,
                         BigDecimal confidenceScore, String imagePath, LocalDateTime detectedAt) {
         this.camera = camera;
         this.vehicle = vehicle;
