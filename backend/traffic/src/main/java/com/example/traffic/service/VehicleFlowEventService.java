@@ -1,0 +1,73 @@
+package com.example.traffic.service;
+
+import com.example.traffic.common.enums.Direction;
+import com.example.traffic.domain.DetectionLog;
+import com.example.traffic.domain.VehicleFlowEvent;
+import com.example.traffic.dto.response.FlowEventResponse;
+import com.example.traffic.repository.VehicleFlowEventRepository;
+import com.example.traffic.repository.ZoneRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+
+@Service
+@Transactional(readOnly = true)
+@RequiredArgsConstructor
+public class VehicleFlowEventService {
+
+    private final VehicleFlowEventRepository flowEventRepository;
+    private final ZoneRepository zoneRepository;
+
+    /**
+     * [핵심 로직] 탐지 로그를 분석하여 실시간 교통 흐름 이벤트 확정[cite: 5, 6]
+     */
+    @Transactional
+    public FlowEventResponse processFlowEvent(DetectionLog currentLog) {
+        // 1. 중복 감지 체크 (10초 이내 동일 차량 + 동일 구역)[cite: 5, 6]
+        LocalDateTime windowTime = currentLog.getDetectedAt().minusSeconds(10);
+
+        boolean isDuplicate = flowEventRepository.existsByVehicleAndZoneAndEventAtAfter(
+                currentLog.getVehicle(),
+                currentLog.getCamera().getZone(),
+                windowTime
+        );
+
+        if (isDuplicate) {
+            return null; // 중복 탐지는 무시함[cite: 6]
+        }
+
+        // 2. 흐름 유형 판단[cite: 6]
+        Direction direction = currentLog.getCamera().getDirectionType();
+
+        // TODO: 만약 direction == BOTH 라면, 추가적인 알고리즘(궤적 분석 등)을 통해
+        // 실제 IN/OUT을 확정 짓는 로직을 여기에 확장할 수 있음
+
+        // 3. VehicleFlowEvent 엔티티 생성 및 저장[cite: 2, 6]
+        VehicleFlowEvent flowEvent = VehicleFlowEvent.builder()
+                .vehicle(currentLog.getVehicle())
+                .camera(currentLog.getCamera())
+                .zone(currentLog.getCamera().getZone())
+                .flowDirection(direction)
+                .eventAt(currentLog.getDetectedAt())
+                .sourceDetectionLog(currentLog)
+                .build();
+
+        VehicleFlowEvent savedEvent = flowEventRepository.save(flowEvent);
+
+        return FlowEventResponse.from(savedEvent);
+    }
+
+    /**
+     * [구역별 통계 수치 조회] 특정 시간대 특정 구역의 유입/유출량 확인
+     */
+    public long getFlowCount(Long zoneId, Direction direction, LocalDateTime start, LocalDateTime end) {
+        com.example.traffic.domain.Zone zone = zoneRepository.findById(zoneId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 구역을 찾을 수 없습니다."));
+
+        // 지적하신 대로 start, end를 인자로 넣어 쿼리가 정상 작동하게 합니다[cite: 3, 5]
+        return flowEventRepository.countByZoneAndFlowDirectionAndEventAtBetween(
+                zone, direction, start, end);
+    }
+}

@@ -1,8 +1,12 @@
 package com.example.traffic.controller;
 
-import com.example.traffic.domain.Zone;
+import com.example.traffic.dto.request.ZoneSaveRequest;
+import com.example.traffic.dto.request.ZoneUpdateRequest;
+import com.example.traffic.dto.response.ZoneResponse;
 import com.example.traffic.service.ZoneService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,36 +19,21 @@ public class ZoneController {
 
     private final ZoneService zoneService;
 
-    // 1. 전체 구역 목록 조회
-    @GetMapping
-    public List<Zone> getAllZones() {
-        return zoneService.findAllZones();
-    }
-
-    // 2. 특정 구역 코드(zoneCode)로 조회
-    @GetMapping("/code/{zoneCode}")
-    public ResponseEntity<Zone> getZoneByCode(@PathVariable String zoneCode) {
-        Zone zone = zoneService.findByZoneCode(zoneCode);
-        return ResponseEntity.ok(zone);
-    }
-
-    // 3. 새로운 구역 등록 (Create)
     @PostMapping
-    public Zone createZone(@RequestBody Zone zone) {
-        return zoneService.saveZone(zone);
+    public ResponseEntity<ZoneResponse> createZone(@RequestBody @Valid ZoneSaveRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(zoneService.saveZone(request));
     }
 
-    // 4. 구역 정보 수정 (Update)
-    @PutMapping("/{id}")
-    public ResponseEntity<Zone> updateZone(@PathVariable Long id, @RequestBody Zone zoneDetails) {
-        Zone updatedZone = zoneService.updateZone(id, zoneDetails);
-        return ResponseEntity.ok(updatedZone);
+    @GetMapping
+    public ResponseEntity<List<ZoneResponse>> getAllZones() {
+        return ResponseEntity.ok(zoneService.findAllZones());
     }
 
-    // 5. 구역 삭제 (Delete)
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteZone(@PathVariable Long id) {
-        zoneService.deleteZone(id);
-        return ResponseEntity.noContent().build(); // 204 No Content 반환
+    @PutMapping("/{zoneId}")
+    public ResponseEntity<Void> updateZone(
+            @PathVariable Long zoneId,
+            @RequestBody @Valid ZoneUpdateRequest request) {
+        zoneService.updateZone(zoneId, request);
+        return ResponseEntity.ok().build();
     }
 }

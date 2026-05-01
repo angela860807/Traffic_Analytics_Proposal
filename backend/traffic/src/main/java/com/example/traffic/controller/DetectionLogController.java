@@ -1,7 +1,9 @@
 package com.example.traffic.controller;
 
-import com.example.traffic.domain.DetectionLog;
+import com.example.traffic.dto.request.DetectionRequest;
+import com.example.traffic.dto.response.DetectionResponse;
 import com.example.traffic.service.DetectionLogService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,29 +18,28 @@ public class DetectionLogController {
 
     private final DetectionLogService detectionLogService;
 
-    // 1. 전체 탐지 로그 조회
     @GetMapping
-    public List<DetectionLog> getAllLogs() {
-        return detectionLogService.findAllLogs();
+    public ResponseEntity<List<DetectionResponse>> getLogs(
+            @RequestParam(required = false) String plateNumber,
+            @RequestParam(required = false) Long zoneId) {
+        // Service에 해당 필터 로직을 추가하여 호출
+        return ResponseEntity.ok(detectionLogService.getFilteredLogs(plateNumber, zoneId));
     }
 
-    // 2. 특정 카메라별 로그 조회
-    @GetMapping("/camera/{cameraId}")
-    public List<DetectionLog> getLogsByCamera(@PathVariable Long cameraId) {
-        return detectionLogService.findLogsByCamera(cameraId);
-    }
-
-    // 3. 로그 등록
+    /**
+     * [AI 탐지 결과 수신] NPU/AI 서버로부터 데이터를 받는 엔드포인트
+     */
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public DetectionLog createLog(@RequestBody DetectionLog log) {
-        return detectionLogService.saveLog(log);
+    public ResponseEntity<Long> receiveDetection(@RequestBody @Valid DetectionRequest request) {
+        Long logId = detectionLogService.processDetection(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(logId);
     }
 
-    // 4. 특정 로그 삭제 (오탐 데이터 정리용)
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteLog(@PathVariable Long id) {
-        detectionLogService.deleteLog(id);
-        return ResponseEntity.noContent().build();
+    /**
+     * [최신 탐지 현황 조회] 실시간 모니터링용
+     */
+    @GetMapping("/recent")
+    public ResponseEntity<List<DetectionResponse>> getRecentLogs() {
+        return ResponseEntity.ok(detectionLogService.getRecentLogs());
     }
 }
