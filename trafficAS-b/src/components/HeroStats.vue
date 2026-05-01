@@ -32,6 +32,11 @@ defineProps({ stats: Array, variant: { type:String, default:'cyan' } })
   font-weight:700;letter-spacing:-2px;line-height:1;color:var(--t)}
 .unit{font-size:13px;color:var(--t3);margin-left:4px}
 .lbl{font-size:11px;color:var(--t3);margin-top:7px}
+/* navy variant는 항상 다크 배경 → 라이트모드에서도 밝은 텍스트 고정 */
+.stats-band.navy .num{color:#e4eeff}
+.stats-band.navy .unit{color:rgba(228,238,255,.45)}
+.stats-band.navy .lbl{color:rgba(228,238,255,.45)}
+.stats-band.navy .badge{color:#60a5fa;opacity:1}
 @media(max-width:768px){
   .stats-band{grid-template-columns:1fr 1fr}
   .sc:nth-child(2){border-right:none}
