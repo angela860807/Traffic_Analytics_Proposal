@@ -78,6 +78,7 @@ sympy==1.14.0
 tensorflow==2.21.0
 termcolor==3.3.0
 uvicorn[standard]==0.43.0
+pytest
 # paddleocr==2.7.3
 # paddlepaddle==2.6.2
 # paddlepaddle-gpu==2.6.2

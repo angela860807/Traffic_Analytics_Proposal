@@ -19,3 +19,36 @@ __pycache__/
 backend/traffic/build/
 backend/traffic/out/
 backend/traffic/.gradle/
+
+# FastAPI runtime storage
+fastapi-server/storage/
+fastapi-server/samples/*.jpg
+fastapi-server/samples/*.png
+
+# Test / tooling cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# FastAPI generated sample/runtime files
+fastapi-server/sample.jpg
+fastapi-server/capture.jpg
+fastapi-server/*.jpg
+fastapi-server/*.png
+
+# Raspberry Pi generated capture files
+fastapi-server/examples/*.jpg
+fastapi-server/examples/*.png
+fastapi-server/examples/capture*.jpg
+fastapi-server/examples/capture*.png
+
+# Local logs
+*.log
+logs/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini

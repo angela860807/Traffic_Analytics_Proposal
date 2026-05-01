@@ -7,9 +7,10 @@
 ## 역할
 
 - Rasberry Pi 또는 카메라 클라이언트로부터 이미지 프레임 수신
-- YOLO/OCR 추론 결과 생성
-- 감지 결과를 Spring Boot Backend로 JSON형태로 전송
-- 모델 상태 및 서버 상태 확인 API 제공
+- 서버 PC에서 YOLO/OCR 추론 결과 생성
+- 감지 결과 생성
+- 감지 이미지 저장
+- 추후 Spring Boot Backend로 감지 결과를 JSON형태로 전송
 
 ## 현재 팀 합의
 
@@ -37,3 +38,45 @@
 cd C:\jwdev\Traffic_Analytics_Proposal\fastapi-server
 .\.venv\Scripts\Activate.ps1
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+
+# 에러 응다 정리
+잘못된 base64:
+imageBase64 must be valid image base64
+
+지원하지 않는 파일 형식:
+image must be jpeg or png
+
+이미지 디코딩 실패:
+image must be a valid jpg or png
+
+백엔드 미연결:
+Spring Boot API is not reachable
+
+백엔드 오류 응답:
+Spring Boot API returned error: {status_code}
+
+
+## Raspberry Pi 연동 검증
+
+### 현재 검증 완료 상태
+
+Raspberry Pi에서 카메라 캡처 후 FastAPI 서버 PC로 이미지 업로드가 정상 동작하는 것을 확인했다.
+
+검증된 흐름:
+
+```
+text
+Raspberry Pi Camera
+→ Picamera2로 이미지 캡처
+→ multipart/form-data로 FastAPI 전송
+→ FastAPI /api/detections/image 수신
+→ mock detection 결과 생성
+→ storage/detections 하위에 이미지 저장
+
+확인 결과
+
+- Raspberry Pi 카메라 캡처 성공
+- capture.jpg 생성 확인
+- FastAPI 서버에서 POST /api/detections/image 200 OK 확인
+- FastAPI PC의 storage/detections 폴더에 실제 캡처 이미지 저장 확인
+```
