@@ -1,7 +1,24 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
-body { -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+html { scroll-behavior: smooth; overflow-x: hidden; scrollbar-gutter: stable; }
+body { -webkit-font-smoothing: antialiased; }
 a { text-decoration: none; color: inherit; }
+
+/* 헤더 고정 - 전역 스타일로 강제 고정 */
+.appnav-line {
+  position: fixed !important;
+  top: 0; left: 0; right: 0;
+  height: 2px; z-index: 201;
+  background: linear-gradient(90deg, transparent, var(--a) 30%, var(--a) 70%, transparent);
+  opacity: .55;
+}
+nav.appnav {
+  position: fixed !important;
+  top: 0; left: 0; right: 0;
+  z-index: 200; height: 62px;
+  background: var(--nav);
+  backdrop-filter: blur(22px);
+  border-bottom: 1px solid var(--b);
+}
 
 /* ── NAVY THEME (Dark) ── */
 .theme-navy {

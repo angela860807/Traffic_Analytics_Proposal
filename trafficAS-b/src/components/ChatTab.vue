@@ -54,7 +54,7 @@ function send() {
 }
 </script>
 <style scoped>
-.chat{display:flex;flex-direction:column;height:calc(100vh - 220px);min-height:400px}
+.chat{display:flex;flex-direction:column;height:100%;min-height:400px}
 .online-bar{padding:10px 20px;border-bottom:1px solid var(--b);background:var(--bg2);
   display:flex;align-items:center;gap:8px}
 .olabel{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--in);
