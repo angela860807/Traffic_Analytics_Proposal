@@ -14,7 +14,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.PostgreSQLDialect
 
   servlet:
     encoding:
@@ -22,6 +21,13 @@ spring:
       enabled: true
       force: true
 
+# JWT 설정은 spring 외부(Root)로 빼는 것이 관례이며 관리가 편합니다
+jwt:
+  secret: c2lsdmVybmluZS10ZWNoLXNwcmluZy1ib290LWp3dC10dXRvcmlhbC1zZWNyZXQtc2lsdmVybmluZS10ZWNoLXNwcmluZy1ib290LWp3dC10dXRvcmlhbC1zZWNyZXQK
+  access-token-expiration: 3600000       # 1시간 (ms)
+  refresh-token-expiration: 1209600000  # 14일 (ms)
+
 logging:
   level:
     com.example.traffic: debug
+    org.springframework.security: info # 들여쓰기 정렬
