@@ -38,6 +38,8 @@ public class VehicleFlowEventService {
 
         if (isDuplicate) {
 
+            log.info("중복 감지 스킵: 차량번호 {}는 최근 10초 내에 동일 구역에서 이미 처리되었습니다.",
+                    currentLog.getPlateNumber());
             return null;
         }
 

@@ -15,7 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -28,48 +27,36 @@ public class DetectionLogService {
     private final CameraRepository cameraRepository;
     private final VehicleService vehicleService;
     private final VehicleFlowEventService vehicleFlowEventService;
-
     private final ObjectProvider<DetectionLogService> selfProvider;
 
     /**
      * [개선된 프로세스] 검증과 저장을 분리하고 Null 체크 강화
      */
     public Long processDetection(DetectionRequest request) {
-        // 1. 피드백 2-3: 필수 응답값 null 검증 (검증은 트랜잭션 밖에서 수행)
         validateDetectionRequest(request);
-
-        // 2. 피드백 2-1: 실제 DB 저장은 별도의 트랜잭션 메서드로 호출
         return selfProvider.getObject().saveDetectionData(request);
     }
 
     @Transactional
     public Long saveDetectionData(DetectionRequest request) {
-        LocalDateTime duplicateWindow = request.getDetectedAt().minusSeconds(2);
-        boolean isDuplicateLog = detectionLogRepository.existsByPlateNumberAndDetectedAtAfter(
-                request.getPlateNumber(),
-                duplicateWindow
-        );
-
-        if (isDuplicateLog) {
-            log.info("중복된 탐지 로그 요청(2초 이내)입니다. 스킵합니다. 차량번호: {}", request.getPlateNumber());
-            return -1L; // 중복임을 나타내는 마커값 반환[cite: 10, 15]
-        }
 
         Camera camera = cameraRepository.findById(request.getCameraId())
                 .orElseThrow(() -> new BusinessException("미등록 카메라입니다. ID: " + request.getCameraId(), HttpStatus.NOT_FOUND));
 
         Vehicle vehicle = vehicleService.getOrCreateVehicle(request.getPlateNumber());
 
-        DetectionLog log = DetectionLog.builder()
+        DetectionLog logEntity = DetectionLog.builder() // 변수명 중복 방지를 위해 logEntity로 변경 추천
                 .camera(camera)
                 .vehicle(vehicle)
                 .plateNumber(request.getPlateNumber())
+                // [반영] 하달 사항: detectionType 반드시 세팅
+                .detectionType(request.getDetectionType())
                 .confidenceScore(java.math.BigDecimal.valueOf(request.getConfidenceScore()))
                 .imagePath(request.getImagePath())
                 .detectedAt(request.getDetectedAt())
                 .build();
 
-        DetectionLog savedLog = detectionLogRepository.save(log);
+        DetectionLog savedLog = detectionLogRepository.save(logEntity);
         vehicleFlowEventService.processFlowEvent(savedLog);
 
         return savedLog.getLogId();
@@ -80,7 +67,8 @@ public class DetectionLogService {
      */
     private void validateDetectionRequest(DetectionRequest request) {
         if (request.getCameraId() == null || request.getPlateNumber() == null ||
-                request.getConfidenceScore() == null || request.getDetectedAt() == null) {
+                request.getConfidenceScore() == null || request.getDetectedAt() == null ||
+                request.getDetectionType() == null) {
 
             throw new BusinessException("AI 분석 응답 필수 값이 누락되었습니다.", HttpStatus.BAD_GATEWAY);
         }

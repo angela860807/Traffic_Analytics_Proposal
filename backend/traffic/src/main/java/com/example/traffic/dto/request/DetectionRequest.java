@@ -1,5 +1,6 @@
 package com.example.traffic.dto.request;
 
+import com.example.traffic.common.enums.DetectionType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -23,4 +24,7 @@ public class DetectionRequest {
 
     @NotNull(message = "탐지 시각은 필수입니다.")
     private LocalDateTime detectedAt;
+
+    @NotNull(message = "탐지 유형은 필수입니다.")
+    private DetectionType detectionType;
 }

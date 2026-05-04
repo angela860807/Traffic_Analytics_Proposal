@@ -17,6 +17,7 @@ public class HourlyTrafficStat {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "hourly_stat_id")
     private Long statId;
 
     @ManyToOne(fetch = FetchType.LAZY)
