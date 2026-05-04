@@ -5,14 +5,20 @@ import com.example.traffic.domain.DetectionLog;
 import com.example.traffic.domain.Vehicle;
 import com.example.traffic.dto.request.DetectionRequest;
 import com.example.traffic.dto.response.DetectionResponse;
+import com.example.traffic.etc.BusinessException;
 import com.example.traffic.repository.CameraRepository;
 import com.example.traffic.repository.DetectionLogRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -23,35 +29,61 @@ public class DetectionLogService {
     private final VehicleService vehicleService;
     private final VehicleFlowEventService vehicleFlowEventService;
 
-    /**
-     * [탐지 프로세스] AI 탐지 데이터를 처리하여 차량 식별 및 흐름 분석 수행
-     */
-    @Transactional
-    public Long processDetection(DetectionRequest request) {
-        // 1. 카메라 확인 (연관 관계를 위해 필수)[cite: 17]
-        Camera camera = cameraRepository.findById(request.getCameraId())
-                .orElseThrow(() -> new IllegalArgumentException("미등록 카메라입니다. ID: " + request.getCameraId()));
+    private final ObjectProvider<DetectionLogService> selfProvider;
 
-        // 2. 차량 확인 및 자동 등록[cite: 16, 17]
+    /**
+     * [개선된 프로세스] 검증과 저장을 분리하고 Null 체크 강화
+     */
+    public Long processDetection(DetectionRequest request) {
+        // 1. 피드백 2-3: 필수 응답값 null 검증 (검증은 트랜잭션 밖에서 수행)
+        validateDetectionRequest(request);
+
+        // 2. 피드백 2-1: 실제 DB 저장은 별도의 트랜잭션 메서드로 호출
+        return selfProvider.getObject().saveDetectionData(request);
+    }
+
+    @Transactional
+    public Long saveDetectionData(DetectionRequest request) {
+        LocalDateTime duplicateWindow = request.getDetectedAt().minusSeconds(2);
+        boolean isDuplicateLog = detectionLogRepository.existsByPlateNumberAndDetectedAtAfter(
+                request.getPlateNumber(),
+                duplicateWindow
+        );
+
+        if (isDuplicateLog) {
+            log.info("중복된 탐지 로그 요청(2초 이내)입니다. 스킵합니다. 차량번호: {}", request.getPlateNumber());
+            return -1L; // 중복임을 나타내는 마커값 반환[cite: 10, 15]
+        }
+
+        Camera camera = cameraRepository.findById(request.getCameraId())
+                .orElseThrow(() -> new BusinessException("미등록 카메라입니다. ID: " + request.getCameraId(), HttpStatus.NOT_FOUND));
+
         Vehicle vehicle = vehicleService.getOrCreateVehicle(request.getPlateNumber());
 
-        // 3. 탐지 로그 빌드 및 저장[cite: 7, 17]
         DetectionLog log = DetectionLog.builder()
                 .camera(camera)
                 .vehicle(vehicle)
                 .plateNumber(request.getPlateNumber())
-                .confidenceScore(request.getConfidenceScore() != null ?
-                        java.math.BigDecimal.valueOf(request.getConfidenceScore()) : null)
+                .confidenceScore(java.math.BigDecimal.valueOf(request.getConfidenceScore()))
                 .imagePath(request.getImagePath())
                 .detectedAt(request.getDetectedAt())
                 .build();
 
         DetectionLog savedLog = detectionLogRepository.save(log);
-
-        // 4. 즉시 흐름 분석 호출 (이벤트 중복 제거 및 IN/OUT 판별)[cite: 17]
         vehicleFlowEventService.processFlowEvent(savedLog);
 
         return savedLog.getLogId();
+    }
+
+    /**
+     * 피드백 2-3 반영: AI 응답 값 null 검증 로직
+     */
+    private void validateDetectionRequest(DetectionRequest request) {
+        if (request.getCameraId() == null || request.getPlateNumber() == null ||
+                request.getConfidenceScore() == null || request.getDetectedAt() == null) {
+
+            throw new BusinessException("AI 분석 응답 필수 값이 누락되었습니다.", HttpStatus.BAD_GATEWAY);
+        }
     }
 
     /**

@@ -7,11 +7,13 @@ import com.example.traffic.dto.response.FlowEventResponse;
 import com.example.traffic.repository.VehicleFlowEventRepository;
 import com.example.traffic.repository.ZoneRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -35,7 +37,8 @@ public class VehicleFlowEventService {
         );
 
         if (isDuplicate) {
-            return null; // 중복 탐지는 무시함[cite: 6]
+
+            return null;
         }
 
         // 2. 흐름 유형 판단[cite: 6]

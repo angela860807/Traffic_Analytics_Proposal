@@ -2,9 +2,14 @@ package com.example.traffic.repository;
 
 import com.example.traffic.domain.DetectionLog;
 import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface DetectionLogRepository extends JpaRepository<DetectionLog, Long> {
+
+    boolean existsByPlateNumberAndDetectedAtAfter(String plateNumber, LocalDateTime detectedAt);
+
     // 최근 탐지 로그 100개 조회 (대시보드용)
     List<DetectionLog> findTop100ByOrderByDetectedAtDesc();
 
