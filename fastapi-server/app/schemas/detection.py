@@ -57,9 +57,9 @@ class DetectionResult(BaseModel):
         examples=["storage/detections/2026/04/30/CAM_001_103000_plate_01.jpg"],
     )
     image_url: str | None = Field(
-    default=None,
-    alias="imageUrl",
-    examples=["/static/detections/2026/04/30/CAM_001_103000_frame.jpg"],
+        default=None,
+        alias="imageUrl",
+        examples=["/static/detections/2026/04/30/CAM_001_103000_frame.jpg"],
     )
     detected_at: datetime = Field(
         alias="detectedAt",

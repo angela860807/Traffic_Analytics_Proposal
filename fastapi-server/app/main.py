@@ -1,8 +1,9 @@
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import camera_stream, detection, health
-from pathlib import Path
-from fastapi.staticfiles import StaticFiles
 from app.core.config import IMAGE_STORAGE_DIR, STATIC_DETECTIONS_URL_PREFIX
 
 app = FastAPI(
