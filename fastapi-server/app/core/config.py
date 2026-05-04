@@ -32,5 +32,11 @@ IMAGE_STORAGE_DIR = os.getenv(
     "storage/detections",
 )
 
+STATIC_DETECTIONS_URL_PREFIX = os.getenv(
+    "STATIC_DETECTIONS_URL_PREFIX",
+    "/static/detections",
+)
+
 MODEL_PATH = os.getenv("MODEL_PATH", "")
 OCR_LANG = os.getenv("OCR_LANG", "korean")
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")

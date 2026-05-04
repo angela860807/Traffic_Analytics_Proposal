@@ -64,6 +64,7 @@ class InferenceService:
             captured_at=captured_at,
             suffix="frame",
         )
+        image_url = self.image_storage_service.build_detection_image_url(image_path)
 
         return DetectionResult(
             camera_code=camera_code,
@@ -73,4 +74,9 @@ class InferenceService:
             confidence_score=detection.confidence_score,
             image_path=image_path,
             detected_at=captured_at,
+            image_url=image_url,
         )
+
+# TODO:
+# mock detector와 mock recognizer를 실제 YOLO/OCR 서비스로 교체한다.
+# API 라우터가 모델 세부 구현에 의존하지 않도록 DetectionResult 응답 구조는 안정적으로 유지한다.

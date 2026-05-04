@@ -59,6 +59,7 @@ def test_create_mock_detection(monkeypatch, tmp_path) -> None:
     assert data["confidenceScore"] == 0.9321
     assert data["imagePath"] is not None
     assert Path(data["imagePath"]).exists()
+    assert data["imageUrl"].startswith("/static/detections/")
 
 
 def test_create_mock_detection_with_invalid_base64() -> None:
@@ -101,6 +102,8 @@ def test_create_detection_from_image(monkeypatch, tmp_path) -> None:
     assert data["plateNumber"] == "123가4567"
     assert data["imagePath"] is not None
     assert Path(data["imagePath"]).exists()
+    assert data["imageUrl"].startswith("/static/detections/")
+
 
 
 def test_create_detection_from_unsupported_file_type() -> None:
