@@ -238,46 +238,50 @@ const stack = [
   background: linear-gradient(
       to right,
       #020b18 0%,
-      rgba(2, 11, 24, 0.95) 15%,
-      rgba(2, 11, 24, 0.5) 35%,
-      transparent 60%
+      rgba(2, 11, 24, 0.7) 12%,
+      rgba(2, 11, 24, 0.2) 28%,
+      transparent 45%
     ),
     linear-gradient(
       to left,
       #020b18 0%,
-      rgba(2, 11, 24, 0.95) 15%,
-      rgba(2, 11, 24, 0.5) 35%,
-      transparent 60%
+      rgba(2, 11, 24, 0.7) 12%,
+      rgba(2, 11, 24, 0.2) 28%,
+      transparent 45%
     ),
     linear-gradient(
       to top,
       #020b18 0%,
-      rgba(2, 11, 24, 0.76) 22%,
-      rgba(2, 11, 24, 0.18) 55%,
-      rgba(2, 11, 24, 0.48) 100%
+      rgba(2, 11, 24, 0.55) 18%,
+      rgba(2, 11, 24, 0.08) 50%,
+      rgba(2, 11, 24, 0.25) 100%
     );
+}
+.light .hfb {
+  background: linear-gradient(162deg, #dde8f4, #e8eff8 50%, #dde8f4);
+}
+.light .hfb::before {
+  background-image: linear-gradient(rgba(37, 99, 235, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.03) 1px, transparent 1px);
 }
 .light .hdim {
   background: linear-gradient(
       to right,
-      var(--bg) 0%,
-      rgba(241, 245, 251, 0.88) 12%,
-      rgba(241, 245, 251, 0.35) 30%,
-      transparent 55%
+      rgba(241, 245, 251, 0.72) 0%,
+      rgba(241, 245, 251, 0.18) 12%,
+      transparent 28%
     ),
     linear-gradient(
       to left,
-      var(--bg) 0%,
-      rgba(241, 245, 251, 0.88) 12%,
-      rgba(241, 245, 251, 0.35) 30%,
-      transparent 55%
+      rgba(241, 245, 251, 0.72) 0%,
+      rgba(241, 245, 251, 0.18) 12%,
+      transparent 28%
     ),
     linear-gradient(
       to top,
-      var(--bg) 0%,
-      rgba(241, 245, 251, 0.55) 18%,
-      rgba(241, 245, 251, 0.08) 50%,
-      rgba(241, 245, 251, 0.22) 100%
+      rgba(241, 245, 251, 0.82) 0%,
+      rgba(241, 245, 251, 0.18) 10%,
+      transparent 24%
     );
 }
 .hacc {
@@ -317,9 +321,9 @@ const stack = [
 }
 h1 {
   font-family: "Syne", sans-serif;
-  font-size: clamp(50px, 7vw, 94px);
+  font-size: clamp(40px, 5vw, 90px);
   font-weight: 800;
-  line-height: 0.94;
+  line-height: 1.25;
   letter-spacing: -3.5px;
   color: var(--t);
   margin-bottom: 24px;
