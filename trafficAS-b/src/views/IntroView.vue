@@ -58,23 +58,6 @@
           </div>
         </section>
 
-        <div class="divider"></div>
-
-        <!-- 데이터 흐름 -->
-        <section class="sec">
-          <div class="sec-label">DATA FLOW</div>
-          <h2 class="sh">데이터 처리 흐름</h2>
-          <p class="sec-desc">카메라 영상이 실시간 대시보드까지 도달하는 5단계 파이프라인입니다.</p>
-          <div class="flow-wrap">
-            <div class="flow-step" v-for="(f, i) in flow" :key="f.title">
-              <div class="flow-num">{{ String(i + 1).padStart(2, '0') }}</div>
-              <div class="flow-title">{{ f.title }}</div>
-              <div class="flow-desc">{{ f.desc }}</div>
-              <div class="flow-tech">{{ f.tech }}</div>
-              <div class="flow-arrow" v-if="i < flow.length - 1">›</div>
-            </div>
-          </div>
-        </section>
 
       </div>
     </main>
@@ -160,33 +143,6 @@ const arch = [
   },
 ]
 
-const flow = [
-  {
-    title: '카메라 입력',
-    desc: 'RTSP / USB 스트림으로 영상 수집',
-    tech: 'RTSP · USB Camera',
-  },
-  {
-    title: 'AI 감지',
-    desc: '차량 탐지 + 번호판 OCR 인식',
-    tech: 'YOLOv8 + EasyOCR',
-  },
-  {
-    title: '중복 제거',
-    desc: '10초 윈도우 내 재감지 필터링',
-    tech: 'Spring Boot Service',
-  },
-  {
-    title: '흐름 분석',
-    desc: 'IN / OUT 이벤트 정제 및 집계',
-    tech: 'vehicle_flow_events',
-  },
-  {
-    title: '대시보드',
-    desc: 'WebSocket으로 실시간 화면 갱신',
-    tech: 'Vue.js · Chart.js',
-  },
-]
 </script>
 
 <style scoped>
@@ -341,39 +297,6 @@ h1 em { color: var(--a); font-style: normal; }
   opacity: .45; line-height: 1.6;
 }
 
-/* ── Flow ── */
-.flow-wrap {
-  display: grid; grid-template-columns: repeat(5, 1fr);
-  background: var(--card); border: 1px solid var(--b);
-  border-radius: 10px; overflow: hidden;
-}
-.flow-step {
-  position: relative;
-  padding: 28px 20px 24px;
-  border-right: 1px solid var(--b);
-  display: flex; flex-direction: column; gap: 7px;
-  transition: background .2s;
-}
-.flow-step:last-child { border-right: none; }
-.flow-step:hover { background: rgba(96,165,250,.04); }
-.flow-num {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10px; color: var(--a); opacity: .35; letter-spacing: .1em;
-}
-.flow-title { font-size: 13px; font-weight: 700; color: var(--t); }
-.flow-desc {
-  font-size: 11px; color: var(--t2);
-  line-height: 1.65; font-weight: 300; flex: 1;
-}
-.flow-tech {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 9px; color: var(--a);
-  opacity: .45; padding-top: 8px; border-top: 1px solid var(--b);
-}
-.flow-arrow {
-  position: absolute; right: -9px; top: 28px;
-  font-size: 16px; color: var(--a); opacity: .3; z-index: 1;
-}
 
 /* ── Footer ── */
 footer {
@@ -399,9 +322,5 @@ footer {
   .kpi-label { white-space: normal; }
   .feat-grid { grid-template-columns: 1fr; }
   .arch-grid { grid-template-columns: 1fr; }
-  .flow-wrap { grid-template-columns: 1fr; }
-  .flow-step { border-right: none; border-bottom: 1px solid var(--b); }
-  .flow-step:last-child { border-bottom: none; }
-  .flow-arrow { display: none; }
 }
 </style>
