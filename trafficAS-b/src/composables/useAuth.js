@@ -4,9 +4,12 @@ const _user = ref(JSON.parse(localStorage.getItem('tas_user') || 'null'))
 const _showModal = ref(false)
 const _modalMode = ref('login')
 
+const ADMIN_EMAIL = 'admin@trafficAS.com'
+
 export function useAuth() {
   const isLoggedIn  = computed(() => !!_user.value)
   const currentUser = computed(() => _user.value)
+  const isAdmin     = computed(() => _user.value?.email === ADMIN_EMAIL)
   const showModal   = _showModal
   const modalMode   = _modalMode
 
@@ -14,12 +17,12 @@ export function useAuth() {
   const openSignup = () => { _modalMode.value = 'signup'; _showModal.value = true }
   const closeModal = () => { _showModal.value = false }
 
-  const signup = (name, email, password) => {
+  const signup = (name, email, phone, password) => {
     const stored = JSON.parse(localStorage.getItem('tas_users') || '[]')
     if (stored.find(u => u.email === email)) throw new Error('이미 사용 중인 이메일입니다.')
-    stored.push({ name, email, password })
+    stored.push({ name, email, phone, password })
     localStorage.setItem('tas_users', JSON.stringify(stored))
-    const user = { name, email }
+    const user = { name, email, phone }
     localStorage.setItem('tas_user', JSON.stringify(user))
     _user.value = user
   }
@@ -38,5 +41,5 @@ export function useAuth() {
     _user.value = null
   }
 
-  return { isLoggedIn, currentUser, showModal, modalMode, openLogin, openSignup, closeModal, signup, login, logout }
+  return { isLoggedIn, isAdmin, currentUser, showModal, modalMode, openLogin, openSignup, closeModal, signup, login, logout }
 }
