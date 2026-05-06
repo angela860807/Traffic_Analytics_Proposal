@@ -39,9 +39,14 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 
-                        // 훨씬 읽기 편해진 코드
+                        // 공지사항 권한
                         .requestMatchers(HttpMethod.GET, "/api/notices/**").permitAll()
-                        .requestMatchers("/api/notices/**").hasAuthority("ADMIN")
+                        .requestMatchers("/api/notices/**").hasRole("ADMIN")
+
+                        // 게시글 권한 추가
+                        .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll() // 목록/상세 조회는 누구나 가능
+
+                        .requestMatchers("/api/qna/**").permitAll()
 
                         .anyRequest().authenticated()
                 )

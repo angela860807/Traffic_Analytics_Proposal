@@ -7,11 +7,13 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -36,7 +38,9 @@ public class JwtTokenProvider {
 
     // 1. 토큰 생성 (Access & Refresh 분리 발급)
     public TokenResponse createToken(Authentication authentication) {
-        String authorities = authentication.getAuthorities().toString();
+        String authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.joining(","));
         long now = (new Date()).getTime();
 
         // Access Token 생성
