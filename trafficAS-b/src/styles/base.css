@@ -33,7 +33,7 @@ nav.appnav {
   --in:   #34d399; --out: #fb923c;
   background: var(--bg);
   color: var(--t);
-  font-family: 'Noto Sans KR', sans-serif;
+  font-family: 'Pretendard Variable', Pretendard, 'Noto Sans KR', sans-serif;
   min-height: 100vh;
   transition: background .3s, color .3s;
 }

@@ -589,7 +589,7 @@ const steps = [
   width: 100%;
 }
 .logo {
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 18px;
   font-weight: 800;
   letter-spacing: -0.4px;
@@ -616,7 +616,7 @@ const steps = [
   margin: auto 0;
 }
 .ey {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   letter-spacing: 0.22em;
   color: #60a5fa;
@@ -634,7 +634,7 @@ const steps = [
   opacity: 0.5;
 }
 h1 {
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: clamp(30px, 3.2vw, 50px);
   font-weight: 800;
   line-height: 0.96;
@@ -668,7 +668,7 @@ h1 em {
   border-bottom: none;
 }
 .snum {
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 28px;
   font-weight: 800;
   letter-spacing: -1px;
@@ -690,7 +690,7 @@ h1 em {
   font-weight: 300;
 }
 .left-foot {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   color: rgba(255, 255, 255, 0.2);
   letter-spacing: 0.08em;
@@ -711,7 +711,7 @@ h1 em {
   max-width: 400px;
 }
 .form-ey {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   letter-spacing: 0.22em;
   color: var(--a);
@@ -729,7 +729,7 @@ h1 em {
   opacity: 0.5;
 }
 h2 {
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 32px;
   font-weight: 800;
   letter-spacing: -1.2px;
@@ -832,7 +832,7 @@ h2 {
   border-radius: 50%;
   background: var(--a);
   color: var(--bg);
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 14px;
   font-weight: 800;
   display: flex;
@@ -877,7 +877,7 @@ h2 {
   gap: 6px;
 }
 .req {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   color: var(--t3);
   text-transform: none;
@@ -982,7 +982,7 @@ input::placeholder {
   background: var(--bg2);
   border: 1px solid var(--b);
   border-radius: 8px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   color: var(--t2);
   cursor: pointer;
@@ -1082,7 +1082,7 @@ input::placeholder {
   color: var(--bg);
   border: none;
   border-radius: 8px;
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;

@@ -77,8 +77,8 @@ import { useTheme } from '@/composables/useTheme'
 const { isDark } = useTheme()
 
 const kpis = [
-  { val: '97%+',  label: '번호판 인식 정확도', desc: 'EasyOCR + 신뢰도 필터링 기반' },
-  { val: '50ms',  label: '실시간 응답 속도',   desc: 'WebSocket 감지 → 화면 반영' },
+  { val: '97%+',  label: '번호판 인식 정확도', desc: '딥러닝 기반 인식 및 신뢰도 필터링' },
+  { val: '50ms',  label: '실시간 응답 속도',   desc: '실시간 감지 → 화면 즉시 반영' },
   { val: '10초',  label: '중복 제거 윈도우',   desc: '동일 차량 재감지 자동 필터링' },
   { val: '24/7',  label: '무중단 모니터링',     desc: '연속 스트림 처리 및 자동 재연결' },
 ]
@@ -111,8 +111,8 @@ const features = [
   },
   {
     num: '06',
-    title: 'WebSocket 실시간 알림',
-    desc: '감지 이벤트를 즉시 브로드캐스트합니다. 연결 장애 시 Polling으로 자동 전환됩니다.',
+    title: '실시간 알림',
+    desc: '감지 이벤트를 즉시 화면에 반영합니다. 혼잡도 임계값 초과 시 자동 알림이 발송됩니다.',
   },
 ]
 
@@ -121,7 +121,7 @@ const arch = [
     tag: 'AI ENGINE',
     title: 'AI 감지 서버',
     desc: '카메라 영상을 분석해 차량 위치와 번호판을 인식합니다.',
-    tech: 'Python · FastAPI · YOLOv8 · EasyOCR',
+    tech: 'Vue.js 3 · YOLO · OCR 엔진',
   },
   {
     tag: 'BACKEND',
@@ -133,7 +133,7 @@ const arch = [
     tag: 'FRONTEND',
     title: '관리 대시보드',
     desc: '실시간 현황과 통계를 웹 브라우저에서 바로 확인합니다.',
-    tech: 'Vue.js 3 · Chart.js · WebSocket',
+    tech: 'Vue.js 3 · Chart.js · 실시간 알림',
   },
   {
     tag: 'DATABASE',
@@ -155,7 +155,7 @@ const arch = [
   background: var(--bg2);
 }
 .ph-ey {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 9px; letter-spacing: .22em;
   color: var(--a); opacity: .6;
   margin-bottom: 10px;
@@ -166,7 +166,7 @@ const arch = [
   background: var(--a); opacity: .5;
 }
 h1 {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Pretendard Variable', Pretendard, sans-serif;
   font-size: clamp(36px, 5vw, 68px); font-weight: 800;
   letter-spacing: -3px; color: var(--t); line-height: .95; margin-bottom: 16px;
 }
@@ -180,12 +180,12 @@ h1 em { color: var(--a); font-style: normal; }
 .pb { padding: 0 60px 60px; max-width: 1280px; }
 .sec { padding-top: 52px; }
 .sec-label {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 9px; letter-spacing: .2em;
   color: var(--a); opacity: .55; margin-bottom: 8px;
 }
 .sh {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Pretendard Variable', Pretendard, sans-serif;
   font-size: 20px; font-weight: 700;
   letter-spacing: -.4px; color: var(--t); margin-bottom: 6px;
 }
@@ -211,19 +211,21 @@ h1 em { color: var(--a); font-style: normal; }
 .kpi:last-child { border-right: none; }
 .kpi:hover { background: rgba(96,165,250,.03); }
 .kpi-val {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 30px; font-weight: 700;
-  letter-spacing: -1px; color: var(--a);
+  font-family: 'Pretendard Variable', Pretendard, sans-serif;
+  font-size: 32px; font-weight: 800;
+  letter-spacing: -1.5px; color: var(--a);
   line-height: 1; margin-bottom: 8px;
 }
 .kpi-label {
-  font-size: 12px; font-weight: 700;
+  font-family: 'Pretendard Variable', Pretendard, sans-serif;
+  font-size: 13px; font-weight: 700;
   color: var(--t); margin-bottom: 5px;
   white-space: nowrap;
 }
 .kpi-desc {
-  font-size: 10px; color: var(--t3);
-  font-weight: 300; line-height: 1.6;
+  font-family: 'Pretendard Variable', Pretendard, sans-serif;
+  font-size: 11px; color: var(--t2);
+  font-weight: 400; line-height: 1.65;
 }
 
 /* ── Features ── */
@@ -241,7 +243,7 @@ h1 em { color: var(--a); font-style: normal; }
 }
 .feat-card:hover { border-color: var(--ba); transform: translateY(-2px); }
 .feat-num {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 10px; letter-spacing: .1em;
   color: var(--a); opacity: .45; margin-bottom: 10px;
 }
@@ -272,14 +274,15 @@ h1 em { color: var(--a); font-style: normal; }
 .arch-card:last-child { border-right: none; }
 .arch-card:hover { background: rgba(96,165,250,.03); }
 .arch-step {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 28px; font-weight: 700;
-  color: var(--a); opacity: .08;
+  color: var(--a); opacity: .12;
   letter-spacing: -1px; line-height: 1;
   margin-bottom: 14px; user-select: none;
 }
+.theme-navy.light .arch-step { opacity: .35; color: var(--a); }
 .arch-tag {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 9px; letter-spacing: .14em;
   color: var(--a); opacity: .6; margin-bottom: 8px;
 }
@@ -292,7 +295,7 @@ h1 em { color: var(--a); font-style: normal; }
   line-height: 1.7; font-weight: 300; margin-bottom: 14px;
 }
 .arch-tech {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 9px; color: var(--a);
   opacity: .45; line-height: 1.6;
 }
@@ -304,9 +307,9 @@ footer {
   background: var(--bg2); display: flex;
   align-items: center; justify-content: space-between;
 }
-.fl { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800; letter-spacing: -.3px; color: var(--t); }
+.fl { font-family: 'Pretendard Variable', Pretendard, sans-serif; font-size: 15px; font-weight: 800; letter-spacing: -.3px; color: var(--t); }
 .fl em { color: var(--a); font-style: normal; }
-.fr { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--t3); }
+.fr { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--t3); }
 
 @media (max-width: 1100px) {
   .kpi-row { grid-template-columns: repeat(2, 1fr); }

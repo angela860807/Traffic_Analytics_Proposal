@@ -6,8 +6,9 @@ import SupportView   from '@/views/SupportView.vue'
 import LoginView     from '@/views/LoginView.vue'
 import SignupView    from '@/views/SignupView.vue'
 import DashboardView from '@/views/DashboardView.vue'
- 
-export default createRouter({
+import { useAuth }   from '@/composables/useAuth'
+
+const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/',            component: MainView      },
@@ -21,3 +22,13 @@ export default createRouter({
   ],
   scrollBehavior: () => ({ top: 0 })
 })
+
+router.beforeEach((to) => {
+  if (to.path === '/dashboard') {
+    const { isLoggedIn, isAdmin } = useAuth()
+    if (!isLoggedIn.value) return '/login'
+    if (!isAdmin.value)    return '/'
+  }
+})
+
+export default router
