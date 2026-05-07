@@ -17,6 +17,11 @@ SPRING_DETECTION_PATH = os.getenv(
     "/api/detections",
 )
 
+BACKEND_INTERNAL_API_KEY = os.getenv(
+    "BACKEND_INTERNAL_API_KEY",
+    ""
+)
+
 DEFAULT_TIMEZONE = os.getenv("DEFAULT_TIMEZONE", "Asia/Seoul")
 
 DETECTION_CONFIDENCE_THRESHOLD = float(

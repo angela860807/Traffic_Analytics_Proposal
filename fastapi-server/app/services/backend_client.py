@@ -1,12 +1,19 @@
 import httpx
 
-from app.core.config import SPRING_BACKEND_BASE_URL, SPRING_DETECTION_PATH
+from app.core.config import BACKEND_INTERNAL_API_KEY, SPRING_BACKEND_BASE_URL, SPRING_DETECTION_PATH
 from app.schemas.detection import DetectionResult
 
 
 class BackendClient:
     async def send_detection(self, result: DetectionResult) -> dict:
+        if not BACKEND_INTERNAL_API_KEY:
+            raise RuntimeError("BACKEND_INTERNAL_API_KEY is not set")
+        
         url = f"{SPRING_BACKEND_BASE_URL}{SPRING_DETECTION_PATH}"
+        headers = {
+            "X-Internal-Api-Key": BACKEND_INTERNAL_API_KEY,
+            "Content_Type": "application/json",
+        }
 
         payload = result.model_dump(
             by_alias=True,
@@ -17,6 +24,7 @@ class BackendClient:
             response = await client.post(
                 url,
                 json=payload,
+                headers=headers
             )
 
         response.raise_for_status()
