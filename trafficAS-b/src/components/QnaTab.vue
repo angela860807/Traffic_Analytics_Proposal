@@ -322,9 +322,9 @@ function saveAnswer(itemId) {
 const items = [
   {
     id: 1,
-    title: "WebSocket 연결이 자꾸 끊기는 문제",
+    title: "영상 업로드 후 재생이 안 되는 문제",
     body:
-      "WebSocket 연결이 일정 시간이 지나면 자동으로 끊깁니다. 서버 설정 문제인지, 클라이언트 설정 문제인지 알고 싶습니다.",
+      "동영상을 업로드했는데 카드에서 재생이 되지 않습니다. 지원 포맷과 용량 제한이 어떻게 되는지 알고 싶습니다.",
     author: "user06",
     status: "답변완료",
     cls: "done",
@@ -354,7 +354,7 @@ const items = [
     id: 4,
     title: "Docker 환경에서 GPU 설정 방법",
     body:
-      "Docker Compose로 배포 시 NVIDIA GPU를 YOLOv8에서 사용하려면 어떤 설정이 필요한지 알려주세요.",
+      "Docker Compose로 배포 시 NVIDIA GPU를 AI 서버에서 사용하려면 어떤 설정이 필요한지 알려주세요.",
     author: "user09",
     status: "대기중",
     cls: "wait",
@@ -407,7 +407,7 @@ const highlight = (text) => {
   padding: 8px 16px;
   background: var(--a);
   color: var(--bg);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -468,7 +468,7 @@ const highlight = (text) => {
   color: var(--t);
 }
 .s-count {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   color: var(--a);
   padding: 0 10px 0 0;
@@ -487,7 +487,7 @@ const highlight = (text) => {
   padding: 10px 16px;
   border-bottom: 1px solid var(--b);
   background: rgba(255, 255, 255, 0.025);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   letter-spacing: 0.1em;
   color: var(--t3);
@@ -539,7 +539,7 @@ const highlight = (text) => {
   color: var(--t3);
 }
 .nb {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 8px;
   background: rgba(255, 255, 255, 0.1);
   color: var(--a);
@@ -548,7 +548,7 @@ const highlight = (text) => {
   flex-shrink: 0;
 }
 .sts {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   padding: 2px 8px;
   border-radius: 3px;
@@ -581,7 +581,7 @@ const highlight = (text) => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   color: var(--t3);
   margin-bottom: 8px;
@@ -595,7 +595,7 @@ const highlight = (text) => {
   white-space: pre-wrap;
 }
 .qmeta {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   color: var(--t3);
 }
@@ -612,7 +612,7 @@ const highlight = (text) => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   color: var(--a);
   margin-bottom: 8px;
@@ -673,7 +673,7 @@ const highlight = (text) => {
   gap: 6px;
 }
 .cact {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   padding: 2px 8px;
   border-radius: 3px;
@@ -694,7 +694,7 @@ const highlight = (text) => {
   border: none;
   border-radius: 4px;
   font-size: 11px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   cursor: pointer;
   transition: opacity 0.2s;
 }
@@ -711,7 +711,7 @@ const highlight = (text) => {
   border: 1px solid var(--b);
   border-radius: 4px;
   font-size: 11px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   color: var(--t3);
   cursor: pointer;
   transition: all 0.15s;
@@ -742,7 +742,7 @@ const highlight = (text) => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   color: var(--a);
 }
