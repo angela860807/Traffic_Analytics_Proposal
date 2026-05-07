@@ -2,6 +2,13 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from app.core.config import (
+    MODEL_PATH,
+    YOLO_CONF_THRESHOLD,
+    YOLO_IOU_THRESHOLD,
+    YOLO_MAX_DET,
+)
+
 
 @dataclass
 class PlateDetection:
@@ -11,16 +18,59 @@ class PlateDetection:
 
 
 class PlateDetector:
+    def __init__(self) -> None:
+        self._model = None
+
     def detect(self, image: np.ndarray) -> PlateDetection:
-        # TODO:
-            # 1. MODEL_PATH 설정값을 사용해 YOLO 모델을 로드한다.
-            # 2. 입력 이미지에서 차량 또는 번호판 영역을 탐지한다.
-            # 3. 여러 탐지 결과 중 confidence가 가장 높은 번호판 탐지 결과를 우선 반환한다.
-            # 4. 추후 번호판 crop 이미지 저장을 위해 bbox 좌표를 함께 유지한다.
+        if not MODEL_PATH:
+            return PlateDetection(
+                detection_type="PLATE",
+                confidence_score=0.9321,
+                bbox=None,
+            )
 
+        model = self._load_model()
 
-        return PlateDetection(
-            detection_type="PLATE",
-            confidence_score=0.9321,
-            bbox=None,
+        results = model(
+            image,
+            conf=YOLO_CONF_THRESHOLD,
+            iou=YOLO_IOU_THRESHOLD,
+            max_det=YOLO_MAX_DET,
         )
+
+        best_detection: PlateDetection | None = None
+
+        for result in results:
+            boxes = sorted(
+                result.boxes,
+                key=lambda box: float(box.conf[0]),
+                reverse=True,
+            )
+
+            for box in boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                confidence_score = float(box.conf[0])
+
+                best_detection = PlateDetection(
+                    detection_type="PLATE",
+                    confidence_score=confidence_score,
+                    bbox=(x1, y1, x2, y2),
+                )
+                break
+
+        if best_detection is None:
+            return PlateDetection(
+                detection_type="VEHICLE",
+                confidence_score=0.0,
+                bbox=None,
+            )
+
+        return best_detection
+
+    def _load_model(self):
+        if self._model is None:
+            from ultralytics import YOLO
+
+            self._model = YOLO(MODEL_PATH)
+
+        return self._model
