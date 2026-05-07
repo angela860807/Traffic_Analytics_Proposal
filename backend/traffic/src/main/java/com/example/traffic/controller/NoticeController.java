@@ -4,6 +4,7 @@ import com.example.traffic.dto.request.NoticeSaveRequest;
 import com.example.traffic.dto.response.CommonResponse;
 import com.example.traffic.dto.response.NoticeResponse;
 import com.example.traffic.service.NoticeService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,7 +22,7 @@ public class NoticeController {
 
     // 공지사항 등록 (ADMIN)
     @PostMapping
-    public ResponseEntity<CommonResponse<Long>> createNotice(@RequestBody NoticeSaveRequest request,
+    public ResponseEntity<CommonResponse<Long>> createNotice(@RequestBody @Valid NoticeSaveRequest request,
                                                              @AuthenticationPrincipal UserDetails userDetails) {
         Long noticeId = noticeService.saveNotice(request, userDetails.getUsername());
         return ResponseEntity.ok(CommonResponse.success(noticeId, "공지사항이 등록되었습니다."));
@@ -41,7 +42,7 @@ public class NoticeController {
 
     // 공지사항 수정 (ADMIN)
     @PutMapping("/{id}")
-    public ResponseEntity<CommonResponse<Void>> updateNotice(@PathVariable Long id, @RequestBody NoticeSaveRequest request) {
+    public ResponseEntity<CommonResponse<Void>> updateNotice(@PathVariable Long id, @Valid @RequestBody NoticeSaveRequest request) {
         noticeService.updateNotice(id, request);
         return ResponseEntity.ok(CommonResponse.success(null, "공지사항이 수정되었습니다."));
     }

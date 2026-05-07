@@ -6,6 +6,7 @@ import com.example.traffic.dto.response.DetectionResponse;
 import com.example.traffic.service.DetectionLogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,7 +22,7 @@ public class DetectionLogController {
 
     @Operation(summary = "AI 탐지 데이터 처리", description = "AI 서버로부터 받은 데이터를 검증하고 저장합니다.")
     @PostMapping
-    public CommonResponse<Long> processDetection(@RequestBody DetectionRequest request) {
+    public CommonResponse<Long> processDetection(@Valid @RequestBody DetectionRequest request) {
         Long logId = detectionLogService.processDetection(request);
         return CommonResponse.success(logId, "탐지 데이터가 성공적으로 처리되었습니다.");
     }

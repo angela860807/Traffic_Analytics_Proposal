@@ -4,6 +4,7 @@ import com.example.traffic.dto.request.CommentRequest;
 import com.example.traffic.dto.response.CommonResponse;
 import com.example.traffic.dto.response.CommentResponse;
 import com.example.traffic.service.CommentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,7 +27,7 @@ public class CommentController {
     @PostMapping("/post/{postId}")
     public ResponseEntity<CommonResponse<Long>> createComment(
             @PathVariable Long postId,
-            @RequestBody CommentRequest request,
+            @Valid @RequestBody CommentRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
 
         // 서비스에서 CommentResponse 대신 ID를 반환하도록 살짝 수정하거나,

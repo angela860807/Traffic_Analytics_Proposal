@@ -5,6 +5,7 @@ import com.example.traffic.dto.request.QnaQuestionRequest;
 import com.example.traffic.dto.response.CommonResponse;
 import com.example.traffic.dto.response.QnaQuestionResponse;
 import com.example.traffic.service.QnaService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,8 +24,9 @@ public class QnaController {
     // 질문 등록
     @PostMapping("/questions")
     public ResponseEntity<CommonResponse<Long>> createQuestion(
-            @RequestBody QnaQuestionRequest request,
+            @Valid @RequestBody QnaQuestionRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
+        // SecurityConfig에서 인증을 강제하므로 userDetails가 null일 수 없음
         Long id = qnaService.createQuestion(request, userDetails.getUsername());
         return ResponseEntity.ok(CommonResponse.success(id, "질문이 등록되었습니다."));
     }
@@ -45,8 +47,9 @@ public class QnaController {
     @PostMapping("/questions/{id}/answers")
     public ResponseEntity<CommonResponse<Long>> createAnswer(
             @PathVariable Long id,
-            @RequestBody QnaAnswerRequest request,
+            @Valid @RequestBody QnaAnswerRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
+        // SecurityConfig에서 hasRole("ADMIN")을 검사하므로 바로 서비스 호출
         Long answerId = qnaService.createAnswer(id, request, userDetails.getUsername());
         return ResponseEntity.ok(CommonResponse.success(answerId, "답변이 등록되었습니다."));
     }

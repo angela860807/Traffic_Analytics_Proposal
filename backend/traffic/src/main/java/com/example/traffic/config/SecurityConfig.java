@@ -43,10 +43,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/notices/**").permitAll()
                         .requestMatchers("/api/notices/**").hasRole("ADMIN")
 
-                        // 게시글 권한 추가
+                        // 게시글 권한
                         .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll() // 목록/상세 조회는 누구나 가능
 
-                        .requestMatchers("/api/qna/**").permitAll()
+                        // QnA 권한 중앙 제어
+                        .requestMatchers(HttpMethod.GET, "/api/qna/**").permitAll() // 목록/상세 조가는 누구나 가능
+                        .requestMatchers(HttpMethod.POST, "/api/qna/questions/*/answers").hasRole("ADMIN") // 답변 작성은 관리자만
+                        .requestMatchers("/api/qna/**").authenticated() // 그 외(질문 등록/삭제 등)는 인증된 사용자만
 
                         .anyRequest().authenticated()
                 )

@@ -4,6 +4,7 @@ import com.example.traffic.dto.request.PostRequest;
 import com.example.traffic.dto.response.CommonResponse;
 import com.example.traffic.dto.response.PostResponse;
 import com.example.traffic.service.PostService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,7 +26,7 @@ public class PostController {
      */
     @PostMapping
     public ResponseEntity<CommonResponse<Long>> createPost(
-            @RequestBody PostRequest request,
+            @Valid @RequestBody PostRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
 
         // PostResponse에서 ID만 추출하거나 Service 리턴타입 변경 고려
@@ -57,7 +58,7 @@ public class PostController {
     @PutMapping("/{id}")
     public ResponseEntity<CommonResponse<Void>> updatePost(
             @PathVariable Long id,
-            @RequestBody PostRequest request,
+            @Valid @RequestBody PostRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
         postService.updatePost(id, request, userDetails.getUsername());
         return ResponseEntity.ok(CommonResponse.success(null, "게시글이 수정되었습니다."));

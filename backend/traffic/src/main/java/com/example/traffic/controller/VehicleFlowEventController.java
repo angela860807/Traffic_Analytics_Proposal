@@ -1,8 +1,8 @@
 package com.example.traffic.controller;
 
 import com.example.traffic.common.enums.Direction;
+import com.example.traffic.dto.response.CommonResponse;
 import com.example.traffic.dto.response.FlowEventResponse;
-import com.example.traffic.repository.VehicleFlowEventRepository;
 import com.example.traffic.service.VehicleFlowEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -17,7 +17,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class VehicleFlowEventController {
 
-    private final VehicleFlowEventRepository flowEventRepository; // 단순 조지는 레포지토리 직접 사용 가능
     private final VehicleFlowEventService flowEventService;
 
     /**
@@ -39,11 +38,9 @@ public class VehicleFlowEventController {
      * [차량 통과 이력 조회] 특정 차량이 어디를 지나갔는지 확인
      */
     @GetMapping("/vehicle/{vehicleId}")
-    public ResponseEntity<List<FlowEventResponse>> getVehicleHistory(@PathVariable Long vehicleId) {
-        List<FlowEventResponse> history = flowEventRepository.findByVehicleVehicleIdOrderByEventAtDesc(vehicleId)
-                .stream()
-                .map(FlowEventResponse::from)
-                .toList();
-        return ResponseEntity.ok(history);
+    public ResponseEntity<CommonResponse<List<FlowEventResponse>>> getVehicleHistory(@PathVariable Long vehicleId) {
+        // 서비스에서 DTO 변환까지 마친 리스트를 받아옵니다.
+        List<FlowEventResponse> history = flowEventService.getVehicleHistory(vehicleId);
+        return ResponseEntity.ok(CommonResponse.success(history, "차량 통과 이력 조회 성공"));
     }
 }

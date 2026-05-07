@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -21,6 +22,16 @@ public class VehicleFlowEventService {
 
     private final VehicleFlowEventRepository flowEventRepository;
     private final ZoneRepository zoneRepository;
+
+    /**
+     * [수정 가이드 4번 반영] 차량 통과 이력 조회 로직 이관
+     * 서비스 레이어에서 DTO 변환까지 완료하여 컨트롤러로 전달합니다.
+     */
+    public List<FlowEventResponse> getVehicleHistory(Long vehicleId) {
+        return flowEventRepository.findByVehicleIdWithDetails(vehicleId).stream()
+                .map(FlowEventResponse::from)
+                .toList();
+    }
 
     /**
      * [핵심 로직] 탐지 로그를 분석하여 실시간 교통 흐름 이벤트 확정[cite: 5, 6]

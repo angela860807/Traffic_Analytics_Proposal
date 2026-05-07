@@ -41,6 +41,7 @@ public class QnaService {
                 .author(author)
                 .title(request.getTitle())
                 .content(request.getContent())
+                .status(QnaStatus.OPEN) // 생성 시점에 명시적으로 '답변대기' 상태 부여
                 .build();
 
         return questionRepository.save(question).getQuestionId();
@@ -108,9 +109,15 @@ public class QnaService {
         QnaQuestion question = questionRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("질문을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
-        // 본인 글만 삭제 가능하도록 검증 (Notice는 ADMIN만 삭제였으나 Q&A는 작성자 권한 필요)
+        // 1. 본인 글 권한 체크
         if (!question.getAuthor().getEmail().equals(email)) {
             throw new BusinessException("삭제 권한이 없습니다.", HttpStatus.FORBIDDEN);
+        }
+
+        // 2. [추가] 답변 완료 상태 체크 (QnaStatus 활용)
+        // 이미 답변이 완료된 질문은 삭제할 수 없게 하거나, 별도의 정책을 적용합니다.
+        if (question.getStatus() == QnaStatus.ANSWERED) {
+            throw new BusinessException("이미 답변이 완료된 질문은 삭제할 수 없습니다.", HttpStatus.BAD_REQUEST);
         }
 
         questionRepository.delete(question);
