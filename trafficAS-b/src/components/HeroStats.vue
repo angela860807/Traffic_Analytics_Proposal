@@ -78,7 +78,7 @@ defineProps({ stats: Array, variant: { type: String, default: "cyan" } });
   text-shadow: 0 0 36px color-mix(in srgb, var(--a) 45%, transparent);
 }
 .badge {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   letter-spacing: 0.18em;
   color: var(--a);
@@ -96,7 +96,7 @@ defineProps({ stats: Array, variant: { type: String, default: "cyan" } });
   animation: livePulse 1.8s ease-in-out infinite;
 }
 .num {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: clamp(24px, 3vw, 44px);
   font-weight: 600;
   letter-spacing: -1.5px;
@@ -104,7 +104,7 @@ defineProps({ stats: Array, variant: { type: String, default: "cyan" } });
   color: var(--t);
 }
 .unit {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 12px;
   color: var(--t3);
   margin-left: 3px;

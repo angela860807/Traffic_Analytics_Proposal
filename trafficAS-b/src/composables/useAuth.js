@@ -5,6 +5,17 @@ const _showModal = ref(false)
 const _modalMode = ref('login')
 
 const ADMIN_EMAIL = 'admin@trafficAS.com'
+const ADMIN_PW    = 'admin1234'
+
+// 관리자 계정 항상 최신 상태로 동기화
+;(() => {
+  const stored = JSON.parse(localStorage.getItem('tas_users') || '[]')
+  const idx = stored.findIndex(u => u.email === ADMIN_EMAIL)
+  const admin = { name: '관리자', email: ADMIN_EMAIL, phone: '', password: ADMIN_PW }
+  if (idx === -1) stored.push(admin)
+  else stored[idx] = admin
+  localStorage.setItem('tas_users', JSON.stringify(stored))
+})()
 
 export function useAuth() {
   const isLoggedIn  = computed(() => !!_user.value)
