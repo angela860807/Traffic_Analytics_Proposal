@@ -99,7 +99,7 @@
           </p>
         </div>
         <div class="cta-btns">
-          <RouterLink to="/sub" class="btn-a">→ 서브 페이지 보기</RouterLink>
+          <RouterLink to="/sub" class="btn-a">자세히 보기</RouterLink>
         </div>
       </div>
     </div>
@@ -151,25 +151,35 @@ onMounted(() => {
 const introItems = [
   {
     num: "01 — AI ENGINE",
-    title: "YOLOv8n 실시간 감지",
+    title: "실시간 차량 감지",
     desc: "초당 30프레임으로 차량 감지. 세단·SUV·트럭·버스 분류 및 신뢰도 반환.",
   },
   {
     num: "02 — OCR MODULE",
-    title: "EasyOCR 번호판 인식",
+    title: "OCR 번호판 인식",
     desc: "번호판 영역 크롭 후 OCR 인식. 96.2% 이상 정확도.",
+  },
+  {
+    num: "03 — ANALYTICS",
+    title: "실시간 통계 분석",
+    desc: "구역별 유입·유출 집계와 시간대별 혼잡도 히트맵으로 교통 패턴을 즉시 파악.",
+  },
+  {
+    num: "04 — ALERT",
+    title: "자동 알림 시스템",
+    desc: "혼잡도 임계값 초과 시 즉시 알림. WebSocket 기반 50ms 이내 대시보드 반영.",
   },
 ];
 const features = [
   {
     tag: "01 — DETECT",
-    title: "YOLOv8 차량 감지",
+    title: "차량 감지",
     desc: "초당 30프레임 실시간 감지. 다중 차량 동시 추적.",
   },
   {
     tag: "02 — OCR",
     title: "번호판 인식",
-    desc: "EasyOCR 기반. 96% 이상 정확도 입·출차 자동 식별.",
+    desc: "OCR 기반. 96% 이상 정확도 입·출차 자동 식별.",
   },
   {
     tag: "03 — ANALYTICS",
@@ -178,20 +188,11 @@ const features = [
   },
   {
     tag: "04 — REALTIME",
-    title: "WebSocket 실시간",
-    desc: "50ms 이내 응답. FastAPI → Vue.js 즉시 렌더링.",
+    title: "실시간 업데이트",
+    desc: "50ms 이내 응답. 감지 결과 즉시 화면 렌더링.",
   },
 ];
-const stack = [
-  "FastAPI",
-  "YOLOv8n",
-  "EasyOCR",
-  "Spring Boot",
-  "Vue.js 3",
-  "PostgreSQL",
-  "WebSocket",
-  "Docker",
-];
+const stack = ["Vue.js 3", "Spring Boot", "PostgreSQL", "YOLO", "OCR 엔진", "Docker"];
 </script>
 
 <style scoped>

@@ -187,7 +187,7 @@ const handleSignup = () => {
 }
 
 .logo {
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.4px;
@@ -264,7 +264,7 @@ input::placeholder {
   color: var(--bg);
   border: none;
   border-radius: 6px;
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;

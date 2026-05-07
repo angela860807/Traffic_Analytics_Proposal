@@ -185,7 +185,7 @@ const posts = [
   { id: 2, title: "야간 번호판 인식률 개선 후기",             author: "user01", date: "04.28", views: 87,  isNew: true  },
   { id: 3, title: "다중 카메라 동시 운영 팁",                author: "user02", date: "04.27", views: 64,  isNew: false },
   { id: 4, title: "Docker Compose 설정 파일 공유",           author: "user03", date: "04.26", views: 52,  isNew: false },
-  { id: 5, title: "Spring Boot + FastAPI 연동 주의사항",     author: "user04", date: "04.25", views: 41,  isNew: false },
+  { id: 5, title: "Spring Boot + Vue.js 연동 주의사항",       author: "user04", date: "04.25", views: 41,  isNew: false },
   { id: 6, title: "PostgreSQL 인덱스 최적화 경험담",         author: "user05", date: "04.24", views: 38,  isNew: false },
 ];
 
@@ -214,7 +214,7 @@ const highlight = (text) => {
 .wbtn {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 8px 16px; background: var(--a); color: var(--bg);
-  font-family: "IBM Plex Mono", monospace; font-size: 11px;
+  font-family: "JetBrains Mono", monospace; font-size: 11px;
   font-weight: 700; letter-spacing: 0.08em; border-radius: 4px;
   cursor: pointer; border: none;
 }
@@ -245,7 +245,7 @@ const highlight = (text) => {
 }
 .s-clear:hover { color: var(--t); }
 .s-count {
-  font-family: "IBM Plex Mono", monospace; font-size: 9px;
+  font-family: "JetBrains Mono", monospace; font-size: 9px;
   color: var(--a); padding: 0 10px 0 0; white-space: nowrap; flex-shrink: 0;
 }
 
@@ -257,7 +257,7 @@ const highlight = (text) => {
 .th {
   padding: 10px 16px; border-bottom: 1px solid var(--b);
   background: rgba(255, 255, 255, 0.025);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px; letter-spacing: 0.1em; color: var(--t3);
 }
 .tr {
@@ -276,14 +276,14 @@ const highlight = (text) => {
 .chv { flex-shrink: 0; color: var(--t3); transition: transform 0.2s; }
 .chv.open { transform: rotate(90deg); color: var(--a); }
 .sub { font-size: 11px; color: var(--t3); }
-.mono { font-family: "IBM Plex Mono", monospace; font-size: 10px; }
+.mono { font-family: "JetBrains Mono", monospace; font-size: 10px; }
 .nb {
-  font-family: "IBM Plex Mono", monospace; font-size: 8px;
+  font-family: "JetBrains Mono", monospace; font-size: 8px;
   background: rgba(255, 255, 255, 0.1); color: var(--a);
   padding: 1px 5px; border-radius: 100px; flex-shrink: 0;
 }
 .cc {
-  font-family: "IBM Plex Mono", monospace; font-size: 9px;
+  font-family: "JetBrains Mono", monospace; font-size: 9px;
   color: var(--t3); flex-shrink: 0;
 }
 
@@ -296,7 +296,7 @@ const highlight = (text) => {
 .cphead {
   display: flex; align-items: center; gap: 6px;
   padding: 10px 16px;
-  font-family: "IBM Plex Mono", monospace; font-size: 10px;
+  font-family: "JetBrains Mono", monospace; font-size: 10px;
   color: var(--t3); border-bottom: 1px solid var(--b);
 }
 .cphead strong { color: var(--a); }
@@ -312,16 +312,16 @@ const highlight = (text) => {
   margin-bottom: 5px;
 }
 .caut {
-  font-family: "IBM Plex Mono", monospace; font-size: 10px;
+  font-family: "JetBrains Mono", monospace; font-size: 10px;
   color: var(--a); font-weight: 500;
 }
 .ctm {
-  font-family: "IBM Plex Mono", monospace; font-size: 9px;
+  font-family: "JetBrains Mono", monospace; font-size: 9px;
   color: var(--t3); flex: 1;
 }
 .cacts { display: flex; gap: 4px; }
 .cact {
-  font-family: "IBM Plex Mono", monospace; font-size: 9px;
+  font-family: "JetBrains Mono", monospace; font-size: 9px;
   padding: 2px 8px; border-radius: 3px;
   border: 1px solid var(--b); background: none;
   color: var(--t3); cursor: pointer; transition: all 0.15s;
@@ -367,13 +367,13 @@ const highlight = (text) => {
 
 .cbtns { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .chint {
-  font-family: "IBM Plex Mono", monospace; font-size: 9px;
+  font-family: "JetBrains Mono", monospace; font-size: 9px;
   color: var(--t3); margin-right: auto;
 }
 .cbtn-save {
   padding: 5px 14px; background: var(--a); color: #fff;
   border: none; border-radius: 4px; font-size: 11px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   cursor: pointer; transition: opacity 0.2s;
 }
 .cbtn-save:hover:not(:disabled) { opacity: 0.85; }
@@ -381,7 +381,7 @@ const highlight = (text) => {
 .cbtn-cancel {
   padding: 5px 12px; background: none;
   border: 1px solid var(--b); border-radius: 4px; font-size: 11px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   color: var(--t3); cursor: pointer; transition: all 0.15s;
 }
 .cbtn-cancel:hover { border-color: var(--ba); color: var(--t); }
@@ -414,7 +414,7 @@ const highlight = (text) => {
 .pg {
   width: 30px; height: 30px; border-radius: 4px;
   border: 1px solid var(--b); background: transparent;
-  color: var(--t3); font-family: "IBM Plex Mono", monospace;
+  color: var(--t3); font-family: "JetBrains Mono", monospace;
   font-size: 11px; cursor: pointer; transition: all 0.2s;
 }
 .pg:hover, .pg.on {
