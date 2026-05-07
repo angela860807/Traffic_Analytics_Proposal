@@ -99,6 +99,11 @@ async def create_and_send_mock_detection(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Spring Boot API is not reachable",
         ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
 
     return DetectionResponse(
         accepted=True,

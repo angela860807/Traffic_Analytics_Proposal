@@ -1,9 +1,10 @@
 from datetime import datetime
 
-from app.core.config import DETECTION_CONFIDENCE_THRESHOLD
+from app.core.config import DETECTION_CONFIDENCE_THRESHOLD, SAVE_PLATE_CROP
 from app.schemas.detection import DetectionResult, RaspberryFrameRequest
 from app.services.image_decoder import ImageDecoder
 from app.services.image_storage_service import ImageStorageService
+from app.services.plate_cropper import crop_plate_with_padding, preprocess_plate_for_ocr
 from app.services.plate_detector import PlateDetector
 from app.services.plate_recognizer import PlateRecognizer
 
@@ -51,12 +52,32 @@ class InferenceService:
     ) -> DetectionResult:
         detection = self.plate_detector.detect(image)
 
-        if detection.confidence_score < DETECTION_CONFIDENCE_THRESHOLD:
+        if detection.bbox is None:
+            if detection.detection_type == "PLATE":
+                plate_number = "123가4567"
+                detection_type = "PLATE"
+            else:
+                plate_number = None
+                detection_type = "VEHICLE"
+        elif detection.confidence_score < DETECTION_CONFIDENCE_THRESHOLD:
             plate_number = None
             detection_type = "VEHICLE"
         else:
-            plate_number = self.plate_recognizer.recognize(image)
-            detection_type = detection.detection_type
+            plate_crop = crop_plate_with_padding(image, detection.bbox)
+            ocr_image = preprocess_plate_for_ocr(plate_crop)
+
+            if SAVE_PLATE_CROP:
+                self.image_storage_service.save_detection_image(
+                    image=ocr_image,
+                    camera_code=camera_code,
+                    captured_at=captured_at,
+                    suffix="plate",
+                )
+
+            recognition = self.plate_recognizer.recognize(ocr_image)
+
+            plate_number = recognition.text
+            detection_type = "PLATE" if plate_number else "VEHICLE"
 
         image_path = self.image_storage_service.save_detection_image(
             image=image,
