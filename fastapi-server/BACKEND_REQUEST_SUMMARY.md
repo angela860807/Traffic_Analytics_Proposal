@@ -28,6 +28,13 @@ Content-Type: application/json
 }
 ```
 
+필수 여부:
+
+```text
+필수: cameraCode, plateNumber, confidenceScore, imagePath, detectedAt, detectionType
+선택: imageUrl
+```
+
 ## 백엔드 처리 요청
 
 - `X-Internal-Api-Key` 헤더를 검증한다.
@@ -38,9 +45,10 @@ Content-Type: application/json
 - 조회한 `Camera.directionType` 기준으로 최종 `IN/OUT`을 판단한다.
 - `detection_logs`에 감지 결과를 저장한다.
 - 중복이 아니면 `vehicle_flow_events`에도 저장한다.
-- `plateNumber`는 OCR 실패 시 `null`이 올 수 있으므로 허용 여부를 결정한다.
+- `plateNumber`는 필수이며 `null`을 허용하지 않는다.
+- FastAPI에서 OCR 실패로 `plateNumber=null`인 감지 결과는 백엔드로 전송하지 않는다.
 - `imagePath`는 저장/추적용 경로로 사용한다.
-- `imageUrl`은 Vue 화면 표시용 URL로 저장할지 여부를 결정한다.
+- `imageUrl`은 선택 필드이며 값이 있으면 Vue 화면 표시용 URL로 사용할 수 있다.
 
 ## enum / 값 규칙
 
