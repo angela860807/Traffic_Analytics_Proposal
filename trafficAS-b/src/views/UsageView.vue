@@ -142,14 +142,14 @@ const steps = [
       "git clone https://github.com/team/traffic-as.git\ncd traffic-as && cp .env.example .env",
   },
   {
-    tag: "AI SERVER",
+    tag: "FRONTEND",
     lang: "bash",
-    shortTitle: "AI 서버",
-    title: "FastAPI AI 서버 실행",
+    shortTitle: "프론트엔드",
+    title: "Vue.js 대시보드 실행",
     desc:
-      "YOLOv8n 모델과 EasyOCR 엔진이 포함된 AI 추론 서버입니다. 첫 실행 시 모델 가중치 파일 다운로드로 수 분이 소요될 수 있습니다.",
+      "교통 관제 대시보드입니다. 의존성 설치 후 개발 서버를 실행하면 http://localhost:5173 에서 확인할 수 있습니다.",
     code:
-      "cd ai-server\npip install -r requirements.txt\nuvicorn main:app --reload --port 8000",
+      "cd frontend\nnpm install\nnpm run dev",
   },
   {
     tag: "API SERVER",
@@ -173,9 +173,9 @@ const steps = [
 
 const arch = [
   {
-    name: "AI 서버",
-    tech: ["Python", "FastAPI"],
-    role: "YOLO 차량 탐지 + OCR 번호판 인식",
+    name: "AI 감지 엔진",
+    tech: ["Vue.js 3", "딥러닝"],
+    role: "차량 탐지 + OCR 번호판 인식",
     color: "#34d399",
   },
   {
@@ -208,16 +208,16 @@ const faq = [
     a: "카메라 해상도를 1080p 이상으로 설정하고 충분한 조도를 확보하세요.",
   },
   {
-    q: "WebSocket 연결이 끊겨요",
-    a: "방화벽에서 8000번 포트를 허용하고 CORS 설정을 확인하세요.",
+    q: "영상 업로드가 안 돼요",
+    a: "mp4, webm, mov 형식을 지원합니다. 파일 용량이 너무 크면 브라우저 메모리 한계로 재생이 지연될 수 있습니다.",
   },
   {
     q: "DB 마이그레이션 방법은?",
     a: "api-server 디렉터리에서 ./mvnw flyway:migrate 명령어를 실행하세요.",
   },
   {
-    q: "YOLO 모델 교체 방법은?",
-    a: "ai-server/models 디렉터리에 .pt 파일을 교체한 뒤 서버를 재시작하세요.",
+    q: "카드에 업로드한 영상이 사라져요",
+    a: "새로고침 시 업로드 상태는 초기화됩니다. 영구 저장이 필요하면 백엔드 연동이 필요합니다.",
   },
 ];
 </script>
@@ -235,7 +235,7 @@ const faq = [
   background: var(--bg2);
 }
 .ph-ey {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   letter-spacing: 0.22em;
   color: var(--a);
@@ -253,7 +253,7 @@ const faq = [
   opacity: 0.5;
 }
 h1 {
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: clamp(36px, 5vw, 68px);
   font-weight: 800;
   letter-spacing: -3px;
@@ -280,7 +280,7 @@ h1 em {
   flex-wrap: wrap;
 }
 .badge {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   color: var(--t3);
   border: 1px solid var(--b);
@@ -315,16 +315,17 @@ h1 em {
   padding-top: 4px;
 }
 .step-big-n {
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 52px;
   font-weight: 800;
   letter-spacing: -3px;
   color: var(--a);
-  opacity: 0.12;
+  opacity: 0.15;
   line-height: 1;
   user-select: none;
   writing-mode: horizontal-tb;
 }
+.theme-navy.light .step-big-n { opacity: 0.4; }
 .step-vline {
   flex: 1;
   width: 1px;
@@ -343,7 +344,7 @@ h1 em {
   margin-bottom: 14px;
 }
 .step-tag {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   letter-spacing: 0.12em;
   color: var(--a);
@@ -353,13 +354,13 @@ h1 em {
   padding: 3px 10px;
 }
 .step-idx {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   letter-spacing: 0.1em;
   color: var(--t3);
 }
 .step-title {
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: clamp(18px, 2vw, 26px);
   font-weight: 800;
   letter-spacing: -0.6px;
@@ -410,14 +411,14 @@ h1 em {
   background: #28c840;
 }
 .tlang {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   color: var(--t3);
   letter-spacing: 0.08em;
   flex: 1;
 }
 .tcopy {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   color: var(--t3);
   background: none;
@@ -437,7 +438,7 @@ h1 em {
 }
 .tcode {
   padding: 16px 18px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 12px;
   line-height: 2;
   background: var(--bg);
@@ -462,7 +463,7 @@ h1 em {
   scroll-margin-top: 80px;
 }
 .ref-label {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   letter-spacing: 0.2em;
   color: var(--a);
@@ -480,7 +481,7 @@ h1 em {
   opacity: 0.5;
 }
 .ref-title {
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.5px;
@@ -529,7 +530,7 @@ h1 em {
   flex-wrap: wrap;
 }
 .arch-tech {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   letter-spacing: 0.04em;
   color: var(--nc);
@@ -587,7 +588,7 @@ h1 em {
   user-select: none;
 }
 .faq-n {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   color: var(--a);
   opacity: 0.4;
@@ -638,7 +639,7 @@ footer {
   justify-content: space-between;
 }
 .fl {
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 15px;
   font-weight: 800;
   letter-spacing: -0.3px;
@@ -649,7 +650,7 @@ footer {
   font-style: normal;
 }
 .fr {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   color: var(--t3);
 }

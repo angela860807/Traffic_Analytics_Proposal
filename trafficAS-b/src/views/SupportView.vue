@@ -97,7 +97,7 @@ const channels = [
     key: "chat",
     tag: "LIVE CHAT",
     name: "실시간 채팅",
-    desc: "운영팀과 WebSocket 기반으로 즉시 소통합니다.",
+    desc: "운영팀과 실시간으로 즉시 소통합니다.",
     badge: "Live",
     live: true,
   },
@@ -133,7 +133,7 @@ watch(
   flex-shrink: 0;
 }
 .ph-ey {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   letter-spacing: 0.22em;
   color: var(--a);
@@ -151,7 +151,7 @@ watch(
   opacity: 0.5;
 }
 h1 {
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: clamp(36px, 5vw, 68px);
   font-weight: 800;
   letter-spacing: -3px;
@@ -229,7 +229,7 @@ h1 em {
   margin-bottom: 5px;
 }
 .sb-tag {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   letter-spacing: 0.12em;
   color: var(--a);
@@ -240,7 +240,7 @@ h1 em {
 }
 
 .sb-badge {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   background: rgba(96, 165, 250, 0.1);
   color: var(--a);
@@ -286,7 +286,7 @@ h1 em {
   animation: livePulse 1.5s ease-in-out infinite;
 }
 .st-text {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   color: #34d399;
 }
@@ -295,12 +295,12 @@ h1 em {
   color: var(--t3);
 }
 .st-meta {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   color: var(--t3);
 }
 .st-copy {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   color: var(--t3);
   opacity: 0.5;
@@ -331,14 +331,14 @@ h1 em {
   gap: 10px;
 }
 .ph-tag {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   letter-spacing: 0.14em;
   color: var(--a);
   opacity: 0.6;
 }
 .ph-name {
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.3px;

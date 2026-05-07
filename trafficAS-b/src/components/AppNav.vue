@@ -13,7 +13,8 @@
       </div>
       <div class="right">
         <template v-if="isLoggedIn">
-          <span class="uname">👤 {{ currentUser.name }}</span>
+          <span class="uname">{{ currentUser.name }}님, 안녕하세요</span>
+          <RouterLink v-if="isAdmin" to="/dashboard" class="btn-dash">대시보드</RouterLink>
           <button class="btn-out" @click="logout">로그아웃</button>
         </template>
         <template v-else>
@@ -29,7 +30,7 @@
 import { RouterLink } from "vue-router";
 import { useAuth } from "@/composables/useAuth";
 
-const { isLoggedIn, currentUser, logout } = useAuth();
+const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
 </script>
 
 <style scoped>
@@ -42,7 +43,7 @@ const { isLoggedIn, currentUser, logout } = useAuth();
   padding: 0 44px;
 }
 .logo {
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 17px;
   font-weight: 800;
   letter-spacing: -0.4px;
@@ -126,7 +127,7 @@ const { isLoggedIn, currentUser, logout } = useAuth();
   border: none;
   border-radius: 6px;
   color: var(--bg);
-  font-family: "Syne", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 12px;
   font-weight: 700;
   transition: opacity 0.2s, transform 0.15s;
@@ -137,6 +138,21 @@ const { isLoggedIn, currentUser, logout } = useAuth();
   opacity: 0.87;
   transform: translateY(-1px);
 }
+.btn-dash {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 16px;
+  background: var(--a);
+  border: none;
+  border-radius: 6px;
+  color: var(--bg);
+  font-size: 12px;
+  font-weight: 700;
+  transition: opacity 0.2s, transform 0.15s;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.btn-dash:hover { opacity: 0.87; transform: translateY(-1px); }
 .btn-out {
   padding: 7px 16px;
   background: none;

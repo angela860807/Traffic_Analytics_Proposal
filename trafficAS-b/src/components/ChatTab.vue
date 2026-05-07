@@ -105,15 +105,18 @@ const API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 const hasKey = computed(() => !!API_KEY && API_KEY.startsWith("gsk_"));
 
 const SYSTEM_PROMPT = `당신은 TrafficAS 고객지원 AI 어시스턴트입니다.
-TrafficAS는 다음과 같은 교통 관제 시스템입니다:
-- YOLOv8 기반 실시간 차량 감지 (초당 30프레임)
-- EasyOCR 번호판 자동 인식 (97%+ 정확도)
-- WebSocket 실시간 통신 (50ms 이내 응답)
-- 구역별 유입·유출 통계 대시보드
-- 기술 스택: Spring Boot + FastAPI + Vue.js 3 + PostgreSQL
 
-사용자 질문에 친절하고 전문적으로 한국어로 답변하세요.
-답변은 핵심만 간결하게 2~4문장으로 작성하세요.`;
+[절대 규칙]
+- 반드시 한국어로만 답변하세요. 영어, 중국어, 일본어 등 어떤 외국어도 섞지 마세요.
+- 답변은 핵심만 간결하게 2~4문장으로 작성하세요.
+- 친절하고 전문적인 톤을 유지하세요.
+
+TrafficAS 교통 관제 시스템 정보:
+- 실시간 차량 감지 및 분류 (YOLO 기반)
+- OCR 번호판 자동 인식 (97%+ 정확도)
+- 구역별 유입·유출 통계 대시보드
+- 시간대별 혼잡도 히트맵 시각화
+- 기술 스택: Spring Boot + Vue.js 3 + PostgreSQL`;
 
 const msgsEl = ref(null);
 const input = ref("");
@@ -211,7 +214,7 @@ async function callGroq(userText) {
         ...history.value,
       ],
       max_tokens: 512,
-      temperature: 0.7,
+      temperature: 0.3,
     }),
   });
 
@@ -265,7 +268,7 @@ function resetChat() {
   gap: 8px;
 }
 .olabel {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   color: var(--in);
   display: flex;
@@ -280,7 +283,7 @@ function resetChat() {
   animation: livePulse 1.5s ease-in-out infinite;
 }
 .meta {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   color: var(--t3);
   flex: 1;
@@ -293,7 +296,7 @@ function resetChat() {
   background: none;
   border: 1px solid var(--b);
   border-radius: 4px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   color: var(--t3);
   cursor: pointer;
@@ -324,7 +327,7 @@ function resetChat() {
 
 .sys {
   text-align: center;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   color: var(--t3);
   display: flex;
@@ -363,7 +366,7 @@ function resetChat() {
   max-width: 72%;
 }
 .name {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   color: var(--t3);
   margin-bottom: 4px;
@@ -429,7 +432,7 @@ function resetChat() {
 }
 
 .time {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
   color: var(--t3);
   margin-top: 4px;
@@ -452,7 +455,7 @@ function resetChat() {
   color: #fb923c;
 }
 .no-key code {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 11px;
   background: rgba(251, 146, 60, 0.12);
   padding: 1px 5px;
@@ -495,7 +498,7 @@ function resetChat() {
   color: var(--bg);
   border: none;
   border-radius: 6px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
