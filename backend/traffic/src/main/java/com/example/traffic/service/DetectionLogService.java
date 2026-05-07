@@ -32,45 +32,56 @@ public class DetectionLogService {
     /**
      * [개선된 프로세스] 검증과 저장을 분리하고 Null 체크 강화
      */
+    @Transactional // 클래스 레벨의 readOnly = true를 덮어씁니다.
     public Long processDetection(DetectionRequest request) {
         validateDetectionRequest(request);
+        // 이제 여기서 시작되는 트랜잭션은 쓰기가 가능합니다.
         return selfProvider.getObject().saveDetectionData(request);
     }
 
     @Transactional
     public Long saveDetectionData(DetectionRequest request) {
+        // 1. [규약 반영] cameraId 대신 cameraCode로 카메라 엔티티 조회
+        Camera camera = cameraRepository.findByCameraCode(request.getCameraCode())
+                .orElseThrow(() -> new BusinessException("미등록 카메라 코드입니다: " + request.getCameraCode(), HttpStatus.NOT_FOUND));
 
-        Camera camera = cameraRepository.findById(request.getCameraId())
-                .orElseThrow(() -> new BusinessException("미등록 카메라입니다. ID: " + request.getCameraId(), HttpStatus.NOT_FOUND));
-
+        // 2. 차량 정보 조회 또는 생성 (plateNumber가 null일 수 있음을 감안한 로직 필요)
         Vehicle vehicle = vehicleService.getOrCreateVehicle(request.getPlateNumber());
 
-        DetectionLog logEntity = DetectionLog.builder() // 변수명 중복 방지를 위해 logEntity로 변경 추천
+        // 3. DetectionLog 생성 및 저장
+        DetectionLog logEntity = DetectionLog.builder()
                 .camera(camera)
                 .vehicle(vehicle)
                 .plateNumber(request.getPlateNumber())
-                // [반영] 하달 사항: detectionType 반드시 세팅
-                .detectionType(request.getDetectionType())
-                .confidenceScore(java.math.BigDecimal.valueOf(request.getConfidenceScore()))
-                .imagePath(request.getImagePath())
+                .detectionType(request.getDetectionType()) // VEHICLE 또는 PLATE
+                .confidenceScore(java.math.BigDecimal.valueOf(request.getConfidenceScore())) // 0.0 ~ 1.0
+                .imagePath(request.getImagePath()) // 물리 저장 경로
+                // .imageUrl(request.getImageUrl()) // 만약 DetectionLog 엔티티에 필드가 있다면 추가 저장
                 .detectedAt(request.getDetectedAt())
                 .build();
 
         DetectionLog savedLog = detectionLogRepository.save(logEntity);
+
+        // 4. [규약 반영] 조회한 Camera의 directionType 기준으로 흐름 이벤트 처리
         vehicleFlowEventService.processFlowEvent(savedLog);
 
         return savedLog.getLogId();
     }
 
     /**
-     * 피드백 2-3 반영: AI 응답 값 null 검증 로직
+     * [통합 규격 반영] 필수 값 검증 로직 (cameraCode로 변경)
      */
     private void validateDetectionRequest(DetectionRequest request) {
-        if (request.getCameraId() == null || request.getPlateNumber() == null ||
+        if (request.getCameraCode() == null || request.getCameraCode().isBlank() ||
                 request.getConfidenceScore() == null || request.getDetectedAt() == null ||
                 request.getDetectionType() == null) {
 
-            throw new BusinessException("AI 분석 응답 필수 값이 누락되었습니다.", HttpStatus.BAD_GATEWAY);
+            throw new BusinessException("AI 서버 전송 데이터 중 필수 값이 누락되었습니다.", HttpStatus.BAD_REQUEST);
+        }
+
+        // 신뢰도 점수 범위 추가 검증
+        if (request.getConfidenceScore() < 0.0 || request.getConfidenceScore() > 1.0) {
+            throw new BusinessException("신뢰도 점수는 0.0에서 1.0 사이여야 합니다.", HttpStatus.BAD_REQUEST);
         }
     }
 

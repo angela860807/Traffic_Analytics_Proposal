@@ -3,11 +3,13 @@ package com.example.traffic.controller;
 import com.example.traffic.dto.request.DetectionRequest;
 import com.example.traffic.dto.response.CommonResponse;
 import com.example.traffic.dto.response.DetectionResponse;
+import com.example.traffic.etc.BusinessException;
 import com.example.traffic.service.DetectionLogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,9 +22,22 @@ public class DetectionLogController {
 
     private final DetectionLogService detectionLogService;
 
+    private final String INTERNAL_API_KEY = "your-team-key";
+
     @Operation(summary = "AI 탐지 데이터 처리", description = "AI 서버로부터 받은 데이터를 검증하고 저장합니다.")
     @PostMapping
-    public CommonResponse<Long> processDetection(@Valid @RequestBody DetectionRequest request) {
+    public CommonResponse<Long> processDetection(
+            @RequestHeader(value = "X-Internal-Api-Key", required = false) String apiKey, // 헤더 추가
+            @Valid @RequestBody DetectionRequest request) {
+
+        // 1. API Key 존재 여부 및 값 검증 (규약 반영)
+        if (apiKey == null) {
+            throw new BusinessException("API Key가 누락되었습니다.", HttpStatus.UNAUTHORIZED);
+        }
+        if (!INTERNAL_API_KEY.equals(apiKey)) {
+            throw new BusinessException("잘못된 API Key입니다.", HttpStatus.FORBIDDEN);
+        }
+
         Long logId = detectionLogService.processDetection(request);
         return CommonResponse.success(logId, "탐지 데이터가 성공적으로 처리되었습니다.");
     }

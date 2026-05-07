@@ -39,6 +39,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 
+                        // [추가] AI 서버 탐지 로그 전송 API: JWT 인증 제외
+                        // 대신 Controller에서 X-Internal-Api-Key로 보안 처리함
+                        .requestMatchers(HttpMethod.POST, "/api/v1/detection-logs").permitAll()
+
                         // 공지사항 권한
                         .requestMatchers(HttpMethod.GET, "/api/notices/**").permitAll()
                         .requestMatchers("/api/notices/**").hasRole("ADMIN")

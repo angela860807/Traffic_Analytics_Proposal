@@ -21,8 +21,8 @@ public enum Direction {
         try {
             return Direction.valueOf(value.toUpperCase());
         } catch (IllegalArgumentException e) {
-            // [2-2 반영] 일반 예외가 아닌 502 성격의 BusinessException으로 명확하게 던짐
-            throw new BusinessException("잘못된 방향 값입니다: " + value, HttpStatus.BAD_GATEWAY);
+            // 502 -> 400으로 변경 권장
+            throw new BusinessException("잘못된 방향 값입니다: " + value, HttpStatus.BAD_REQUEST);
         }
     }
 }

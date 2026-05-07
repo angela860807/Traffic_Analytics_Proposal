@@ -20,8 +20,8 @@ public enum DetectionType {
         try {
             return DetectionType.valueOf(value.toUpperCase());
         } catch (IllegalArgumentException e) {
-            // AI 탐지 결과와 직결되므로 502 처리
-            throw new BusinessException("잘못된 탐지 타입입니다: " + value, HttpStatus.BAD_GATEWAY);
+            // AI가 잘못된 값을 보낸 것이므로 400 에러가 더 적절합니다.
+            throw new BusinessException("잘못된 탐지 타입입니다: " + value, HttpStatus.BAD_REQUEST);
         }
     }
 }

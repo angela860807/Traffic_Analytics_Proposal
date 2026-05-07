@@ -34,9 +34,9 @@ public class VehicleFlowEventService {
     }
 
     /**
-     * [핵심 로직] 탐지 로그를 분석하여 실시간 교통 흐름 이벤트 확정[cite: 5, 6]
+     * [핵심 로직] 탐지 로그를 분석하여 실시간 교통 흐름 이벤트 확정
      */
-    @Transactional
+    @Transactional // ★ 이 부분을 반드시 추가해야 INSERT가 가능합니다!
     public FlowEventResponse processFlowEvent(DetectionLog currentLog) {
         // 1. 중복 감지 체크 (10초 이내 동일 차량 + 동일 구역)[cite: 5, 6]
         LocalDateTime windowTime = currentLog.getDetectedAt().minusSeconds(10);
