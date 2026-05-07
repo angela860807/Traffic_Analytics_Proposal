@@ -22,7 +22,7 @@ public class DetectionLogController {
 
     private final DetectionLogService detectionLogService;
 
-    private final String INTERNAL_API_KEY = "your-team-key";
+    private final String INTERNAL_API_KEY = "traffic-ai-internal-key-2026";
 
     @Operation(summary = "AI 탐지 데이터 처리", description = "AI 서버로부터 받은 데이터를 검증하고 저장합니다.")
     @PostMapping

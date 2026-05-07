@@ -53,10 +53,10 @@ public class DetectionLogService {
                 .camera(camera)
                 .vehicle(vehicle)
                 .plateNumber(request.getPlateNumber())
-                .detectionType(request.getDetectionType()) // VEHICLE 또는 PLATE
-                .confidenceScore(java.math.BigDecimal.valueOf(request.getConfidenceScore())) // 0.0 ~ 1.0
-                .imagePath(request.getImagePath()) // 물리 저장 경로
-                // .imageUrl(request.getImageUrl()) // 만약 DetectionLog 엔티티에 필드가 있다면 추가 저장
+                .detectionType(request.getDetectionType())
+                .confidenceScore(java.math.BigDecimal.valueOf(request.getConfidenceScore()))
+                .imagePath(request.getImagePath())
+                .imageUrl(request.getImageUrl())
                 .detectedAt(request.getDetectedAt())
                 .build();
 

@@ -46,6 +46,10 @@ public class DetectionLog {
     @Column(length = 255)
     private String imagePath;
 
+    // 하달 사항: Vue 화면 표시용 URL 필드 추가
+    @Column(length = 500)
+    private String imageUrl;
+
     @Column(nullable = false)
     private LocalDateTime detectedAt;
 
@@ -54,13 +58,14 @@ public class DetectionLog {
 
     @Builder
     public DetectionLog(Camera camera, Vehicle vehicle, String plateNumber, DetectionType detectionType,
-                        BigDecimal confidenceScore, String imagePath, LocalDateTime detectedAt) {
+                        BigDecimal confidenceScore, String imagePath, String imageUrl, LocalDateTime detectedAt) {
         this.camera = camera;
         this.vehicle = vehicle;
         this.plateNumber = plateNumber;
         this.detectionType = detectionType;
         this.confidenceScore = confidenceScore;
         this.imagePath = imagePath;
+        this.imageUrl = imageUrl;
         this.detectedAt = (detectedAt != null) ? detectedAt : LocalDateTime.now();
         this.createdAt = LocalDateTime.now();
     }
