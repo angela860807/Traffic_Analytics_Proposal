@@ -117,13 +117,42 @@ async def create_and_send_detection_from_image(
     captured_at: datetime = Form(..., alias="capturedAt"),
     image: UploadFile = File(...),
 ) -> DetectionResponse:
+    if image.content_type not in {"image/jpeg", "image/png"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="image must be jpeg or png",
+        )
+
     image_bytes = await image.read()
-    result = await inference_service.detect_from_image_bytes(
-        camera_code=camera_code,
-        captured_at=captured_at,
-        image_bytes=image_bytes,
-    )
-    await backend_client.send_detection(result)
+
+    try:
+        result = await inference_service.detect_from_image_bytes(
+            camera_code=camera_code,
+            captured_at=captured_at,
+            image_bytes=image_bytes,
+        )
+        await backend_client.send_detection(result)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="image must be a valid jpg or png",
+        ) from exc
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Spring Boot API returned error: {exc.response.status_code}",
+        ) from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Spring Boot API is not reachable",
+        ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
+
     return DetectionResponse(
         accepted=True,
         message="Detection result sent to backend",

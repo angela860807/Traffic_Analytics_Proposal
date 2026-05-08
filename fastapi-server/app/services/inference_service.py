@@ -98,6 +98,7 @@ class InferenceService:
             image_url=image_url,
         )
 
+
 # TODO:
-# mock detector와 mock recognizer를 실제 YOLO/OCR 서비스로 교체한다.
-# API 라우터가 모델 세부 구현에 의존하지 않도록 DetectionResult 응답 구조는 안정적으로 유지한다.
+# Replace the mock detector/recognizer with the real YOLO/OCR services.
+# Keep DetectionResult stable so API callers do not depend on model internals.
