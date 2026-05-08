@@ -3,7 +3,6 @@ package com.example.traffic.config;
 import com.example.traffic.security.CustomUserDetailsService;
 import com.example.traffic.security.JwtAuthenticationFilter;
 import com.example.traffic.security.JwtTokenProvider;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,6 +15,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -33,27 +37,43 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 
-                        // [추가] AI 서버 탐지 로그 전송 API: JWT 인증 제외
-                        // 대신 Controller에서 X-Internal-Api-Key로 보안 처리함
+                        // FastAPI internal ingestion endpoint. Controller checks X-Internal-Api-Key.
                         .requestMatchers(HttpMethod.POST, "/api/v1/detection-logs").permitAll()
 
-                        // 공지사항 권한
+                        // TODO(frontend-integration): Temporary permitAll for Vue first-pass integration.
+                        // Remove this GET rule after JWT login is wired from Vue and protect it with authenticated().
+                        .requestMatchers(HttpMethod.GET, "/api/v1/detection-logs/**").permitAll()
+                        // TODO(frontend-integration): Temporary permitAll for Vue flow count dashboard integration.
+                        // Remove this GET rule after JWT login is wired from Vue and protect it with authenticated().
+                        .requestMatchers(HttpMethod.GET, "/api/flow-events/stats/count").permitAll()
+                        // TODO(frontend-integration): Temporary permitAll for Vue camera/zone dashboard integration.
+                        // Remove these GET rules after JWT login is wired from Vue and protect them with authenticated().
+                        .requestMatchers(HttpMethod.GET, "/api/zones").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/cameras").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/cameras/**").permitAll()
+                        // TODO(frontend-integration): Temporary permitAll for Vue hourly stats dashboard integration.
+                        // Remove this GET rule after JWT login is wired from Vue and protect it with authenticated().
+                        .requestMatchers(HttpMethod.GET, "/api/stats/hourly").permitAll()
+
+                        // Notice permissions
                         .requestMatchers(HttpMethod.GET, "/api/notices/**").permitAll()
                         .requestMatchers("/api/notices/**").hasRole("ADMIN")
 
-                        // 게시글 권한
-                        .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll() // 목록/상세 조회는 누구나 가능
+                        // Post permissions
+                        .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll()
 
-                        // QnA 권한 중앙 제어
-                        .requestMatchers(HttpMethod.GET, "/api/qna/**").permitAll() // 목록/상세 조가는 누구나 가능
-                        .requestMatchers(HttpMethod.POST, "/api/qna/questions/*/answers").hasRole("ADMIN") // 답변 작성은 관리자만
-                        .requestMatchers("/api/qna/**").authenticated() // 그 외(질문 등록/삭제 등)는 인증된 사용자만
+                        // QnA permissions
+                        .requestMatchers(HttpMethod.GET, "/api/qna/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/qna/questions/*/answers").hasRole("ADMIN")
+                        .requestMatchers("/api/qna/**").authenticated()
 
                         .anyRequest().authenticated()
                 )
@@ -61,5 +81,22 @@ public class SecurityConfig {
                         UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of(
+                "http://localhost:5173",
+                "http://127.0.0.1:5173"
+        ));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Internal-Api-Key"));
+        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }

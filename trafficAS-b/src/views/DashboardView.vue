@@ -113,6 +113,7 @@ import StatsTab    from '@/components/dashboard/StatsTab.vue'
 import AlertsTab   from '@/components/dashboard/AlertsTab.vue'
 import { useTheme } from '@/composables/useTheme'
 import { levelColor } from '@/utils/levelColor'
+import { apiGet } from '@/api/client'
 
 const { isDark } = useTheme()
 
@@ -165,6 +166,10 @@ function connectWS() {
 const timeStr  = ref('')
 const totalV   = ref(1248), avgSpd = ref(31), cIdx = ref(68)
 const flowIn   = ref(842),  flowOut = ref(406), accCnt = ref(2)
+const flowCountsConnected = ref(false)
+const cameraListConnected = ref(false)
+const hourlyStatsConnected = ref(false)
+const FLOW_ZONE_ID = Number(import.meta.env.VITE_DEFAULT_ZONE_ID || 1)
 
 const kpis = computed(() => [
   { label:'감지 차량', value: totalV.value.toLocaleString(), unit:'대',    color:'var(--a)',      type:'bar', pct: Math.min(Math.round((totalV.value/2000)*100),100) },
@@ -194,6 +199,146 @@ const plates = ref([
   { id:5, num:'서울 90마 1234', dir:'OUT', cam:'CAM-05', time:'14:28', conf:96.7 },
   { id:6, num:'경기 11바 2345', dir:'IN',  cam:'CAM-06', time:'14:24', conf:97.9 },
 ])
+
+async function loadDetectionLogs() {
+  try {
+    const body = await apiGet('/api/v1/detection-logs')
+    const rows = body.data || []
+
+    plates.value = rows.map(log => ({
+      id: log.logId,
+      num: log.plateNumber,
+      dir: log.directionType || '-',
+      cam: log.cameraName || '-',
+      time: log.detectedAt ? log.detectedAt.slice(11, 16) : '-',
+      conf: log.confidenceScore != null
+        ? Math.round(log.confidenceScore * 1000) / 10
+        : 0,
+      imagePath: log.imagePath || '',
+      imageUrl: log.imageUrl || '',
+    }))
+  } catch (error) {
+    console.warn('Failed to load detection logs', error)
+  }
+}
+
+function toLocalDateParam(date) {
+  const pad = (value) => String(value).padStart(2, '0')
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+  ].join('-')
+}
+
+function toLocalDateTimeParam(date) {
+  const pad = (value) => String(value).padStart(2, '0')
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+  ].join('-') + 'T' + [
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds()),
+  ].join(':')
+}
+
+async function loadFlowCounts() {
+  const now = new Date()
+  const start = new Date(now)
+  start.setHours(0, 0, 0, 0)
+
+  const params = new URLSearchParams({
+    zoneId: String(FLOW_ZONE_ID),
+    start: toLocalDateTimeParam(start),
+    end: toLocalDateTimeParam(now),
+  })
+
+  try {
+    const [inCount, outCount] = await Promise.all([
+      apiGet(`/api/flow-events/stats/count?${params.toString()}&direction=IN`),
+      apiGet(`/api/flow-events/stats/count?${params.toString()}&direction=OUT`),
+    ])
+
+    flowIn.value = Number(inCount) || 0
+    flowOut.value = Number(outCount) || 0
+    flowCountsConnected.value = true
+  } catch (error) {
+    flowCountsConnected.value = false
+    console.warn('Failed to load flow counts', error)
+  }
+}
+
+async function loadZonesAndCameras() {
+  try {
+    const zones = await apiGet('/api/zones')
+    if (!Array.isArray(zones) || zones.length === 0) {
+      cameraListConnected.value = false
+      return
+    }
+
+    heatZones.splice(0, heatZones.length, ...zones.map((zone, index) => ({
+      name: zone.zoneName || zone.zoneCode || `ZONE-${zone.zoneId}`,
+      pct: heatZones[index]?.pct ?? 50,
+    })))
+
+    const selectedZone = zones.find(zone => Number(zone.zoneId) === FLOW_ZONE_ID) || zones[0]
+    const cameras = await apiGet(`/api/cameras?zoneId=${selectedZone.zoneId}`)
+    if (!Array.isArray(cameras) || cameras.length === 0) {
+      cameraListConnected.value = false
+      return
+    }
+
+    cameras.slice(0, segments.length).forEach((camera, index) => {
+      const segment = segments[index]
+      if (!segment) return
+
+      segment.name = camera.cameraName || camera.zoneName || camera.cameraCode || segment.name
+      segment.cam = camera.cameraCode || camera.cameraName || segment.cam
+      segment.dir = camera.directionType || segment.dir
+      segment.conf = camera.isActive === false ? 0 : segment.conf
+    })
+
+    cameraListConnected.value = true
+  } catch (error) {
+    cameraListConnected.value = false
+    console.warn('Failed to load zones or cameras', error)
+  }
+}
+
+async function loadHourlyStats() {
+  const params = new URLSearchParams({
+    statDate: toLocalDateParam(new Date()),
+    zoneId: String(FLOW_ZONE_ID),
+  })
+
+  try {
+    const rows = await apiGet(`/api/stats/hourly?${params.toString()}`)
+    if (!Array.isArray(rows) || rows.length === 0) {
+      hourlyStatsConnected.value = false
+      return
+    }
+
+    const totalsByHour = new Map(rows.map(row => [
+      Number(row.statHour),
+      Number(row.totalCount) || 0,
+    ]))
+    const hours = Array.from({ length: 12 }, (_, index) => index + 7)
+    const values = hours.map(hour => totalsByHour.get(hour) ?? 0)
+
+    if (!values.some(value => value > 0)) {
+      hourlyStatsConnected.value = false
+      return
+    }
+
+    chartData.splice(0, chartData.length, ...values)
+    hourlyStatsConnected.value = true
+  } catch (error) {
+    hourlyStatsConnected.value = false
+    console.warn('Failed to load hourly stats', error)
+  }
+}
 
 const incidents = ref([
   { id:1, time:'14:38', type:'교통사고', loc:'강남구 테헤란로 119',   lv:'H' },
@@ -272,7 +417,7 @@ function openFullscreen(seg) { fullscreenSeg.value = seg }
 function closeFullscreen()   { fullscreenSeg.value = null }
 
 /* ── 라이프사이클 ── */
-let clockTimer = null, dataTimer = null
+let clockTimer = null, dataTimer = null, logTimer = null, flowTimer = null, cameraTimer = null, statsTimer = null
 
 onMounted(() => {
   clockTimer = setInterval(() => {
@@ -281,19 +426,31 @@ onMounted(() => {
   }, 1000)
 
   connectWS()
+  loadDetectionLogs()
+  loadFlowCounts()
+  loadZonesAndCameras()
+  loadHourlyStats()
+  logTimer = setInterval(loadDetectionLogs, 5000)
+  flowTimer = setInterval(loadFlowCounts, 5000)
+  cameraTimer = setInterval(loadZonesAndCameras, 30000)
+  statsTimer = setInterval(loadHourlyStats, 30000)
 
   dataTimer = setInterval(() => {
     totalV.value  = 1100 + Math.round(Math.random()*300)
     avgSpd.value  = 27   + Math.round(Math.random()*9)
     cIdx.value    = 60   + Math.round(Math.random()*15)
-    flowIn.value  = 750  + Math.round(Math.random()*200)
-    flowOut.value = 350  + Math.round(Math.random()*150)
+    if (!flowCountsConnected.value) {
+      flowIn.value  = 750  + Math.round(Math.random()*200)
+      flowOut.value = 350  + Math.round(Math.random()*150)
+    }
 segments.forEach(s => {
       s.spd = Math.max(5, s.spd + (Math.random()>.5?1:-1)*Math.random()*2)
       s.cnt = Math.max(10, s.cnt + Math.round((Math.random()-.5)*6))
     })
     heatZones.forEach(z => { z.pct = Math.max(10,Math.min(95,z.pct+Math.round((Math.random()-.5)*5))) })
-    chartData.push(6000+Math.round(Math.random()*3000)); chartData.shift()
+    if (!hourlyStatsConnected.value) {
+      chartData.push(6000+Math.round(Math.random()*3000)); chartData.shift()
+    }
   }, 4000)
 
   setTimeout(() => pushNotif('H','테헤란로 혼잡 감지','평균 속도 12km/h — 임계값 초과'), 2000)
@@ -301,7 +458,7 @@ segments.forEach(s => {
 })
 
 onUnmounted(() => {
-  clearInterval(clockTimer); clearInterval(dataTimer)
+  clearInterval(clockTimer); clearInterval(dataTimer); clearInterval(logTimer); clearInterval(flowTimer); clearInterval(cameraTimer); clearInterval(statsTimer)
   if (wsRetry) clearTimeout(wsRetry)
   if (ws) ws.close()
 })
