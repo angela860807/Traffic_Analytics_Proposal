@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -38,7 +37,7 @@ public class VehicleFlowEventService {
      * [핵심 로직] 탐지 로그를 분석하여 실시간 교통 흐름 이벤트 확정
      */
     @Transactional // ★ 이 부분을 반드시 추가해야 INSERT가 가능합니다!
-    public FlowEventResponse processFlowEvent(DetectionLog currentLog, Double speed, Long stayTime) {
+    public FlowEventResponse processFlowEvent(DetectionLog currentLog) {
         // 1. 중복 감지 체크 (10초 이내 동일 차량 + 동일 구역)[cite: 5, 6]
         LocalDateTime windowTime = currentLog.getDetectedAt().minusSeconds(10);
 
@@ -69,8 +68,6 @@ public class VehicleFlowEventService {
                 .flowDirection(direction)
                 .eventAt(currentLog.getDetectedAt())
                 .sourceDetectionLog(currentLog)
-                .speed(speed != null ? BigDecimal.valueOf(speed) : null)
-                .stayTime(stayTime)
                 .build();
 
         VehicleFlowEvent savedEvent = flowEventRepository.save(flowEvent);

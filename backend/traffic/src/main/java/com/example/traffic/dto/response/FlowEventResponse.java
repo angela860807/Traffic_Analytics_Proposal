@@ -15,8 +15,6 @@ public class FlowEventResponse {
     private final String cameraName; //[cite: 6]
     private final Direction flowDirection; //[cite: 6]
     private final LocalDateTime eventAt; //[cite: 6]
-    private final Double speed;
-    private final Long stayTime;
 
     public static FlowEventResponse from(VehicleFlowEvent event) {
         return FlowEventResponse.builder()
@@ -25,8 +23,6 @@ public class FlowEventResponse {
                 .cameraName(event.getCamera().getCameraName()) //[cite: 6]
                 .flowDirection(event.getFlowDirection()) //[cite: 6]
                 .eventAt(event.getEventAt()) //[cite: 6]
-                .speed(event.getSpeed() != null ? event.getSpeed().doubleValue() : null)
-                .stayTime(event.getStayTime())
                 .build();
     }
 }

@@ -1,17 +1,12 @@
 package com.example.traffic.controller;
 
-import com.example.traffic.domain.Zone;
 import com.example.traffic.dto.request.TrafficStatSearchRequest;
 import com.example.traffic.dto.response.TrafficStatResponse;
-import com.example.traffic.etc.BusinessException;
-import com.example.traffic.repository.ZoneRepository;
 import com.example.traffic.service.HourlyTrafficStatService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -20,7 +15,6 @@ import java.util.List;
 public class HourlyTrafficStatController {
 
     private final HourlyTrafficStatService hourlyTrafficStatService;
-    private final ZoneRepository zoneRepository;
 
     /**
      * [시간대별 통계 조회] 날짜와 구역 ID를 조건으로 통계 목록을 가져옵니다.
@@ -43,12 +37,6 @@ public class HourlyTrafficStatController {
             @RequestParam Long zoneId,
             @RequestParam String targetTime) {
         // 실제 운영 시에는 zoneId로 Zone 객체를 조회한 후 서비스를 호출하는 로직이 추가됩니다.
-        Zone zone = zoneRepository.findById(zoneId)
-                .orElseThrow(() -> new BusinessException("Zone not found.", HttpStatus.NOT_FOUND));
-
-        LocalDateTime parsedTargetTime = LocalDateTime.parse(targetTime);
-        hourlyTrafficStatService.aggregateHourlyStats(zone, parsedTargetTime);
-
         return ResponseEntity.accepted().build();
     }
 }
