@@ -27,6 +27,8 @@ public class DetectionRequest {
     @NotBlank(message = "이미지 경로는 필수입니다.")
     private String imagePath; // 저장/추적용 물리 경로
 
+    private String preprocessedPath;
+
     private String imageUrl; // Vue 화면 표시용 URL 추가
 
     @NotNull(message = "탐지 시각은 필수입니다.")
