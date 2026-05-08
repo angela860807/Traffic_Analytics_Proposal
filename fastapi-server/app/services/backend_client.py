@@ -12,7 +12,7 @@ class BackendClient:
         url = f"{SPRING_BACKEND_BASE_URL}{SPRING_DETECTION_PATH}"
         headers = {
             "X-Internal-Api-Key": BACKEND_INTERNAL_API_KEY,
-            "Content_Type": "application/json",
+            "Content-Type": "application/json",
         }
 
         payload = result.model_dump(
