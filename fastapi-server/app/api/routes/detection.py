@@ -110,3 +110,22 @@ async def create_and_send_mock_detection(
         message="Mock detection result sent to backend",
         data=result,
     )
+
+@router.post("/image/send", response_model=DetectionResponse)
+async def create_and_send_detection_from_image(
+    camera_code: str = Form(..., alias="cameraCode"),
+    captured_at: datetime = Form(..., alias="capturedAt"),
+    image: UploadFile = File(...),
+) -> DetectionResponse:
+    image_bytes = await image.read()
+    result = await inference_service.detect_from_image_bytes(
+        camera_code=camera_code,
+        captured_at=captured_at,
+        image_bytes=image_bytes,
+    )
+    await backend_client.send_detection(result)
+    return DetectionResponse(
+        accepted=True,
+        message="Detection result sent to backend",
+        data=result,
+    )
