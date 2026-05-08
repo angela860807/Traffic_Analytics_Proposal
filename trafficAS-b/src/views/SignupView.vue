@@ -259,7 +259,7 @@
 
               <!-- 비밀번호 -->
               <div class="field" :class="{ focused: focus === 'pw', filled: password }">
-                <label>비밀번호 <span class="req">6자 이상</span></label>
+                <label>비밀번호 <span class="req">4자 이상</span></label>
                 <div class="input-wrap">
                   <span class="iico">
                     <svg
@@ -280,7 +280,7 @@
                   <input
                     v-model="password"
                     :type="showPw ? 'text' : 'password'"
-                    placeholder="6자 이상 입력"
+                    placeholder="4자 이상 입력"
                     autocomplete="new-password"
                     @focus="focus = 'pw'"
                     @blur="focus = ''"
@@ -478,7 +478,7 @@ const pwStrength = computed(() => {
   const p = password.value;
   if (!p) return 0;
   let s = 0;
-  if (p.length >= 6) s += 25;
+  if (p.length >= 4) s += 25;
   if (p.length >= 10) s += 25;
   if (/[A-Z]/.test(p) || /[0-9]/.test(p)) s += 25;
   if (/[^a-zA-Z0-9]/.test(p)) s += 25;
@@ -521,8 +521,8 @@ const nextStep = () => {
 
 const handleSubmit = async () => {
   error.value = "";
-  if (password.value.length < 6) {
-    error.value = "비밀번호는 6자 이상이어야 합니다.";
+  if (password.value.length < 4) {
+    error.value = "비밀번호는 4자 이상이어야 합니다.";
     return;
   }
   if (password.value !== confirm.value) {
@@ -532,7 +532,7 @@ const handleSubmit = async () => {
   loading.value = true;
   await new Promise((r) => setTimeout(r, 700));
   try {
-    signup(name.value, email.value, phone.value, password.value);
+    await signup(name.value, email.value, phone.value, password.value);
     router.push("/");
   } catch (e) {
     error.value = e.message;

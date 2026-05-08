@@ -68,7 +68,7 @@
               <input
                 v-model="password"
                 type="password"
-                placeholder="6자 이상"
+                placeholder="4자 이상"
                 autocomplete="new-password"
               />
             </label>
@@ -113,28 +113,28 @@ watch(modalMode, () => {
   confirm.value = "";
 });
 
-const handleLogin = () => {
+const handleLogin = async () => {
   error.value = "";
   if (!email.value || !password.value) {
     error.value = "이메일과 비밀번호를 입력하세요.";
     return;
   }
   try {
-    login(email.value, password.value);
+    await login(email.value, password.value);
     closeModal();
   } catch (e) {
     error.value = e.message;
   }
 };
 
-const handleSignup = () => {
+const handleSignup = async () => {
   error.value = "";
   if (!name.value || !email.value || !password.value) {
     error.value = "모든 항목을 입력하세요.";
     return;
   }
-  if (password.value.length < 6) {
-    error.value = "비밀번호는 6자 이상이어야 합니다.";
+  if (password.value.length < 4) {
+    error.value = "비밀번호는 4자 이상이어야 합니다.";
     return;
   }
   if (password.value !== confirm.value) {
@@ -142,7 +142,7 @@ const handleSignup = () => {
     return;
   }
   try {
-    signup(name.value, email.value, password.value);
+    await signup(name.value, email.value, '', password.value);
     closeModal();
   } catch (e) {
     error.value = e.message;

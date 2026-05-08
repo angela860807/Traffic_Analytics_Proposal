@@ -40,5 +40,18 @@ services:
     volumes:
       - ./fastapi-server/storage:/app/storage
 
+  frontend:
+    build:
+      context: ./trafficAS-b
+      args:
+        VITE_API_BASE_URL: ""
+        VITE_FASTAPI_BASE_URL: ""
+    container_name: traffic-frontend
+    depends_on:
+      - spring-backend
+      - fastapi-server
+    ports:
+      - "5173:80"
+
 volumes:
   traffic_postgres_data:

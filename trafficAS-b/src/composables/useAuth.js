@@ -1,53 +1,97 @@
 import { ref, computed } from 'vue'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+
 const _user = ref(JSON.parse(localStorage.getItem('tas_user') || 'null'))
 const _showModal = ref(false)
 const _modalMode = ref('login')
 
-const ADMIN_EMAIL = 'admin@trafficAS.com'
-const ADMIN_PW    = 'admin1234'
+function parseJwtPayload(token) {
+  if (!token) return {}
 
-// 관리자 계정 항상 최신 상태로 동기화
-;(() => {
-  const stored = JSON.parse(localStorage.getItem('tas_users') || '[]')
-  const idx = stored.findIndex(u => u.email === ADMIN_EMAIL)
-  const admin = { name: '관리자', email: ADMIN_EMAIL, phone: '', password: ADMIN_PW }
-  if (idx === -1) stored.push(admin)
-  else stored[idx] = admin
-  localStorage.setItem('tas_users', JSON.stringify(stored))
-})()
+  try {
+    const base64Url = token.split('.')[1]
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const json = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((char) => `%${(`00${char.charCodeAt(0).toString(16)}`).slice(-2)}`)
+        .join('')
+    )
+    return JSON.parse(json)
+  } catch {
+    return {}
+  }
+}
+
+async function readApiBody(res) {
+  const text = await res.text()
+  if (!text) return {}
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { message: text }
+  }
+}
 
 export function useAuth() {
-  const isLoggedIn  = computed(() => !!_user.value)
+  const isLoggedIn = computed(() => !!_user.value)
   const currentUser = computed(() => _user.value)
-  const isAdmin     = computed(() => _user.value?.email === ADMIN_EMAIL)
-  const showModal   = _showModal
-  const modalMode   = _modalMode
+  const isAdmin = computed(() => _user.value?.role === 'ADMIN')
+  const showModal = _showModal
+  const modalMode = _modalMode
 
-  const openLogin  = () => { _modalMode.value = 'login';  _showModal.value = true }
+  const openLogin = () => { _modalMode.value = 'login'; _showModal.value = true }
   const openSignup = () => { _modalMode.value = 'signup'; _showModal.value = true }
   const closeModal = () => { _showModal.value = false }
 
-  const signup = (name, email, phone, password) => {
-    const stored = JSON.parse(localStorage.getItem('tas_users') || '[]')
-    if (stored.find(u => u.email === email)) throw new Error('이미 사용 중인 이메일입니다.')
-    stored.push({ name, email, phone, password })
-    localStorage.setItem('tas_users', JSON.stringify(stored))
-    const user = { name, email, phone }
+  const signup = async (name, email, phone, password) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, phone, password }),
+    })
+    const body = await readApiBody(res)
+
+    if (!res.ok || body.success === false) {
+      throw new Error(body.message || '회원가입에 실패했습니다.')
+    }
+
+    const user = body.data
     localStorage.setItem('tas_user', JSON.stringify(user))
     _user.value = user
+    return user
   }
 
-  const login = (email, password) => {
-    const stored = JSON.parse(localStorage.getItem('tas_users') || '[]')
-    const found  = stored.find(u => u.email === email && u.password === password)
-    if (!found) throw new Error('이메일 또는 비밀번호가 올바르지 않습니다.')
-    const user = { name: found.name, email: found.email }
+  const login = async (email, password) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    const body = await readApiBody(res)
+
+    if (!res.ok || body.success === false) {
+      throw new Error(body.message || '이메일 또는 비밀번호가 올바르지 않습니다.')
+    }
+
+    const token = body.data?.accessToken
+    const payload = parseJwtPayload(token)
+    const role = payload.auth === 'ROLE_ADMIN' ? 'ADMIN' : 'USER'
+    const user = { email: payload.sub || email, role }
+
+    localStorage.setItem('tas_access_token', token)
+    localStorage.setItem('tas_refresh_token', body.data?.refreshToken || '')
     localStorage.setItem('tas_user', JSON.stringify(user))
     _user.value = user
+
+    return user
   }
 
   const logout = () => {
+    localStorage.removeItem('tas_access_token')
+    localStorage.removeItem('tas_refresh_token')
     localStorage.removeItem('tas_user')
     _user.value = null
   }
