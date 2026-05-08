@@ -5,7 +5,6 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
@@ -28,8 +27,6 @@ public class DetectionRequest {
     @NotBlank(message = "이미지 경로는 필수입니다.")
     private String imagePath; // 저장/추적용 물리 경로
 
-    private String preprocessedPath;
-
     private String imageUrl; // Vue 화면 표시용 URL 추가
 
     @NotNull(message = "탐지 시각은 필수입니다.")
@@ -37,10 +34,4 @@ public class DetectionRequest {
 
     @NotNull(message = "탐지 유형은 필수입니다.")
     private DetectionType detectionType;
-
-    @PositiveOrZero(message = "Speed must be zero or greater.")
-    private Double speed;
-
-    @PositiveOrZero(message = "Stay time must be zero or greater.")
-    private Long stayTime;
 }

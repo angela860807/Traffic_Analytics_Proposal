@@ -7,7 +7,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -47,24 +46,15 @@ public class VehicleFlowEvent {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(precision = 5, scale = 2)
-    private BigDecimal speed;
-
-    @Column
-    private Long stayTime;
-
     @Builder
     public VehicleFlowEvent(Vehicle vehicle, Camera camera, Zone zone, Direction flowDirection,
-                            LocalDateTime eventAt, DetectionLog sourceDetectionLog,
-                            BigDecimal speed, Long stayTime) {
+                            LocalDateTime eventAt, DetectionLog sourceDetectionLog) {
         this.vehicle = vehicle;
         this.camera = camera;
         this.zone = zone;
         this.flowDirection = flowDirection;
         this.eventAt = (eventAt != null) ? eventAt : LocalDateTime.now();
         this.sourceDetectionLog = sourceDetectionLog;
-        this.speed = (speed != null) ? speed : BigDecimal.ZERO;
-        this.stayTime = (stayTime != null) ? stayTime : 0L;
         this.createdAt = LocalDateTime.now();
     }
 }
