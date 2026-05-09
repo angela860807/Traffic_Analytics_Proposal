@@ -1,4 +1,5 @@
 import base64
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -15,5 +16,18 @@ class ImageDecoder:
 
         if image is None:
             raise ValueError("image must be a valid jpg or png")
+
+        return image
+
+    def decode_image_file(self, image_path: str) -> np.ndarray:
+        path = Path(image_path)
+
+        if not path.exists():
+            raise ValueError("image file does not exist")
+
+        image = cv2.imread(str(path))
+
+        if image is None:
+            raise ValueError("image file must be a valid jpg or png")
 
         return image
