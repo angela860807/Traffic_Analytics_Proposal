@@ -54,4 +54,7 @@ OCR_MIN_CONFIDENCE = float(os.getenv("OCR_MIN_CONFIDENCE", "0.5"))
 OCR_PREPROCESS_SCALE = float(os.getenv("OCR_PREPROCESS_SCALE", "2.0"))
 OCR_ADAPTIVE_BLOCK_SIZE = int(os.getenv("OCR_ADAPTIVE_BLOCK_SIZE", "31"))
 OCR_ADAPTIVE_C = int(os.getenv("OCR_ADAPTIVE_C", "5"))
-SAVE_PLATE_CROP = os.getenv("SAVE_PLATE_CROP", "false").lower() == "true"
+SAVE_PLATE_CROP = os.getenv("SAVE_PLATE_CROP", "true").lower() == "true"
+SAVE_OCR_PREPROCESSED_IMAGE = (
+    os.getenv("SAVE_OCR_PREPROCESSED_IMAGE", "true").lower() == "true"
+)

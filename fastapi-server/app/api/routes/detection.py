@@ -13,6 +13,10 @@ inference_service = InferenceService()
 backend_client = BackendClient()
 
 
+def should_send_to_backend(result) -> bool:
+    return result.detection_type == "PLATE" and bool(result.plate_number)
+
+
 @router.post(
     "/mock",
     response_model=DetectionResponse,
@@ -83,6 +87,12 @@ async def create_and_send_mock_detection(
 ) -> DetectionResponse:
     try:
         result = await inference_service.detect_from_frame(request)
+        if not should_send_to_backend(result):
+            return DetectionResponse(
+                accepted=True,
+                message="Detection result created but not sent to backend because plate was not recognized",
+                data=result,
+            )
         await backend_client.send_detection(result)
     except ValueError as exc:
         raise HTTPException(
@@ -131,6 +141,12 @@ async def create_and_send_detection_from_image(
             captured_at=captured_at,
             image_bytes=image_bytes,
         )
+        if not should_send_to_backend(result):
+            return DetectionResponse(
+                accepted=True,
+                message="Detection result created but not sent to backend because plate was not recognized",
+                data=result,
+            )
         await backend_client.send_detection(result)
     except ValueError as exc:
         raise HTTPException(
