@@ -2,38 +2,15 @@ import time
 from datetime import datetime
 
 import cv2
-import requests
 from picamera2 import Picamera2
 
+from fastapi_client import FastApiClientError, upload_detection_image
+
 from config import (
-    CAMERA_CODE,
     CAMERA_HEIGHT,
     CAMERA_WIDTH,
     CAPTURE_INTERVAL_SECONDS,
-    DETECTION_IMAGE_SEND_URL,
-    REQUEST_TIMEOUT_SECONDS,
 )
-
-
-def upload_image(image_bytes: bytes, captured_at: datetime) -> dict:
-    data = {
-        "cameraCode": CAMERA_CODE,
-        "capturedAt": captured_at.replace(microsecond=0).isoformat(),
-    }
-
-    files = {
-        "image": ("capture.jpg", image_bytes, "image/jpeg"),
-    }
-
-    response = requests.post(
-        DETECTION_IMAGE_SEND_URL,
-        data=data,
-        files=files,
-        timeout=REQUEST_TIMEOUT_SECONDS,
-    )
-
-    response.raise_for_status()
-    return response.json()
 
 
 def main() -> None:
@@ -60,9 +37,9 @@ def main() -> None:
                 continue
 
             try:
-                result = upload_image(buffer.tobytes(), captured_at)
+                result = upload_detection_image(buffer.tobytes(), captured_at)
                 print(result)
-            except requests.RequestException as exc:
+            except FastApiClientError as exc:
                 print(f"upload failed: {exc}")
 
             time.sleep(CAPTURE_INTERVAL_SECONDS)

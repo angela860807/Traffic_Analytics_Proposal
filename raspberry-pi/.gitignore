@@ -6,3 +6,5 @@ logs/
 *.jpeg
 *.png
 *.mp4
+Thumbs.db
+desktop.ini

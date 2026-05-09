@@ -1,5 +1,13 @@
 import os
 
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    load_dotenv = None
+
+if load_dotenv is not None:
+    load_dotenv()
+
 
 FASTAPI_BASE_URL = os.getenv("FASTAPI_BASE_URL", "http://192.168.10.91:8000").rstrip("/")
 CAMERA_CODE = os.getenv("CAMERA_CODE", "CAM_001")
