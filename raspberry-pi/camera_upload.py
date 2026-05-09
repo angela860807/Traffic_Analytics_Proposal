@@ -1,15 +1,13 @@
 from datetime import datetime
 
 import cv2
-import requests
 from picamera2 import Picamera2
 
+from fastapi_client import upload_detection_image
+
 from config import (
-    CAMERA_CODE,
     CAMERA_HEIGHT,
     CAMERA_WIDTH,
-    DETECTION_IMAGE_SEND_URL,
-    REQUEST_TIMEOUT_SECONDS,
 )
 
 def capture_frame_as_jpeg() -> bytes:
@@ -32,30 +30,11 @@ def capture_frame_as_jpeg() -> bytes:
     
     return buffer.tobytes()
 
-def upload_image(image_bytes:bytes) -> dict:
-    data = {
-        "cameraCode": CAMERA_CODE,
-        "capturedAt": datetime.now().replace(microsecond=0).isoformat(),
-    }
-    
-    files = {
-        "image" : ("capture.jpg", image_bytes, "image/jpeg"),
-    }
-    
-    response = requests.post(
-        DETECTION_IMAGE_SEND_URL,
-        data=data,
-        files=files,
-        timeout=REQUEST_TIMEOUT_SECONDS,
-    )
-    
-    response.raise_for_status()
-    return response.json()
-
 def main() -> None:
     image_bytes = capture_frame_as_jpeg()
-    result = upload_image(image_bytes)
+    result = upload_detection_image(image_bytes, captured_at=datetime.now())
     print(result)
-    
+
+
 if __name__ == "__main__":
     main()
