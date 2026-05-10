@@ -2,6 +2,7 @@ package com.example.traffic.service;
 
 import com.example.traffic.common.enums.Direction;
 import com.example.traffic.domain.HourlyTrafficStat;
+import com.example.traffic.domain.VehicleFlowEvent;
 import com.example.traffic.domain.Zone;
 import com.example.traffic.dto.request.TrafficStatSearchRequest;
 import com.example.traffic.dto.response.TrafficStatResponse;
@@ -55,13 +56,43 @@ public class HourlyTrafficStatService {
         LocalDateTime start = targetTime.withMinute(0).withSecond(0).withNano(0);
         LocalDateTime end = targetTime.withMinute(59).withSecond(59).withNano(999999999);
 
-        // VehicleFlowEventRepository를 통해 IN/OUT 집계
-        int inCount = (int) vehicleFlowEventRepository.countByZoneAndFlowDirectionAndEventAtBetween(
-                zone, Direction.IN, start, end);
-        int outCount = (int) vehicleFlowEventRepository.countByZoneAndFlowDirectionAndEventAtBetween(
-                zone, Direction.OUT, start, end);
+        // 1. [핵심 수정] 이전 분석 지점(lastLogId) 확인
+        // 정의서 3.3절: 중복 분석 방지를 위해 마지막 기록을 먼저 찾습니다.
+        Long lastLogId = hourlyTrafficStatRepository.findFirstByZoneZoneIdOrderByStatDateDescStatHourDesc(zone.getZoneId())
+                .map(HourlyTrafficStat::getLastLogId)
+                .orElse(0L);
 
-        // HourlyTrafficStatRepository 사용[cite: 5, 6]
+        // 2. 분석 대상 데이터 조회 (앞서 수정한 레포지토리 메서드 활용)
+        // 정의서 3.3절: lastLogId 이후의 데이터만 가져와서 분석합니다.
+        List<VehicleFlowEvent> eventsForAnalysis = vehicleFlowEventRepository.findEventsForAnalysis(
+                zone, start, end, lastLogId);
+
+        if (eventsForAnalysis.isEmpty()) return; // 분석할 신규 데이터가 없으면 종료
+
+        // 3. 지표 계산 (정의서 3.3절 분석 항목)
+        long currentInCount = eventsForAnalysis.stream().filter(e -> e.getFlowDirection() == Direction.IN).count();
+        long currentOutCount = eventsForAnalysis.stream().filter(e -> e.getFlowDirection() == Direction.OUT).count();
+
+        Double avgSpeed = eventsForAnalysis.stream()
+                .mapToDouble(e -> e.getSpeed() != null ? e.getSpeed() : 0.0)
+                .average().orElse(0.0);
+
+        Double avgStayTime = eventsForAnalysis.stream()
+                .mapToDouble(e -> e.getStayTime() != null ? e.getStayTime() : 0.0)
+                .average().orElse(0.0);
+
+        // 4. 중복 차량 수 계산 (정의서 3.6절)
+        long totalUniqueVehicles = vehicleFlowEventRepository.countUniqueVehicles(zone, start, end);
+        int duplicateCount = (int) ((currentInCount + currentOutCount) - totalUniqueVehicles);
+        duplicateCount = Math.max(0, duplicateCount);
+
+        // 5. 혼잡도 점수 산출 (정의서 3.7절)
+        Double congestionScore = calculateCongestionScore((int)(currentInCount + currentOutCount), avgSpeed);
+
+        // 6. 새로운 마지막 로그 ID 파악
+        Long newLastLogId = eventsForAnalysis.getLast().getFlowEventId();
+
+        // 7. 엔티티 저장 또는 갱신
         HourlyTrafficStat stat = hourlyTrafficStatRepository.findByZoneZoneIdAndStatDateAndStatHour(
                         zone.getZoneId(), statDate, statHour)
                 .orElseGet(() -> HourlyTrafficStat.builder()
@@ -70,7 +101,24 @@ public class HourlyTrafficStatService {
                         .statHour(statHour)
                         .build());
 
-        stat.updateCounts(inCount, outCount); // HourlyTrafficStat_7.java의 메서드[cite: 5]
+        // 수정된 엔티티 메서드 호출
+        stat.updateStats(
+                (int) currentInCount,
+                (int) currentOutCount,
+                avgSpeed,
+                congestionScore,
+                avgStayTime,
+                duplicateCount,
+                newLastLogId
+        );
+
         hourlyTrafficStatRepository.save(stat);
+    }
+
+    private Double calculateCongestionScore(int totalCount, Double avgSpeed) {
+        if (totalCount == 0) return 0.0;
+        // 예시: 속도가 낮고 차량수가 많을수록 점수 상승
+        double score = (totalCount * 2.0) + (100 - avgSpeed);
+        return Math.min(100.0, Math.max(0.0, score));
     }
 }
