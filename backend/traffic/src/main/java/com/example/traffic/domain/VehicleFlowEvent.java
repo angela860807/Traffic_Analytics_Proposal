@@ -46,15 +46,24 @@ public class VehicleFlowEvent {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(precision = 5, scale = 2)
+    private Double speed;
+
+    @Column
+    private Long stayTime;
+
     @Builder
     public VehicleFlowEvent(Vehicle vehicle, Camera camera, Zone zone, Direction flowDirection,
-                            LocalDateTime eventAt, DetectionLog sourceDetectionLog) {
+                            LocalDateTime eventAt, DetectionLog sourceDetectionLog,
+                            Double speed, Long stayTime) { // 파라미터 추가
         this.vehicle = vehicle;
         this.camera = camera;
         this.zone = zone;
         this.flowDirection = flowDirection;
         this.eventAt = (eventAt != null) ? eventAt : LocalDateTime.now();
         this.sourceDetectionLog = sourceDetectionLog;
+        this.speed = (speed != null) ? speed : 0.0; // 추가
+        this.stayTime = (stayTime != null) ? stayTime : 0L; // 추가
         this.createdAt = LocalDateTime.now();
     }
 }
