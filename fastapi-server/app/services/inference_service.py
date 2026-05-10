@@ -8,7 +8,11 @@ from app.core.config import (
 from app.schemas.detection import DetectionResult, RaspberryFrameRequest
 from app.services.image_decoder import ImageDecoder
 from app.services.image_storage_service import ImageStorageService
-from app.services.plate_cropper import crop_plate_with_padding, preprocess_plate_for_ocr
+from app.services.image_preprocessor import (
+    crop_plate_with_padding,
+    preprocess_frame_for_detection,
+    preprocess_plate_for_ocr,
+)
 from app.services.plate_detector import PlateDetector
 from app.services.plate_recognizer import PlateRecognizer
 
@@ -83,7 +87,8 @@ class InferenceService:
 
         image_url = self.image_storage_service.build_detection_image_url(image_path)
 
-        detection = self.plate_detector.detect(image)
+        detection_image = preprocess_frame_for_detection(image)
+        detection = self.plate_detector.detect(detection_image)
 
         if detection.bbox is None:
             if detection.detection_type == "PLATE":
