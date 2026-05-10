@@ -5,16 +5,34 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
 from app.schemas.detection import DetectionResponse, RaspberryFrameRequest
 from app.services.backend_client import BackendClient
+from app.services.duplicate_detection_guard import DuplicateDetectionGuard
 from app.services.inference_service import InferenceService
 
 router = APIRouter(prefix="/api/detections", tags=["detections"])
 
 inference_service = InferenceService()
 backend_client = BackendClient()
+duplicate_detection_guard = DuplicateDetectionGuard()
 
 
 def should_send_to_backend(result) -> bool:
     return result.detection_type == "PLATE" and bool(result.plate_number)
+
+
+def build_unrecognized_plate_response(result) -> DetectionResponse:
+    return DetectionResponse(
+        accepted=True,
+        message="Detection result created but not sent to backend because plate was not recognized",
+        data=result,
+    )
+
+
+def build_duplicate_detection_response(result) -> DetectionResponse:
+    return DetectionResponse(
+        accepted=True,
+        message="Duplicate detection skipped because same plate was already sent within duplicate window",
+        data=result,
+    )
 
 
 @router.post(
@@ -88,12 +106,11 @@ async def create_and_send_mock_detection(
     try:
         result = await inference_service.detect_from_frame(request)
         if not should_send_to_backend(result):
-            return DetectionResponse(
-                accepted=True,
-                message="Detection result created but not sent to backend because plate was not recognized",
-                data=result,
-            )
+            return build_unrecognized_plate_response(result)
+        if duplicate_detection_guard.is_duplicate(result):
+            return build_duplicate_detection_response(result)
         await backend_client.send_detection(result)
+        duplicate_detection_guard.remember(result)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -142,12 +159,11 @@ async def create_and_send_detection_from_image(
             image_bytes=image_bytes,
         )
         if not should_send_to_backend(result):
-            return DetectionResponse(
-                accepted=True,
-                message="Detection result created but not sent to backend because plate was not recognized",
-                data=result,
-            )
+            return build_unrecognized_plate_response(result)
+        if duplicate_detection_guard.is_duplicate(result):
+            return build_duplicate_detection_response(result)
         await backend_client.send_detection(result)
+        duplicate_detection_guard.remember(result)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

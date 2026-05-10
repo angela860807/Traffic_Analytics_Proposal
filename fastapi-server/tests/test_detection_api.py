@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 import app.api.routes.detection as detection_route
 from app.main import app
 from app.schemas.detection import DetectionResult
+import app.services.image_preprocessor as image_preprocessor
 from app.services.inference_service import InferenceService
 from app.services.plate_detector import PlateDetection
 from app.services.plate_recognizer import PlateRecognition
@@ -38,6 +39,21 @@ def make_unrecognized_detection() -> DetectionResult:
         image_path="storage/detections/2026/04/30/CAM_001_103000_frame.jpg",
         image_url="/static/detections/2026/04/30/CAM_001_103000_frame.jpg",
         detected_at=datetime(2026, 4, 30, 10, 30, 0),
+    )
+
+
+def make_recognized_detection(
+    detected_at: datetime = datetime(2026, 4, 30, 10, 30, 0),
+) -> DetectionResult:
+    return DetectionResult(
+        camera_code="CAM_001",
+        plate_number="123A4567",
+        detection_type="PLATE",
+        direction_type="IN",
+        confidence_score=0.9321,
+        image_path="storage/detections/2026/04/30/CAM_001_103000_frame.jpg",
+        image_url="/static/detections/2026/04/30/CAM_001_103000_frame.jpg",
+        detected_at=detected_at,
     )
 
 
@@ -174,6 +190,75 @@ def test_detection_saves_frame_crop_and_ocr_images_when_enabled(
     assert (storage_dir / "CAM_001_103000_frame.jpg").exists()
     assert (storage_dir / "CAM_001_103000_plate_crop.jpg").exists()
     assert (storage_dir / "CAM_001_103000_ocr.jpg").exists()
+
+
+def test_detection_preprocess_none_keeps_frame_unchanged(monkeypatch) -> None:
+    monkeypatch.setattr(image_preprocessor, "DETECTION_PREPROCESS_MODE", "none")
+
+    image = np.zeros((80, 160, 3), dtype=np.uint8)
+    preprocessed = image_preprocessor.preprocess_frame_for_detection(image)
+
+    assert preprocessed is image
+
+
+def test_detection_preprocess_standard_keeps_shape(monkeypatch) -> None:
+    monkeypatch.setattr(image_preprocessor, "DETECTION_PREPROCESS_MODE", "standard")
+
+    image = np.zeros((80, 160, 3), dtype=np.uint8)
+    preprocessed = image_preprocessor.preprocess_frame_for_detection(image)
+
+    assert preprocessed.shape == image.shape
+    assert preprocessed.dtype == image.dtype
+
+
+def test_inference_uses_detection_preprocess_before_detector(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(
+        "app.services.image_storage_service.IMAGE_STORAGE_DIR",
+        str(tmp_path / "detections"),
+    )
+    monkeypatch.setattr("app.services.inference_service.SAVE_PLATE_CROP", False)
+    monkeypatch.setattr(
+        "app.services.inference_service.SAVE_OCR_PREPROCESSED_IMAGE",
+        False,
+    )
+
+    service = InferenceService()
+    original_image_ids = []
+    detector_image_ids = []
+
+    def fake_preprocess(image):
+        original_image_ids.append(id(image))
+        return image.copy()
+
+    def fake_detect(image):
+        detector_image_ids.append(id(image))
+        return PlateDetection(
+            detection_type="VEHICLE",
+            confidence_score=0.0,
+            bbox=None,
+        )
+
+    monkeypatch.setattr(
+        "app.services.inference_service.preprocess_frame_for_detection",
+        fake_preprocess,
+    )
+    monkeypatch.setattr(service.plate_detector, "detect", fake_detect)
+
+    result = asyncio.run(
+        service.detect_from_image_bytes(
+            camera_code="CAM_001",
+            captured_at=datetime(2026, 4, 30, 10, 30, 0),
+            image_bytes=make_test_image_bytes(),
+        )
+    )
+
+    assert result.detection_type == "VEHICLE"
+    assert len(original_image_ids) == 1
+    assert len(detector_image_ids) == 1
+    assert detector_image_ids[0] != original_image_ids[0]
 
 
 def test_detection_can_reprocess_saved_image_without_resaving_frame(
@@ -370,3 +455,51 @@ def test_create_and_send_image_detection_skips_backend_when_plate_is_not_recogni
     )
     assert body["data"]["plateNumber"] is None
     assert body["data"]["detectionType"] == "VEHICLE"
+
+
+def test_create_and_send_image_detection_skips_duplicate_backend_send(
+    monkeypatch,
+) -> None:
+    detection_route.duplicate_detection_guard.clear()
+    send_count = 0
+
+    async def return_recognized_detection(*, camera_code, captured_at, image_bytes):
+        return make_recognized_detection()
+
+    async def count_backend_send(result):
+        nonlocal send_count
+        send_count += 1
+
+    monkeypatch.setattr(
+        detection_route.inference_service,
+        "detect_from_image_bytes",
+        return_recognized_detection,
+    )
+    monkeypatch.setattr(
+        detection_route.backend_client,
+        "send_detection",
+        count_backend_send,
+    )
+
+    request_kwargs = {
+        "data": {
+            "cameraCode": "CAM_001",
+            "capturedAt": "2026-04-30T10:30:00",
+        },
+        "files": {
+            "image": ("sample.jpg", make_test_image_bytes(), "image/jpeg"),
+        },
+    }
+
+    first_response = client.post("/api/detections/image/send", **request_kwargs)
+    second_response = client.post("/api/detections/image/send", **request_kwargs)
+
+    assert first_response.status_code == 200
+    assert first_response.json()["message"] == "Detection result sent to backend"
+    assert second_response.status_code == 200
+    assert second_response.json()["message"] == (
+        "Duplicate detection skipped because same plate was already sent within duplicate window"
+    )
+    assert send_count == 1
+
+    detection_route.duplicate_detection_guard.clear()
