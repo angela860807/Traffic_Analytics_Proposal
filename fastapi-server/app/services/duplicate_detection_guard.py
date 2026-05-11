@@ -5,6 +5,14 @@ from app.schemas.detection import DetectionResult
 
 
 class DuplicateDetectionGuard:
+    """
+    Process-local duplicate guard for reducing repeated sends to Spring.
+
+    This is a best-effort network-saving check only. It is reset when FastAPI
+    restarts and is not shared across workers, so Spring/DB remains the source
+    of truth for final duplicate handling.
+    """
+
     def __init__(self, window_seconds: int = DUPLICATE_WINDOW_SECONDS) -> None:
         self.window_seconds = window_seconds
         self._recent_detections: dict[tuple[str, str], datetime] = {}

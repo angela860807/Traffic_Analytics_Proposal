@@ -1,6 +1,7 @@
 import asyncio
 import base64
 from datetime import datetime
+import logging
 from pathlib import Path
 
 import cv2
@@ -14,7 +15,7 @@ from app.schemas.detection import DetectionResult
 import app.services.image_preprocessor as image_preprocessor
 from app.services.inference_service import InferenceService
 from app.services.plate_detector import PlateDetection
-from app.services.plate_recognizer import PlateRecognition
+from app.services.plate_recognizer import PlateRecognition, PlateRecognizer
 
 
 client = TestClient(app)
@@ -65,6 +66,22 @@ def test_health_check() -> None:
         "status": "ok",
         "service": "traffic-ai-server",
     }
+
+
+def test_plate_number_normalization_keeps_korean_plate_characters() -> None:
+    recognizer = PlateRecognizer()
+
+    cases = {
+        "서울 12가 3456": "서울12가3456",
+        "123가4567": "123가4567",
+        "ABC123가4567!!": "123가4567",
+        "  경기 78나 9012\n": "경기78나9012",
+        None: None,
+        "ABC-!!": None,
+    }
+
+    for raw_text, expected in cases.items():
+        assert recognizer._normalize_plate_number(raw_text) == expected
 
 
 def test_create_mock_detection(monkeypatch, tmp_path) -> None:
@@ -377,6 +394,54 @@ def test_create_and_send_mock_detection_without_backend(monkeypatch, tmp_path) -
 
     assert response.status_code == 503
     assert response.json()["detail"] == "Spring Boot API is not reachable"
+
+
+def test_create_and_send_mock_detection_includes_spring_error_body(
+    monkeypatch,
+    tmp_path,
+    caplog,
+) -> None:
+    monkeypatch.setattr(
+        "app.services.image_storage_service.IMAGE_STORAGE_DIR",
+        str(tmp_path / "detections"),
+    )
+
+    async def raise_spring_error(result):
+        request = httpx.Request("POST", "http://spring/api/v1/detection-logs")
+        response = httpx.Response(
+            status_code=500,
+            text='{"code":"SERVER_ERROR","message":"column \\"status\\" does not exist"}',
+            request=request,
+        )
+        raise httpx.HTTPStatusError(
+            "Spring server error",
+            request=request,
+            response=response,
+        )
+
+    monkeypatch.setattr(
+        detection_route.backend_client,
+        "send_detection",
+        raise_spring_error,
+    )
+    caplog.set_level(logging.WARNING, logger="app.api.routes.detection")
+
+    image_bytes = make_test_image_bytes()
+    body = {
+        "cameraCode": "CAM_001",
+        "capturedAt": "2026-04-30T10:30:00",
+        "imageBase64": base64.b64encode(image_bytes).decode("ascii"),
+    }
+
+    response = client.post("/api/detections/mock/send", json=body)
+
+    assert response.status_code == 502
+    detail = response.json()["detail"]
+    assert "Spring Boot API returned error: 500" in detail
+    assert "status" in detail
+    assert "does not exist" in detail
+    assert "status" in caplog.text
+    assert "does not exist" in caplog.text
 
 
 def test_create_and_send_mock_detection_skips_backend_when_plate_is_not_recognized(

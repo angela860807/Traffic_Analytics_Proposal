@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 
 import httpx
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
@@ -9,6 +10,8 @@ from app.services.duplicate_detection_guard import DuplicateDetectionGuard
 from app.services.inference_service import InferenceService
 
 router = APIRouter(prefix="/api/detections", tags=["detections"])
+logger = logging.getLogger(__name__)
+SPRING_ERROR_BODY_LIMIT = 500
 
 inference_service = InferenceService()
 backend_client = BackendClient()
@@ -33,6 +36,28 @@ def build_duplicate_detection_response(result) -> DetectionResponse:
         message="Duplicate detection skipped because same plate was already sent within duplicate window",
         data=result,
     )
+
+
+def build_spring_error_detail(exc: httpx.HTTPStatusError) -> str:
+    status_code = exc.response.status_code
+    response_body = exc.response.text.strip()
+
+    if not response_body:
+        return f"Spring Boot API returned error: {status_code}"
+
+    if len(response_body) > SPRING_ERROR_BODY_LIMIT:
+        response_body = f"{response_body[:SPRING_ERROR_BODY_LIMIT]}..."
+
+    return f"Spring Boot API returned error: {status_code}; body={response_body}"
+
+
+def raise_spring_http_exception(exc: httpx.HTTPStatusError) -> None:
+    detail = build_spring_error_detail(exc)
+    logger.warning(detail)
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail=detail,
+    ) from exc
 
 
 @router.post(
@@ -117,10 +142,7 @@ async def create_and_send_mock_detection(
             detail="imageBase64 must be valid image base64",
         ) from exc
     except httpx.HTTPStatusError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Spring Boot API returned error: {exc.response.status_code}",
-        ) from exc
+        raise_spring_http_exception(exc)
     except httpx.RequestError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -170,10 +192,7 @@ async def create_and_send_detection_from_image(
             detail="image must be a valid jpg or png",
         ) from exc
     except httpx.HTTPStatusError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Spring Boot API returned error: {exc.response.status_code}",
-        ) from exc
+        raise_spring_http_exception(exc)
     except httpx.RequestError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
