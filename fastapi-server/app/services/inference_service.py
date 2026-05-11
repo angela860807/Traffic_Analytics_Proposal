@@ -1,10 +1,18 @@
 from datetime import datetime
 
-from app.core.config import DETECTION_CONFIDENCE_THRESHOLD, SAVE_PLATE_CROP
+from app.core.config import (
+    DETECTION_CONFIDENCE_THRESHOLD,
+    SAVE_OCR_PREPROCESSED_IMAGE,
+    SAVE_PLATE_CROP,
+)
 from app.schemas.detection import DetectionResult, RaspberryFrameRequest
 from app.services.image_decoder import ImageDecoder
 from app.services.image_storage_service import ImageStorageService
-from app.services.plate_cropper import crop_plate_with_padding, preprocess_plate_for_ocr
+from app.services.image_preprocessor import (
+    crop_plate_with_padding,
+    preprocess_frame_for_detection,
+    preprocess_plate_for_ocr,
+)
 from app.services.plate_detector import PlateDetector
 from app.services.plate_recognizer import PlateRecognizer
 
@@ -43,14 +51,44 @@ class InferenceService:
             captured_at=captured_at,
         )
 
+    async def detect_from_saved_image(
+        self,
+        *,
+        camera_code: str,
+        captured_at: datetime,
+        image_path: str,
+    ) -> DetectionResult:
+        image = self.image_decoder.decode_image_file(image_path)
+
+        return self._detect(
+            image=image,
+            camera_code=camera_code,
+            captured_at=captured_at,
+            existing_image_path=image_path,
+        )
+
     def _detect(
         self,
         *,
         image,
         camera_code: str,
         captured_at: datetime,
+        existing_image_path: str | None = None,
     ) -> DetectionResult:
-        detection = self.plate_detector.detect(image)
+        if existing_image_path is None:
+            image_path = self.image_storage_service.save_detection_image(
+                image=image,
+                camera_code=camera_code,
+                captured_at=captured_at,
+                suffix="frame",
+            )
+        else:
+            image_path = existing_image_path.replace("\\", "/")
+
+        image_url = self.image_storage_service.build_detection_image_url(image_path)
+
+        detection_image = preprocess_frame_for_detection(image)
+        detection = self.plate_detector.detect(detection_image)
 
         if detection.bbox is None:
             if detection.detection_type == "PLATE":
@@ -64,28 +102,29 @@ class InferenceService:
             detection_type = "VEHICLE"
         else:
             plate_crop = crop_plate_with_padding(image, detection.bbox)
-            ocr_image = preprocess_plate_for_ocr(plate_crop)
 
             if SAVE_PLATE_CROP:
+                self.image_storage_service.save_detection_image(
+                    image=plate_crop,
+                    camera_code=camera_code,
+                    captured_at=captured_at,
+                    suffix="plate_crop",
+                )
+
+            ocr_image = preprocess_plate_for_ocr(plate_crop)
+
+            if SAVE_OCR_PREPROCESSED_IMAGE:
                 self.image_storage_service.save_detection_image(
                     image=ocr_image,
                     camera_code=camera_code,
                     captured_at=captured_at,
-                    suffix="plate",
+                    suffix="ocr",
                 )
 
             recognition = self.plate_recognizer.recognize(ocr_image)
 
             plate_number = recognition.text
             detection_type = "PLATE" if plate_number else "VEHICLE"
-
-        image_path = self.image_storage_service.save_detection_image(
-            image=image,
-            camera_code=camera_code,
-            captured_at=captured_at,
-            suffix="frame",
-        )
-        image_url = self.image_storage_service.build_detection_image_url(image_path)
 
         return DetectionResult(
             camera_code=camera_code,
@@ -98,6 +137,7 @@ class InferenceService:
             image_url=image_url,
         )
 
+
 # TODO:
-# mock detector와 mock recognizer를 실제 YOLO/OCR 서비스로 교체한다.
-# API 라우터가 모델 세부 구현에 의존하지 않도록 DetectionResult 응답 구조는 안정적으로 유지한다.
+# Replace the mock detector/recognizer with the real YOLO/OCR services.
+# Keep DetectionResult stable so API callers do not depend on model internals.

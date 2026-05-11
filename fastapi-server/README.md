@@ -6,16 +6,16 @@
 
 ## 역할
 
-- Rasberry Pi 또는 카메라 클라이언트로부터 이미지 프레임 수신
+- Raspberry Pi 또는 카메라 클라이언트로부터 이미지 프레임 수신
 - 서버 PC에서 YOLO/OCR 추론 수행 예정
 - 감지 결과 생성
 - 감지 이미지 저장
 - 추후 Spring Boot Backend로 감지 결과 JSON 전송
-- Rasberry Pi live preview 테스트 지원
+- Raspberry Pi live preview 테스트 지원
 
 ## 현재 팀 합의
 
-- Rasberry Pi는 추론하지 않고 카메라 프레임 수집/전송만 담당한다.
+- Raspberry Pi는 추론하지 않고 카메라 프레임 수집/전송만 담당한다.
 - FastAPI 서버 PC에서 YOLO/OCR 추론을 수행한다.
 - 초기 테스트 입력은 base64 JSON으로 진행한다.
 - 최종 목표 입력 방식은 multipart/form-data 이미지 업로드이다.
@@ -39,7 +39,7 @@ cd C:\jwdev\Traffic_Analytics_Proposal\fastapi-server
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Rasberry Pi에서 접근해야 할 때는 외부 접속을 허용하도록 `0.0.0.0`으로 실행합니다.
+Raspberry Pi에서 접근해야 할 때는 외부 접속을 허용하도록 `0.0.0.0`으로 실행합니다.
 
 ```powershell
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -164,7 +164,7 @@ http://127.0.0.1:8000/static/detections/2026/05/01/CAM_001_143632_frame.jpg
 
 ## Camera Live Preview
 
-Rasberry Pi가 최신 프레임을 계속 전송하면 FastAPI PC 브라우저에서 live preview를 확인할 수 있습니다.
+Raspberry Pi가 최신 프레임을 계속 전송하면 FastAPI PC 브라우저에서 live preview를 확인할 수 있습니다.
 
 ```text
 POST /api/camera/frame
@@ -180,16 +180,16 @@ http://<FASTAPI_PC_IP>:8000/api/camera/live
 
 이 기능은 테스트용 preview이며 이미지를 저장하지 않습니다.
 
-## Rasberry Pi 예제 클라이언트
+## Raspberry Pi 예제 클라이언트
 
 로컬 샘플 이미지 기반 테스트:
 
 ```powershell
-python examples/rasberry_pi_base64_client.py
-python examples/rasberry_pi_multipart_client.py
+python examples/raspberry_pi_base64_client.py
+python examples/raspberry_pi_multipart_client.py
 ```
 
-Rasberry Pi 실기 파일은 `examples/`에 재현 가능한 형태로 보관합니다. 실제 캡처 이미지, 개인 IP, `.env`, `storage/` 파일은 Git에 올리지 않습니다.
+Raspberry Pi 실기 파일은 `examples/`에 재현 가능한 형태로 보관합니다. 실제 캡처 이미지, 개인 IP, `.env`, `storage/` 파일은 Git에 올리지 않습니다.
 
 ## 자동 테스트
 
@@ -230,5 +230,5 @@ Spring Boot API returned error: {status_code}
 - 번호판 crop 이미지 저장 방식
 - Spring Boot/Vue에서 imageUrl을 어떻게 저장/노출할지 여부
 - directionType을 Spring Boot가 cameraCode 기준으로 최종 판단하도록 연동 계약 반영
-- Rasberry Pi 장시간 안정성 테스트
+- Raspberry Pi 장시간 안정성 테스트
 - 전체 통합 테스트
