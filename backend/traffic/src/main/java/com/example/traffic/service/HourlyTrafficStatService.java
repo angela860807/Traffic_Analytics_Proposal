@@ -2,16 +2,19 @@ package com.example.traffic.service;
 
 import com.example.traffic.common.enums.Direction;
 import com.example.traffic.domain.HourlyTrafficStat;
+import com.example.traffic.domain.TrafficAnalysisIndex;
 import com.example.traffic.domain.VehicleFlowEvent;
 import com.example.traffic.domain.Zone;
 import com.example.traffic.dto.request.TrafficStatSearchRequest;
 import com.example.traffic.dto.response.TrafficStatResponse;
 import com.example.traffic.repository.HourlyTrafficStatRepository;
+import com.example.traffic.repository.TrafficAnalysisIndexRepository;
 import com.example.traffic.repository.VehicleFlowEventRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,6 +27,8 @@ public class HourlyTrafficStatService {
     // 목록에 있는 실제 파일명으로 주입받습니다.
     private final HourlyTrafficStatRepository hourlyTrafficStatRepository;
     private final VehicleFlowEventRepository vehicleFlowEventRepository;
+    private final TrafficAnalysisIndexRepository trafficAnalysisIndexRepository;
+
 
     /**
      * [조회] 사용자님이 만드신 13개 DTO 중 TrafficStatResponse를 사용해 데이터를 반환합니다.[cite: 7, 8]
@@ -58,14 +63,20 @@ public class HourlyTrafficStatService {
 
         // 1. [핵심 수정] 이전 분석 지점(lastLogId) 확인
         // 정의서 3.3절: 중복 분석 방지를 위해 마지막 기록을 먼저 찾습니다.
-        Long lastLogId = hourlyTrafficStatRepository.findFirstByZoneZoneIdOrderByStatDateDescStatHourDesc(zone.getZoneId())
-                .map(HourlyTrafficStat::getLastLogId)
-                .orElse(0L);
+        TrafficAnalysisIndex index = trafficAnalysisIndexRepository.findTopByOrderByIdDesc()
+                .orElseGet(() -> TrafficAnalysisIndex.builder()
+                        .lastSeq(0L)
+                        .lastLogId(0L)
+                        .lastLogTime(null)
+                        .build());
+
+        Long lastSeq = index.getLastSeq() != null ? index.getLastSeq() : 0L;
+
 
         // 2. 분석 대상 데이터 조회 (앞서 수정한 레포지토리 메서드 활용)
         // 정의서 3.3절: lastLogId 이후의 데이터만 가져와서 분석합니다.
         List<VehicleFlowEvent> eventsForAnalysis = vehicleFlowEventRepository.findEventsForAnalysis(
-                zone, start, end, lastLogId);
+                zone, start, end, lastSeq);
 
         if (eventsForAnalysis.isEmpty()) return; // 분석할 신규 데이터가 없으면 종료
 
@@ -74,7 +85,7 @@ public class HourlyTrafficStatService {
         long currentOutCount = eventsForAnalysis.stream().filter(e -> e.getFlowDirection() == Direction.OUT).count();
 
         Double avgSpeed = eventsForAnalysis.stream()
-                .mapToDouble(e -> e.getSpeed() != null ? e.getSpeed() : 0.0)
+                .mapToDouble(e -> e.getSpeed() != null ? e.getSpeed().doubleValue() : 0.0)
                 .average().orElse(0.0);
 
         Double avgStayTime = eventsForAnalysis.stream()
@@ -90,7 +101,13 @@ public class HourlyTrafficStatService {
         Double congestionScore = calculateCongestionScore((int)(currentInCount + currentOutCount), avgSpeed);
 
         // 6. 새로운 마지막 로그 ID 파악
-        Long newLastLogId = eventsForAnalysis.getLast().getFlowEventId();
+        VehicleFlowEvent lastEvent = eventsForAnalysis.get(eventsForAnalysis.size() - 1);
+
+        Long newLastLogId = lastEvent.getSourceDetectionLog() != null
+                ? lastEvent.getSourceDetectionLog().getLogId()
+                : null;
+
+
 
         // 7. 엔티티 저장 또는 갱신
         HourlyTrafficStat stat = hourlyTrafficStatRepository.findByZoneZoneIdAndStatDateAndStatHour(
@@ -105,14 +122,24 @@ public class HourlyTrafficStatService {
         stat.updateStats(
                 (int) currentInCount,
                 (int) currentOutCount,
-                avgSpeed,
-                congestionScore,
-                avgStayTime,
+                BigDecimal.valueOf(avgSpeed),
+                BigDecimal.valueOf(congestionScore),
+                BigDecimal.valueOf(avgStayTime),
                 duplicateCount,
                 newLastLogId
         );
 
         hourlyTrafficStatRepository.save(stat);
+
+        index.update(
+                lastEvent.getFlowEventId(),
+                newLastLogId,
+                lastEvent.getEventAt()
+        );
+
+        trafficAnalysisIndexRepository.save(index);
+
+
     }
 
     private Double calculateCongestionScore(int totalCount, Double avgSpeed) {

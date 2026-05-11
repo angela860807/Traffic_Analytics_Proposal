@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -30,28 +31,28 @@ public class HourlyTrafficStat {
     @Column(nullable = false)
     private Integer statHour;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "integer default 0")
     private Integer inCount;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "integer default 0")
     private Integer outCount;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "integer default 0")
     private Integer totalCount;
 
-    @Column(precision = 5, scale = 2, nullable = false)
-    private Double averageSpeed;
+    @Column(nullable = false, columnDefinition = "numeric(5,2) default 0.00")
+    private BigDecimal averageSpeed;
 
-    @Column(precision = 5, scale = 2, nullable = false)
-    private Double congestionScore;
+    @Column(nullable = false, columnDefinition = "numeric(5,2) default 0.00")
+    private BigDecimal congestionScore;
 
-    @Column(precision = 10, scale = 2, nullable = false)
-    private Double averageStayTime;
+    @Column(nullable = false, columnDefinition = "numeric(10,2) default 0.00")
+    private BigDecimal averageStayTime;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "integer default 0")
     private Integer duplicateVehicleCount;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "bigint default 0")
     private Long lastLogId;
 
     @Column(nullable = false, updatable = false)
@@ -59,8 +60,8 @@ public class HourlyTrafficStat {
 
     @Builder
     public HourlyTrafficStat(Zone zone, LocalDate statDate, Integer statHour,
-                             Integer inCount, Integer outCount, Double averageSpeed,
-                             Double congestionScore, Double averageStayTime,
+                             Integer inCount, Integer outCount, BigDecimal averageSpeed,
+                             BigDecimal congestionScore, BigDecimal averageStayTime,
                              Integer duplicateVehicleCount, Long lastLogId) {
         this.zone = zone;
         this.statDate = statDate;
@@ -71,16 +72,16 @@ public class HourlyTrafficStat {
         // ★ 필독: totalCount 계산 로직 추가
         this.totalCount = this.inCount + this.outCount;
 
-        this.averageSpeed = (averageSpeed != null) ? averageSpeed : 0.0;
-        this.congestionScore = (congestionScore != null) ? congestionScore : 0.0;
-        this.averageStayTime = (averageStayTime != null) ? averageStayTime : 0.0;
+        this.averageSpeed = (averageSpeed != null) ? averageSpeed : BigDecimal.ZERO;
+        this.congestionScore = (congestionScore != null) ? congestionScore : BigDecimal.ZERO;
+        this.averageStayTime = (averageStayTime != null) ? averageStayTime : BigDecimal.ZERO;
         this.duplicateVehicleCount = (duplicateVehicleCount != null) ? duplicateVehicleCount : 0;
         this.lastLogId = (lastLogId != null) ? lastLogId : 0L;
         this.createdAt = LocalDateTime.now();
     }
 
-    public void updateStats(Integer inCount, Integer outCount, Double averageSpeed,
-                            Double congestionScore, Double averageStayTime,
+    public void updateStats(Integer inCount, Integer outCount, BigDecimal averageSpeed,
+                            BigDecimal congestionScore, BigDecimal averageStayTime,
                             Integer duplicateVehicleCount, Long lastLogId) {
         this.inCount = inCount;
         this.outCount = outCount;
