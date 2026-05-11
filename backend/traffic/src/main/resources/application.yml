@@ -35,3 +35,8 @@ logging:
   level:
     com.example.traffic: debug
     org.springframework.security: info # 들여쓰기 정렬
+
+app:
+  api:
+    # 환경변수 INTERNAL_API_KEY가 있으면 사용하고, 없으면 우측의 기본값 사용
+    internal-key: ${INTERNAL_API_KEY:traffic-ai-internal-key-2026}

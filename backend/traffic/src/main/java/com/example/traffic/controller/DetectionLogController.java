@@ -8,7 +8,6 @@ import com.example.traffic.service.DetectionLogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -18,13 +17,17 @@ import java.util.List;
 @Tag(name = "Detection Log API", description = "AI 탐지 로그 관리 및 조회")
 @RestController
 @RequestMapping("/api/v1/detection-logs")
-@RequiredArgsConstructor
 public class DetectionLogController {
 
     private final DetectionLogService detectionLogService;
+    private final String internalApiKey;
 
-    @Value("${internal.api-key:traffic-ai-internal-key-2026}")
-    private String internalApiKey;
+    public DetectionLogController(
+            DetectionLogService detectionLogService,
+            @Value("${app.api.internal-key}") String internalApiKey) {
+        this.detectionLogService = detectionLogService;
+        this.internalApiKey = internalApiKey;
+    }
 
     @Operation(summary = "AI 탐지 데이터 처리", description = "AI 서버로부터 받은 데이터를 검증하고 저장합니다.")
     @PostMapping
