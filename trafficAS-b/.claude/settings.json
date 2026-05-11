@@ -11,7 +11,11 @@
       "Bash(awk 'NR>=2948 && NR<=2954' src/views/RoadDashboardView.vue)",
       "Bash(awk 'NR>=3115 && NR<=3122' src/views/RoadDashboardView.vue)",
       "Bash(find \"c:/Users/ez/Desktop/TM\" -maxdepth 4 -type f \\\\\\( -iname \"*.md\" -o -iname \"README*\" -o -iname \"*troubleshoot*\" -o -iname \"*트러블*\" \\\\\\) -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" 2>&1)",
-      "Read(//c/Users/ez/Desktop/TM/**)"
+      "Read(//c/Users/ez/Desktop/TM/**)",
+      "Bash(grep -rEn \"^<{4,}|^>{4,}|^={4,}\" README.md TROUBLESHOOTING.md trafficAS-b/src --include=\"*.vue\" --include=\"*.js\" --include=\"*.md\")",
+      "Bash(grep -En \"^<{4,}|^>{4,}|^={4,}\" README.md)",
+      "Bash(sed -i.bak *)",
+      "Bash(rm README.md.bak TROUBLESHOOTING.md.bak)"
     ],
     "additionalDirectories": [
       "c:\\Users\\ez\\Desktop\\TM"
