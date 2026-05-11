@@ -15,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -41,29 +43,42 @@ public class DetectionLogService {
 
     @Transactional
     public Long saveDetectionData(DetectionRequest request) {
-        // 1. [규약 반영] cameraId 대신 cameraCode로 카메라 엔티티 조회
+        // 1. 카메라 조회
         Camera camera = cameraRepository.findByCameraCode(request.getCameraCode())
-                .orElseThrow(() -> new BusinessException("미등록 카메라 코드입니다: " + request.getCameraCode(), HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BusinessException("미등록 카메라 코드: " + request.getCameraCode(), HttpStatus.NOT_FOUND));
 
-        // 2. 차량 정보 조회 또는 생성 (plateNumber가 null일 수 있음을 감안한 로직 필요)
+        // 2. [중복 제거 로직 추가] 동일 카메라에서 5초 이내 같은 번호판이 찍혔는지 확인
+        LocalDateTime fiveSecondsAgo = request.getDetectedAt().minusSeconds(5);
+        boolean isDuplicate = detectionLogRepository.existsByCameraAndPlateNumberAndDetectedAtAfter(
+                camera, request.getPlateNumber(), fiveSecondsAgo);
+
+        if (isDuplicate) {
+            log.info("중복된 차량 감지 제외: {}", request.getPlateNumber());
+            return null; // 또는 기존 ID 반환
+        }
+
+        // 3. 차량 정보 관리
         Vehicle vehicle = vehicleService.getOrCreateVehicle(request.getPlateNumber());
 
-        // 3. DetectionLog 생성 및 저장
+        // 4. DetectionLog 생성 (엔티티의 새 필드들 반영)
         DetectionLog logEntity = DetectionLog.builder()
                 .camera(camera)
                 .vehicle(vehicle)
                 .plateNumber(request.getPlateNumber())
                 .detectionType(request.getDetectionType())
-                .confidenceScore(java.math.BigDecimal.valueOf(request.getConfidenceScore()))
+                .confidenceScore(BigDecimal.valueOf(request.getConfidenceScore()))
                 .imagePath(request.getImagePath())
+                .preprocessedPath(request.getPreprocessedPath()) // 엔티티와 일치시킴
+                .status("PENDING") // 수집 직후 상태 설정
                 .imageUrl(request.getImageUrl())
                 .detectedAt(request.getDetectedAt())
                 .build();
 
         DetectionLog savedLog = detectionLogRepository.save(logEntity);
 
-        // 4. [규약 반영] 조회한 Camera의 directionType 기준으로 흐름 이벤트 처리
-        vehicleFlowEventService.processFlowEvent(savedLog);
+        // 5. 흐름 이벤트 처리
+        vehicleFlowEventService.processFlowEvent(savedLog, request.getSpeed(), request.getStayTime());
+        savedLog.completeAnalysis(request.getPlateNumber(), BigDecimal.valueOf(request.getConfidenceScore()));
 
         return savedLog.getLogId();
     }

@@ -1,0 +1,49 @@
+package com.example.traffic.domain;
+
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "traffic_analysis_index")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class TrafficAnalysisIndex {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    // Last processed vehicle_flow_events.flow_event_id.
+    private Long lastSeq;
+
+    // Last source detection_logs.detection_log_id included in analysis.
+    private Long lastLogId;
+
+    // Last analyzed event time.
+    private LocalDateTime lastLogTime;
+
+    // Time when this index row was updated.
+    private LocalDateTime fetchedTime;
+
+    @Builder
+    public TrafficAnalysisIndex(Long lastSeq, Long lastLogId,
+                                LocalDateTime lastLogTime,
+                                LocalDateTime fetchedTime) {
+        this.lastSeq = lastSeq;
+        this.lastLogId = lastLogId;
+        this.lastLogTime = lastLogTime;
+        this.fetchedTime = fetchedTime != null ? fetchedTime : LocalDateTime.now();
+    }
+
+    public void update(Long lastSeq, Long lastLogId, LocalDateTime lastLogTime) {
+        this.lastSeq = lastSeq;
+        this.lastLogId = lastLogId;
+        this.lastLogTime = lastLogTime;
+        this.fetchedTime = LocalDateTime.now();
+    }
+}
