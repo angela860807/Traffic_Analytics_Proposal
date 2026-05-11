@@ -118,7 +118,7 @@
 
     <footer>
       <span class="fl">Traffic<em>AS</em></span>
-      <span class="fr">© 2025 네바퀴 1조 · 스마트 모빌리티 DX Academy</span>
+      <span class="fr">© 2026 네바퀴 1조 · 스마트 모빌리티 DX Academy</span>
     </footer>
   </div>
 </template>

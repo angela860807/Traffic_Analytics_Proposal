@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(git -C \"c:/Users/ez/Desktop/TM/trafficAS-b\" diff HEAD -- src/router/index.js src/components/AppNav.vue)",
+      "Bash(git -C \"c:/Users/ez/Desktop/TM/trafficAS-b\" log --oneline -10 -- src/router/index.js src/components/AppNav.vue src/composables/useAuth.js)",
+      "Bash(git -C \"c:/Users/ez/Desktop/TM/trafficAS-b\" show HEAD:trafficAS-b/src/components/AppNav.vue)",
+      "Bash(awk '{printf \"%-15s %8s MB\\\\n\", $9, $5/1024/1024}')",
+      "Bash(awk 'NR>=408 && NR<=580 {print NR\": \"$0}' src/views/RoadDashboardView.vue)",
+      "Bash(awk 'NR>=1865 && NR<=1872' src/views/RoadDashboardView.vue)",
+      "Bash(awk 'NR>=2948 && NR<=2954' src/views/RoadDashboardView.vue)",
+      "Bash(awk 'NR>=3115 && NR<=3122' src/views/RoadDashboardView.vue)",
+      "Bash(find \"c:/Users/ez/Desktop/TM\" -maxdepth 4 -type f \\\\\\( -iname \"*.md\" -o -iname \"README*\" -o -iname \"*troubleshoot*\" -o -iname \"*트러블*\" \\\\\\) -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" 2>&1)",
+      "Read(//c/Users/ez/Desktop/TM/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\ez\\Desktop\\TM"
+    ]
+  }
+}
