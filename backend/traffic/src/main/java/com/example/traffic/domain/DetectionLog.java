@@ -14,7 +14,8 @@ import java.time.LocalDateTime;
 @Table(name = "detection_logs", indexes = {
         // 복합 인덱스로 조회 성능 최적화 (차량번호 + 인식시간)
         @Index(name = "idx_plate_detected", columnList = "plate_number, detected_at"),
-        @Index(name = "idx_detected_at", columnList = "detected_at")
+        @Index(name = "idx_detected_at", columnList = "detected_at"),
+        @Index(name = "idx_status", columnList = "status")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -40,11 +41,17 @@ public class DetectionLog {
     @Column(nullable = false, length = 20)
     private DetectionType detectionType;
 
-    @Column(precision = 5, scale = 4)
+    @Column(precision = 5, scale = 2)
     private BigDecimal confidenceScore;
 
     @Column(length = 255)
     private String imagePath;
+
+    @Column(length = 255)
+    private String preprocessedPath; // 전처리 이미지  추가
+
+    @Column(length = 20, nullable = false)
+    private String status; // PENDING, COMPLETED, FAILED 등
 
     // 하달 사항: Vue 화면 표시용 URL 필드 추가
     @Column(length = 500)
@@ -58,15 +65,28 @@ public class DetectionLog {
 
     @Builder
     public DetectionLog(Camera camera, Vehicle vehicle, String plateNumber, DetectionType detectionType,
-                        BigDecimal confidenceScore, String imagePath, String imageUrl, LocalDateTime detectedAt) {
+                        BigDecimal confidenceScore, String imagePath, String preprocessedPath,
+                        String status, String imageUrl, LocalDateTime detectedAt) {
         this.camera = camera;
         this.vehicle = vehicle;
         this.plateNumber = plateNumber;
         this.detectionType = detectionType;
         this.confidenceScore = confidenceScore;
         this.imagePath = imagePath;
+        this.preprocessedPath = preprocessedPath; // 파라미터 추가 [cite: 17]
+        this.status = (status != null) ? status : "PENDING"; // 기본값 설정 [cite: 117]
         this.imageUrl = imageUrl;
         this.detectedAt = (detectedAt != null) ? detectedAt : LocalDateTime.now();
         this.createdAt = LocalDateTime.now();
+    }
+
+    public void completeAnalysis(String plateNumber, BigDecimal confidenceScore) {
+        this.plateNumber = plateNumber;
+        this.confidenceScore = confidenceScore;
+        this.status = "COMPLETED";
+    }
+
+    public void updateStatus(String status) {
+        this.status = status;
     }
 }

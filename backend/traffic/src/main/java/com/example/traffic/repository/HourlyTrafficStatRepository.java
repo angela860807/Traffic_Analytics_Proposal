@@ -15,4 +15,6 @@ public interface HourlyTrafficStatRepository extends JpaRepository<HourlyTraffic
 
     // 특정 날짜의 모든 구역 통계 목록을 시간순으로 조회
     List<HourlyTrafficStat> findByStatDateOrderByStatHourAsc(LocalDate statDate);
+
+    Optional<HourlyTrafficStat> findFirstByZoneZoneIdOrderByStatDateDescStatHourDesc(Long zoneId);
 }
