@@ -14,7 +14,7 @@ SPRING_BACKEND_BASE_URL = os.getenv(
 
 SPRING_DETECTION_PATH = os.getenv(
     "SPRING_DETECTION_PATH",
-    "/api/detections",
+    "/api/v1/detection-logs",
 )
 
 BACKEND_INTERNAL_API_KEY = os.getenv(
