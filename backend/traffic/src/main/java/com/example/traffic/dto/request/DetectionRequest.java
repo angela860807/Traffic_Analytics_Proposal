@@ -5,6 +5,7 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
@@ -36,4 +37,10 @@ public class DetectionRequest {
 
     @NotNull(message = "탐지 유형은 필수입니다.")
     private DetectionType detectionType;
+
+    @PositiveOrZero(message = "Speed must be zero or greater.")
+    private Double speed;
+
+    @PositiveOrZero(message = "Stay time must be zero or greater.")
+    private Long stayTime;
 }

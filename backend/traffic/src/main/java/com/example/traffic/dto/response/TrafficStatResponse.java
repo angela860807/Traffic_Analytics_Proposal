@@ -28,9 +28,9 @@ public class TrafficStatResponse {
                 .inCount(stat.getInCount())
                 .outCount(stat.getOutCount())
                 .totalCount(stat.getTotalCount())
-                .averageSpeed(stat.getAverageSpeed())
-                .congestionScore(stat.getCongestionScore())
-                .averageStayTime(stat.getAverageStayTime())
+                .averageSpeed(stat.getAverageSpeed() != null ? stat.getAverageSpeed().doubleValue() : null)
+                .congestionScore(stat.getCongestionScore() != null ? stat.getCongestionScore().doubleValue() : null)
+                .averageStayTime(stat.getAverageStayTime() != null ? stat.getAverageStayTime().doubleValue() : null)
                 .duplicateCount(stat.getDuplicateVehicleCount())
                 .build();
     }

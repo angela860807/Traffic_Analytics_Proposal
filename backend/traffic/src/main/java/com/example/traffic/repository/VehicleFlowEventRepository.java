@@ -33,13 +33,13 @@ public interface VehicleFlowEventRepository extends JpaRepository<VehicleFlowEve
     @Query("SELECT vfe FROM VehicleFlowEvent vfe " +
             "WHERE vfe.zone = :zone " +
             "AND vfe.eventAt BETWEEN :start AND :end " +
-            "AND vfe.flowEventId > :lastLogId " +
+            "AND vfe.flowEventId > :lastSeq " +
             "ORDER BY vfe.flowEventId ASC")
     List<VehicleFlowEvent> findEventsForAnalysis(
             @Param("zone") Zone zone,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end,
-            @Param("lastLogId") Long lastLogId);
+            @Param("lastSeq") Long lastSeq);
 
     /**
      * [추가 - 정의서 3.6절 중복 차량 분석]

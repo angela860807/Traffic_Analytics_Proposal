@@ -77,7 +77,8 @@ public class DetectionLogService {
         DetectionLog savedLog = detectionLogRepository.save(logEntity);
 
         // 5. 흐름 이벤트 처리
-        vehicleFlowEventService.processFlowEvent(savedLog);
+        vehicleFlowEventService.processFlowEvent(savedLog, request.getSpeed(), request.getStayTime());
+        savedLog.completeAnalysis(request.getPlateNumber(), BigDecimal.valueOf(request.getConfidenceScore()));
 
         return savedLog.getLogId();
     }
