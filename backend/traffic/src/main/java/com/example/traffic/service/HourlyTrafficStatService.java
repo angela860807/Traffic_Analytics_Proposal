@@ -62,12 +62,12 @@ public class HourlyTrafficStatService {
                 .filter(e -> e.getFlowDirection() == Direction.OUT)
                 .count();
 
-        Double avgSpeed = eventsForAnalysis.stream()
+        double avgSpeed = eventsForAnalysis.stream()
                 .mapToDouble(e -> e.getSpeed() != null ? e.getSpeed().doubleValue() : 0.0)
                 .average()
                 .orElse(0.0);
 
-        Double avgStayTime = eventsForAnalysis.stream()
+        double avgStayTime = eventsForAnalysis.stream()
                 .mapToDouble(e -> e.getStayTime() != null ? e.getStayTime() : 0.0)
                 .average()
                 .orElse(0.0);
@@ -76,12 +76,7 @@ public class HourlyTrafficStatService {
         int duplicateCount = (int) ((currentInCount + currentOutCount) - totalUniqueVehicles);
         duplicateCount = Math.max(0, duplicateCount);
 
-        Double congestionScore = calculateCongestionScore((int) (currentInCount + currentOutCount), avgSpeed);
-
-        VehicleFlowEvent lastEvent = eventsForAnalysis.get(eventsForAnalysis.size() - 1);
-        Long newLastLogId = lastEvent.getSourceDetectionLog() != null
-                ? lastEvent.getSourceDetectionLog().getLogId()
-                : null;
+        double congestionScore = calculateCongestionScore((int) (currentInCount + currentOutCount), avgSpeed);
 
         HourlyTrafficStat stat = hourlyTrafficStatRepository.findByZoneZoneIdAndStatDateAndStatHour(
                         zone.getZoneId(), statDate, statHour)
@@ -98,13 +93,13 @@ public class HourlyTrafficStatService {
                 BigDecimal.valueOf(congestionScore),
                 BigDecimal.valueOf(avgStayTime),
                 duplicateCount,
-                newLastLogId
+                0L // lastLogId는 더 이상 의미가 없으므로 0으로 처리하거나 필드 제거 고려
         );
 
         hourlyTrafficStatRepository.save(stat);
     }
 
-    private Double calculateCongestionScore(int totalCount, Double avgSpeed) {
+    private double calculateCongestionScore(int totalCount, double avgSpeed) {
         if (totalCount == 0) {
             return 0.0;
         }
