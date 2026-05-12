@@ -28,16 +28,16 @@ export CAMERA_CODE=CAM_001
 ## 2. 설치
 
 ```bash
-python -m venv venv
+python -m venv --system-site-packages venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-`picamera2`는 Raspberry Pi OS에서 별도로 설치되어 있어야 한다.
+`picamera2`와 `cv2`는 Raspberry Pi OS에서 apt 패키지로 설치한다.
 
 ```bash
 sudo apt update
-sudo apt install -y python3-picamera2
+sudo apt install -y python3-picamera2 python3-opencv
 ```
 
 ## 3. 실행 순서

@@ -66,7 +66,7 @@ APP_NAME=traffic-ai-server
 APP_ENV=local
 
 SPRING_BACKEND_BASE_URL=http://127.0.0.1:8080
-SPRING_DETECTION_PATH=/api/detections
+SPRING_DETECTION_PATH=/api/v1/detection-logs
 
 DEFAULT_TIMEZONE=Asia/Seoul
 DETECTION_CONFIDENCE_THRESHOLD=0.7
@@ -75,8 +75,19 @@ IMAGE_STORAGE_DIR=storage/detections
 STATIC_DETECTIONS_URL_PREFIX=/static/detections
 PUBLIC_BASE_URL=
 
-MODEL_PATH=
+MODEL_PATH=best.pt
 OCR_LANG=korean
+YOLO_CONF_THRESHOLD=0.5
+YOLO_IOU_THRESHOLD=0.4
+YOLO_MAX_DET=5
+DETECTION_PREPROCESS_MODE=none
+PLATE_CROP_PADDING_RATIO=0.10
+OCR_MIN_CONFIDENCE=0.5
+OCR_PREPROCESS_SCALE=2.0
+OCR_ADAPTIVE_BLOCK_SIZE=31
+OCR_ADAPTIVE_C=5
+SAVE_PLATE_CROP=true
+SAVE_OCR_PREPROCESSED_IMAGE=true
 ```
 
 ## Health Check
@@ -202,6 +213,11 @@ python -m pytest
 ```powershell
 python -m compileall app
 ```
+
+## 병합 테스트 주의사항
+
+mock inference 단계에서는 번호판이 `123가4567`로 고정됩니다.
+`DUPLICATE_WINDOW_SECONDS` 안에 같은 `cameraCode`와 번호판이 반복되면 FastAPI가 Spring 전송을 생략하므로, DB row 증가를 매 요청마다 확인하려면 테스트 중에는 `DUPLICATE_WINDOW_SECONDS=0`으로 낮추거나 요청 간격을 충분히 둡니다.
 
 ## 에러 응답
 
