@@ -48,9 +48,20 @@ public class DetectionLog {
     @Column(length = 255)
     private String imagePath;
 
-    // 하달 사항: Vue 화면 표시용 URL 필드 추가
     @Column(length = 500)
     private String imageUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String plateCropImagePath;
+
+    @Column(columnDefinition = "TEXT")
+    private String plateCropImageUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String ocrImagePath;
+
+    @Column(columnDefinition = "TEXT")
+    private String ocrImageUrl;
 
     @Column(nullable = false)
     private LocalDateTime detectedAt;
@@ -65,6 +76,8 @@ public class DetectionLog {
     @Builder
     public DetectionLog(Camera camera, Vehicle vehicle, String plateNumber, DetectionType detectionType,
                         BigDecimal confidenceScore, String imagePath, String imageUrl,
+                        String plateCropImagePath, String plateCropImageUrl,
+                        String ocrImagePath, String ocrImageUrl,
                         LocalDateTime detectedAt, DetectionLogStatus status) {
         this.camera = camera;
         this.vehicle = vehicle;
@@ -73,6 +86,10 @@ public class DetectionLog {
         this.confidenceScore = confidenceScore;
         this.imagePath = imagePath;
         this.imageUrl = imageUrl;
+        this.plateCropImagePath = plateCropImagePath;
+        this.plateCropImageUrl = plateCropImageUrl;
+        this.ocrImagePath = ocrImagePath;
+        this.ocrImageUrl = ocrImageUrl;
         this.detectedAt = (detectedAt != null) ? detectedAt : LocalDateTime.now();
         this.status = (status != null) ? status : DetectionLogStatus.RECEIVED;
         this.createdAt = LocalDateTime.now();
@@ -84,5 +101,9 @@ public class DetectionLog {
 
     public void markDuplicateSkipped() {
         this.status = DetectionLogStatus.DUPLICATE_SKIPPED;
+    }
+
+    public void markOcrFailed() {
+        this.status = DetectionLogStatus.OCR_FAILED;
     }
 }

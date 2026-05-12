@@ -25,9 +25,17 @@ public class DetectionRequest {
     private Double confidenceScore;
 
     @NotBlank(message = "이미지 경로는 필수입니다.")
-    private String imagePath; // 저장/추적용 물리 경로
+    private String imagePath;
 
-    private String imageUrl; // Vue 화면 표시용 URL 추가
+    private String imageUrl;
+
+    private String plateCropImagePath;
+
+    private String plateCropImageUrl;
+
+    private String ocrImagePath;
+
+    private String ocrImageUrl;
 
     @NotNull(message = "탐지 시각은 필수입니다.")
     private LocalDateTime detectedAt;
