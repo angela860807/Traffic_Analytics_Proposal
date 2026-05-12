@@ -15,7 +15,19 @@
       "Bash(grep -rEn \"^<{4,}|^>{4,}|^={4,}\" README.md TROUBLESHOOTING.md trafficAS-b/src --include=\"*.vue\" --include=\"*.js\" --include=\"*.md\")",
       "Bash(grep -En \"^<{4,}|^>{4,}|^={4,}\" README.md)",
       "Bash(sed -i.bak *)",
-      "Bash(rm README.md.bak TROUBLESHOOTING.md.bak)"
+      "Bash(rm README.md.bak TROUBLESHOOTING.md.bak)",
+      "Bash(mkdir -p src/styles)",
+      "Bash(sed -n '1623,3669p' src/views/RoadDashboardView.vue)",
+      "Bash(awk 'NR<=1621 {print} NR==1622 {print \"<style src=\\\\\"@/styles/dashboard.css\\\\\"></style>\"; exit}' src/views/RoadDashboardView.vue)",
+      "Read(//tmp/**)",
+      "Bash(mv /tmp/rd_new.vue src/views/RoadDashboardView.vue)",
+      "Bash(grep -E \"\\\\.\\(js|css\\)$\")",
+      "Bash(git ls-tree *)",
+      "Bash(awk '/^\\\\.[a-zA-Z_-]/{ gsub\\(/[,{].*/, \"\"\\); print $1 }' src/styles/dashboard.css)",
+      "Bash(file public/car1.jpg)",
+      "Bash(identify public/car1.jpg)",
+      "Bash(python3 -c \"from PIL import Image; im=Image.open\\('public/car1.jpg'\\); print\\(f'{im.size[0]}x{im.size[1]}'\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\);const b=fs.readFileSync\\('public/car1.jpg'\\);let i=4;while\\(i<b.length\\){if\\(b[i]===0xFF&&\\(b[i+1]===0xC0||b[i+1]===0xC2\\)\\){console.log\\(b.readUInt16BE\\(i+7\\)+'x'+b.readUInt16BE\\(i+5\\)\\);break}i++}\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\ez\\Desktop\\TM"
