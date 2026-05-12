@@ -1,6 +1,7 @@
 package com.example.traffic.dto.request;
 
 import com.example.traffic.common.enums.DetectionType;
+import com.example.traffic.common.enums.DetectionLogStatus;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -16,7 +17,6 @@ public class DetectionRequest {
     @NotBlank(message = "카메라 코드는 필수입니다.")
     private String cameraCode;
 
-    @NotBlank(message = "인식된 번호판은 필수입니다.")
     private String plateNumber;
 
     @NotNull(message = "신뢰도 점수는 필수입니다.")
@@ -34,4 +34,6 @@ public class DetectionRequest {
 
     @NotNull(message = "탐지 유형은 필수입니다.")
     private DetectionType detectionType;
+
+    private DetectionLogStatus status;
 }

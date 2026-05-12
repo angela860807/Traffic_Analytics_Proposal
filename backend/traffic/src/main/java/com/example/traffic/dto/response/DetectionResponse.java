@@ -1,6 +1,7 @@
 package com.example.traffic.dto.response;
 
 import com.example.traffic.common.enums.Direction;
+import com.example.traffic.common.enums.DetectionLogStatus;
 import com.example.traffic.domain.DetectionLog;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,6 +20,7 @@ public class DetectionResponse {
     private final String imageUrl;
     private final Double confidenceScore;
     private final LocalDateTime detectedAt;
+    private final DetectionLogStatus status;
 
     public static DetectionResponse from(DetectionLog log) {
         return DetectionResponse.builder()
@@ -31,6 +33,7 @@ public class DetectionResponse {
                 .imageUrl(log.getImageUrl()) // ★ 엔티티 값을 응답 DTO에 매핑
                 .confidenceScore(log.getConfidenceScore() != null ? log.getConfidenceScore().doubleValue() : null)
                 .detectedAt(log.getDetectedAt())
+                .status(log.getStatus())
                 .build();
     }
 }

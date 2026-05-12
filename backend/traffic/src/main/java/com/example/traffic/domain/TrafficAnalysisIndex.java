@@ -9,7 +9,15 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "traffic_analysis_index")
+@Table(
+        name = "traffic_analysis_index",
+        indexes = {
+                @Index(name = "idx_traffic_analysis_index_zone", columnList = "zone_id")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_traffic_analysis_index_zone", columnNames = "zone_id")
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TrafficAnalysisIndex {
@@ -17,6 +25,10 @@ public class TrafficAnalysisIndex {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "zone_id")
+    private Zone zone;
 
     // Last processed vehicle_flow_events.flow_event_id.
     private Long lastSeq;
@@ -31,9 +43,10 @@ public class TrafficAnalysisIndex {
     private LocalDateTime fetchedTime;
 
     @Builder
-    public TrafficAnalysisIndex(Long lastSeq, Long lastLogId,
+    public TrafficAnalysisIndex(Zone zone, Long lastSeq, Long lastLogId,
                                 LocalDateTime lastLogTime,
                                 LocalDateTime fetchedTime) {
+        this.zone = zone;
         this.lastSeq = lastSeq;
         this.lastLogId = lastLogId;
         this.lastLogTime = lastLogTime;

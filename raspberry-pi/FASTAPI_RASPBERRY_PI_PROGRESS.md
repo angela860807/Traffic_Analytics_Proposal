@@ -7,8 +7,8 @@
 ### 1. 번호판 미인식 처리 정책
 
 - FastAPI 분석 결과가 `detectionType=PLATE`이고 `plateNumber`가 있을 때만 Spring Boot로 전송한다.
-- 번호판 미인식 결과는 FastAPI 응답까지만 반환하고 Spring/DB 저장은 생략한다.
-- 이유: 현재 Spring `DetectionRequest`와 DB 계약은 `plateNumber` 필수에 가깝기 때문에, 미인식 건을 바로 저장하면 백엔드 저장 단계에서 실패할 수 있다.
+- 번호판 미인식 결과도 Spring으로 전송하고 `detection_logs.status=OCR_FAILED`로 저장한다.
+- `OCR_FAILED` 로그는 차량 번호가 없으므로 `vehicles`, `vehicle_flow_events`는 생성하지 않는다.
 
 ### 2. 원본 이미지 + crop + OCR 전처리 이미지 저장
 
@@ -92,7 +92,7 @@ python -m pytest tests/test_detection_api.py -q
 
 - `cameraCode + plateNumber + 시간 window` 기준으로 FastAPI의 Spring 전송 중복을 방지한다.
 - 중복 window는 `DUPLICATE_WINDOW_SECONDS` 설정을 사용한다.
-- 동일 번호판이 window 안에 다시 들어오면 Spring 전송을 생략하고 FastAPI 응답만 반환한다.
+- 동일 번호판이 window 안에 다시 들어오면 Spring으로 전송하되 `detection_logs.status=DUPLICATE_SKIPPED`로 저장한다.
 - 백엔드 저장 성공 후에만 중복 기준으로 기록한다.
 - 최종 Tracking ID 기반 중복 제거는 YOLO/OCR 모델 검증 이후로 둔다.
 
@@ -120,11 +120,11 @@ python scripts/verify_yolo_ocr.py --image samples/sample.jpg --camera-code CAM_0
 
 ## 작업일지 요약
 
-- FastAPI에서 번호판 미인식 결과를 Spring으로 보내지 않도록 처리했다.
+- FastAPI에서 번호판 미인식 결과를 `OCR_FAILED` 상태로 Spring에 저장하도록 처리했다.
 - 원본 프레임, 번호판 crop, OCR 전처리 이미지 저장 구조를 분리했다.
 - 저장된 이미지로 YOLO/OCR을 다시 실행할 수 있는 재처리 서비스 경로를 만들었다.
 - 라즈베리파이는 수집/업로드만 담당하고, 전처리는 FastAPI가 담당하도록 역할을 분리했다.
 - 탐지 전처리와 OCR 전처리를 별도 함수로 나누고, 탐지 전처리는 기본 비활성화했다.
-- 동일 `cameraCode + plateNumber`가 설정된 시간 안에 반복 인식되면 Spring 전송을 생략하도록 중복 방지 로직을 추가했다.
+- 동일 `cameraCode + plateNumber`가 설정된 시간 안에 반복 인식되면 `DUPLICATE_SKIPPED` 상태로 Spring에 저장하도록 중복 방지 로직을 조정했다.
 - 실제 YOLOv11/PaddleOCR 모델 연결을 확인할 수 있는 검증 스크립트를 추가했다.
 - 실시간 화면 전송 방식 정리는 7번 작업으로 보류했다.
