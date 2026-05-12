@@ -18,6 +18,10 @@ public class TrafficAnalysisIndex {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "zone_id", nullable = false)
+    private Zone zone;
+
     // Last processed vehicle_flow_events.flow_event_id.
     private Long lastSeq;
 
@@ -31,9 +35,9 @@ public class TrafficAnalysisIndex {
     private LocalDateTime fetchedTime;
 
     @Builder
-    public TrafficAnalysisIndex(Long lastSeq, Long lastLogId,
-                                LocalDateTime lastLogTime,
-                                LocalDateTime fetchedTime) {
+    public TrafficAnalysisIndex(Zone zone, Long lastSeq, Long lastLogId,
+                                LocalDateTime lastLogTime, LocalDateTime fetchedTime) {
+        this.zone = zone;
         this.lastSeq = lastSeq;
         this.lastLogId = lastLogId;
         this.lastLogTime = lastLogTime;
