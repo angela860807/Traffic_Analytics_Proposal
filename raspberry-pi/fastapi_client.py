@@ -1,6 +1,6 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import requests
 
@@ -61,7 +61,7 @@ def _post_image(
 
 def upload_detection_image(
     image_bytes: bytes,
-    captured_at: datetime | None = None,
+    captured_at: Optional[datetime] = None,
     filename: str = "capture.jpg",
 ) -> dict[str, Any]:
     response = _post_image(
@@ -75,7 +75,7 @@ def upload_detection_image(
 
 def upload_live_frame(
     image_bytes: bytes,
-    captured_at: datetime | None = None,
+    captured_at: Optional[datetime] = None,
     filename: str = "frame.jpg",
 ) -> None:
     _post_image(
@@ -88,7 +88,7 @@ def upload_live_frame(
 
 def upload_detection_image_file(
     image_path: Path,
-    captured_at: datetime | None = None,
+    captured_at: Optional[datetime] = None,
 ) -> dict[str, Any]:
     return upload_detection_image(
         image_bytes=image_path.read_bytes(),
