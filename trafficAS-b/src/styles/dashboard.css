@@ -2135,6 +2135,25 @@ input[type="time"] {
   object-fit: cover; border-radius: 3px;
   margin-bottom: 4px; filter: brightness(.85);
 }
+.v2-ocr-thumb-empty {
+  width: 100%; aspect-ratio: 16/9;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.04);
+  border-radius: 3px;
+  margin-bottom: 4px;
+  color: rgba(228,238,255,.25);
+  font-size: 16px;
+}
+.v2-ocr-photo-empty {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #1a2b44, #0f1d30);
+  color: rgba(228,238,255,.35);
+  font-size: 12px;
+}
+.v2-ocr-photo-empty i { font-size: 28px; color: #60a5fa; opacity: .5; }
 .v2-lt-row { cursor: pointer; transition: background .15s; }
 .v2-lt-row.active {
   background: rgba(96,165,250,.12) !important;

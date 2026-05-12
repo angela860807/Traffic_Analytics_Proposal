@@ -135,7 +135,11 @@
           </div>
           <div class="v2-ocr-body">
             <div class="v2-ocr-photo">
-              <img :src="plateImg(modalPlate)" class="v2-ocr-photo-img" :alt="modalPlate.num" />
+              <img v-if="plateImg(modalPlate)" :src="plateImg(modalPlate)" class="v2-ocr-photo-img" :alt="modalPlate.num" />
+              <div v-else class="v2-ocr-photo-empty">
+                <i class="bi bi-image"></i>
+                <span>이미지 없음</span>
+              </div>
               <div class="v2-plate-vis">
                 <div class="v2-plate-num mono">
                   {{ modalPlate.status === 'OCR_FAILED' ? '미인식' : modalPlate.num }}

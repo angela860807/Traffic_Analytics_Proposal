@@ -63,11 +63,12 @@ CCTV 기반 번호판 자동 인식(ANPR), 구역별 혼잡도 히트맵, 차량
 ### 6-1 Frontend
 
 - Vue 3 (Composition API, `<script setup>`)
-- Vue Router 4
-- Vite 5
+- Vue Router 4 — 라우트별 lazy loading (`() => import(...)`)
+- Vite 5 — 코드 분할 빌드
 - ECharts 6 (혼잡도/도넛/통계 차트)
 - Leaflet 1.9 + VWorld 다크 / CartoDB Dark Matter 타일
 - OpenStreetMap Overpass API (실제 도로 geometry)
+- `defineAsyncComponent` — 대시보드 탭 on-demand 로딩
 - Bootstrap Icons 1.11.3 (CDN)
 - Pretendard Variable, Syne, IBM Plex Mono, JetBrains Mono (폰트)
 
@@ -345,10 +346,79 @@ trafficAS-b/
 
 ---
 
-## 13. 향후 개선 사항
+## 13. 성능 최적화 — 사용자 부하 대응
+
+### 13-1 라우트별 코드 분할 (Route-level Code Splitting)
+
+```js
+// src/router/index.js
+const MainView          = () => import('@/views/MainView.vue')
+const RoadDashboardView = () => import('@/views/RoadDashboardView.vue')
+```
+
+**효과**: 일반 사용자(메인 페이지 방문자)는 관리자용 대시보드 코드 + ECharts(~250KB) + Leaflet(~50KB)를 다운로드하지 않음.
+
+### 13-2 대시보드 탭 On-demand 로딩
+
+```js
+// src/views/RoadDashboardView.vue
+const StatsTab = defineAsyncComponent(() => import('@/components/dashboard/StatsTab.vue'))
+```
+
+**+ "처음 방문한 탭만 마운트" 패턴**:
+```js
+const visitedTabs = ref(new Set(['overview']))
+watch(activeTab, (v) => { visitedTabs.value.add(v) })
+```
+
+```vue
+<StatsTab v-if="visitedTabs.has('stats')" :active="..." />
+```
+
+**효과**: 관리자가 overview 탭만 보고 닫으면 다른 탭은 절대 로드 안 됨. `v-show` 대비 메모리·차트 인스턴스·타이머 사용량 0.
+
+### 13-3 OSM 도로 데이터 24시간 localStorage 캐시
+
+```js
+const OVERPASS_CACHE_KEY = 'osm-roads-v1-gangnam'
+const OVERPASS_CACHE_TTL = 24 * 60 * 60 * 1000
+if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data
+```
+
+**효과**: 강남권 도로 geometry(~200KB)는 사용자 1명당 24시간에 1회만 외부 API 호출. 동시 접속자 100명이라도 Overpass 공용 서버 부담 최소화.
+
+### 13-4 메모리 누수 방지
+
+```js
+onUnmounted(() => {
+  clearInterval(dataT)
+  clearInterval(districtT)
+  Object.values(charts).forEach(c => c.dispose())
+  heatMap?.remove()
+  document.removeEventListener('keydown', onEscClose)
+})
+```
+
+**효과**: 모든 타이머·이벤트 리스너·차트 인스턴스 명시적 정리. 장시간 켜놓는 관제 모니터링 특성상 필수.
+
+### 13-5 빌드 결과 (Vite 프로덕션)
+
+| 시나리오 | gzip 크기 |
+|---|---|
+| 메인 페이지 첫 진입 | **약 51 KB** (Vue + Router + MainView) |
+| 대시보드 첫 진입 | +433 KB (RoadDashboardView + ECharts + Leaflet) |
+| 통계 탭 첫 클릭 | +2.3 KB |
+| 검색 탭 첫 클릭 | +3.4 KB |
+
+---
+
+## 14. 향후 개선 사항
+
+## 14. 향후 개선 사항
 
 - 실제 FastAPI 백엔드 연동 실전 검증 (`.env`의 `VITE_FASTAPI_BASE_URL` 채우면 즉시 통신 시도)
 - WebSocket 도입 (현재는 3초 폴링)
+- ECharts 트리쉐이킹 — 사용 차트 타입만 import해서 대시보드 청크 추가 100KB 절감
 - 검색 결과 서버사이드 페이지네이션 + 가상 스크롤
 - 차량 이미지 다양화 + 번호판 좌표 메타데이터 기반 자동 합성
 - 에러 / 로딩 상태 통합 안내 (현재는 console.warn 중심)

@@ -76,10 +76,12 @@ function dirLabel(d) { return d === 'in' ? '진입' : d === 'out' ? '이탈' : '
 function levelLabel(lv) { return lv === 'critical' ? '중요' : lv === 'warning' ? '경고' : '정보' }
 function plateImg(p) {
   if (!p) return ''
+  /* 우선순위: crop(plateCropImageUrl) → 원본(imageUrl) → 데모 폴백
+     PROD에선 데이터 없을 때 빈 문자열 반환 (가짜 이미지 노출 방지) */
   return p.plateCropImageUrl
       || p.cropUrl
       || p.imageUrl
-      || '/car1.jpg'
+      || (import.meta.env.DEV ? '/car1.jpg' : '')
 }
 function plateStatus(s) {
   if (s === 'OCR_FAILED')        return { label: '실패', cls: 'fail', icon: 'bi bi-x-circle-fill' }
