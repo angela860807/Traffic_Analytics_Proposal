@@ -13,6 +13,7 @@ import app.api.routes.detection as detection_route
 from app.main import app
 from app.schemas.detection import DetectionResult
 import app.services.image_preprocessor as image_preprocessor
+from app.services.backend_client import BackendClient
 from app.services.inference_service import InferenceService
 from app.services.plate_detector import PlateDetection
 from app.services.plate_recognizer import PlateRecognition, PlateRecognizer
@@ -54,6 +55,10 @@ def make_recognized_detection(
         confidence_score=0.9321,
         image_path="storage/detections/2026/04/30/CAM_001_103000_frame.jpg",
         image_url="/static/detections/2026/04/30/CAM_001_103000_frame.jpg",
+        plate_crop_image_path="storage/detections/2026/04/30/CAM_001_103000_plate_crop.jpg",
+        plate_crop_image_url="/static/detections/2026/04/30/CAM_001_103000_plate_crop.jpg",
+        ocr_image_path="storage/detections/2026/04/30/CAM_001_103000_ocr.jpg",
+        ocr_image_url="/static/detections/2026/04/30/CAM_001_103000_ocr.jpg",
         detected_at=detected_at,
     )
 
@@ -103,15 +108,18 @@ def test_create_mock_detection(monkeypatch, tmp_path) -> None:
     assert response.status_code == 200
 
     data = response.json()["data"]
+    assert response.json()["analysisStatus"] == "ANALYSIS_ONLY"
 
     assert data["cameraCode"] == "CAM_001"
-    assert data["plateNumber"] == "123가4567"
-    assert data["detectionType"] == "PLATE"
+    assert data["plateNumber"] is None
+    assert data["detectionType"] == "VEHICLE"
     assert data["directionType"] == "IN"
-    assert data["confidenceScore"] == 0.9321
+    assert data["confidenceScore"] == 0.0
     assert data["imagePath"] is not None
     assert Path(data["imagePath"]).exists()
     assert data["imageUrl"].startswith("/static/detections/")
+    assert data["plateCropImageUrl"] is None
+    assert data["ocrImageUrl"] is None
 
 
 def test_create_mock_detection_with_invalid_base64() -> None:
@@ -149,12 +157,16 @@ def test_create_detection_from_image(monkeypatch, tmp_path) -> None:
     assert response.status_code == 200
 
     data = response.json()["data"]
+    assert response.json()["analysisStatus"] == "ANALYSIS_ONLY"
 
     assert data["cameraCode"] == "CAM_001"
-    assert data["plateNumber"] == "123가4567"
+    assert data["plateNumber"] is None
+    assert data["detectionType"] == "VEHICLE"
     assert data["imagePath"] is not None
     assert Path(data["imagePath"]).exists()
     assert data["imageUrl"].startswith("/static/detections/")
+    assert data["plateCropImageUrl"] is None
+    assert data["ocrImageUrl"] is None
 
 
 def test_detection_saves_frame_crop_and_ocr_images_when_enabled(
@@ -204,9 +216,62 @@ def test_detection_saves_frame_crop_and_ocr_images_when_enabled(
     storage_dir = tmp_path / "detections" / "2026" / "04" / "30"
 
     assert result.image_path.endswith("CAM_001_103000_frame.jpg")
+    assert result.image_url.endswith("/2026/04/30/CAM_001_103000_frame.jpg")
+    assert result.plate_crop_image_path.endswith("CAM_001_103000_plate_crop.jpg")
+    assert result.plate_crop_image_url.endswith("/2026/04/30/CAM_001_103000_plate_crop.jpg")
+    assert result.ocr_image_path.endswith("CAM_001_103000_ocr.jpg")
+    assert result.ocr_image_url.endswith("/2026/04/30/CAM_001_103000_ocr.jpg")
     assert (storage_dir / "CAM_001_103000_frame.jpg").exists()
     assert (storage_dir / "CAM_001_103000_plate_crop.jpg").exists()
     assert (storage_dir / "CAM_001_103000_ocr.jpg").exists()
+
+
+def test_detection_includes_crop_and_ocr_images_when_ocr_fails_after_bbox(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(
+        "app.services.image_storage_service.IMAGE_STORAGE_DIR",
+        str(tmp_path / "detections"),
+    )
+    monkeypatch.setattr("app.services.inference_service.SAVE_PLATE_CROP", True)
+    monkeypatch.setattr(
+        "app.services.inference_service.SAVE_OCR_PREPROCESSED_IMAGE",
+        True,
+    )
+
+    service = InferenceService()
+
+    monkeypatch.setattr(
+        service.plate_detector,
+        "detect",
+        lambda image: PlateDetection(
+            detection_type="PLATE",
+            confidence_score=0.9321,
+            bbox=(10, 20, 80, 50),
+        ),
+    )
+    monkeypatch.setattr(
+        service.plate_recognizer,
+        "recognize",
+        lambda image: PlateRecognition(
+            text=None,
+            confidence_score=0.0,
+        ),
+    )
+
+    result = asyncio.run(
+        service.detect_from_image_bytes(
+            camera_code="CAM_001",
+            captured_at=datetime(2026, 4, 30, 10, 30, 0),
+            image_bytes=make_test_image_bytes(),
+        )
+    )
+
+    assert result.plate_number is None
+    assert result.detection_type == "VEHICLE"
+    assert result.plate_crop_image_url.endswith("/2026/04/30/CAM_001_103000_plate_crop.jpg")
+    assert result.ocr_image_url.endswith("/2026/04/30/CAM_001_103000_ocr.jpg")
 
 
 def test_detection_preprocess_none_keeps_frame_unchanged(monkeypatch) -> None:
@@ -329,6 +394,10 @@ def test_detection_can_reprocess_saved_image_without_resaving_frame(
 
     assert result.image_path == str(saved_image_path).replace("\\", "/")
     assert result.image_url.endswith("/2026/04/30/CAM_001_103000_frame.jpg")
+    assert result.plate_crop_image_path.endswith("CAM_001_103000_plate_crop.jpg")
+    assert result.plate_crop_image_url.endswith("/2026/04/30/CAM_001_103000_plate_crop.jpg")
+    assert result.ocr_image_path.endswith("CAM_001_103000_ocr.jpg")
+    assert result.ocr_image_url.endswith("/2026/04/30/CAM_001_103000_ocr.jpg")
     assert (storage_dir / "CAM_001_103000_plate_crop.jpg").exists()
     assert (storage_dir / "CAM_001_103000_ocr.jpg").exists()
     assert len(list(storage_dir.glob("*_frame.jpg"))) == 1
@@ -365,6 +434,53 @@ def test_create_detection_from_invalid_image_bytes() -> None:
 
     assert response.status_code == 400
     assert response.json()["detail"] == "image must be a valid jpg or png"
+
+
+def test_backend_client_payload_includes_crop_and_ocr_image_fields(monkeypatch) -> None:
+    captured = {}
+
+    class FakeResponse:
+        content = b'{"status":"ok"}'
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"status": "ok"}
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return None
+
+        async def post(self, url, json, headers):
+            captured["json"] = json
+            captured["headers"] = headers
+            return FakeResponse()
+
+    monkeypatch.setattr("app.services.backend_client.BACKEND_INTERNAL_API_KEY", "test-key")
+    monkeypatch.setattr("app.services.backend_client.httpx.AsyncClient", FakeAsyncClient)
+
+    asyncio.run(
+        BackendClient().send_detection(
+            make_recognized_detection(),
+            "DUPLICATE_SKIPPED",
+        )
+    )
+
+    payload = captured["json"]
+
+    assert payload["status"] == "DUPLICATE_SKIPPED"
+    assert payload["plateCropImagePath"].endswith("_plate_crop.jpg")
+    assert payload["plateCropImageUrl"].endswith("_plate_crop.jpg")
+    assert payload["ocrImagePath"].endswith("_ocr.jpg")
+    assert payload["ocrImageUrl"].endswith("_ocr.jpg")
+    assert captured["headers"]["X-Internal-Api-Key"] == "test-key"
 
 
 def test_create_and_send_mock_detection_without_backend(monkeypatch, tmp_path) -> None:
@@ -480,6 +596,7 @@ def test_create_and_send_mock_detection_sends_ocr_failed_when_plate_is_not_recog
     assert body["message"] == (
         "Detection result sent to backend as OCR_FAILED"
     )
+    assert body["analysisStatus"] == "OCR_FAILED"
     assert body["data"]["plateNumber"] is None
     assert body["data"]["detectionType"] == "VEHICLE"
     assert sent_statuses == ["OCR_FAILED"]
@@ -523,6 +640,7 @@ def test_create_and_send_image_detection_sends_ocr_failed_when_plate_is_not_reco
     assert body["message"] == (
         "Detection result sent to backend as OCR_FAILED"
     )
+    assert body["analysisStatus"] == "OCR_FAILED"
     assert body["data"]["plateNumber"] is None
     assert body["data"]["detectionType"] == "VEHICLE"
     assert sent_statuses == ["OCR_FAILED"]
@@ -566,10 +684,12 @@ def test_create_and_send_image_detection_sends_duplicate_status_to_backend(
 
     assert first_response.status_code == 200
     assert first_response.json()["message"] == "Detection result sent to backend"
+    assert first_response.json()["analysisStatus"] == "SENT_TO_BACKEND"
     assert second_response.status_code == 200
     assert second_response.json()["message"] == (
         "Duplicate detection sent to backend as DUPLICATE_SKIPPED"
     )
+    assert second_response.json()["analysisStatus"] == "DUPLICATE_SKIPPED"
     assert sent_statuses == [None, "DUPLICATE_SKIPPED"]
 
     detection_route.duplicate_detection_guard.clear()

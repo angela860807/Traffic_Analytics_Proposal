@@ -8,7 +8,7 @@ class BackendClient:
     async def send_detection(
         self,
         result: DetectionResult,
-        detection_status: str | None = None,
+        analysis_status: str | None = None,
     ) -> dict:
         if not BACKEND_INTERNAL_API_KEY:
             raise RuntimeError("BACKEND_INTERNAL_API_KEY is not set")
@@ -23,8 +23,8 @@ class BackendClient:
             by_alias=True,
             mode="json",
         )
-        if detection_status is not None:
-            payload["status"] = detection_status
+        if analysis_status is not None:
+            payload["status"] = analysis_status
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(

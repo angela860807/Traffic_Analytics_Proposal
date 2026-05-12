@@ -18,23 +18,25 @@ class FastApiClientError(RuntimeError):
 def summarize_detection_response(result: dict[str, Any]) -> str:
     data = result.get("data") or {}
     message = result.get("message", "")
-    backend_status = _infer_backend_status(message)
+    analysis_status = result.get("analysisStatus") or _infer_analysis_status(message)
 
     return (
         "upload result: "
         f"accepted={result.get('accepted')}, "
-        f"backendStatus={backend_status}, "
+        f"analysisStatus={analysis_status}, "
         f"cameraCode={data.get('cameraCode')}, "
         f"plateNumber={data.get('plateNumber') or '-'}, "
         f"detectionType={data.get('detectionType')}, "
         f"confidenceScore={data.get('confidenceScore')}, "
         f"detectedAt={data.get('detectedAt')}, "
         f"imageUrl={data.get('imageUrl') or '-'}, "
+        f"plateCropImageUrl={data.get('plateCropImageUrl') or '-'}, "
+        f"ocrImageUrl={data.get('ocrImageUrl') or '-'}, "
         f"message={message}"
     )
 
 
-def _infer_backend_status(message: str) -> str:
+def _infer_analysis_status(message: str) -> str:
     if "OCR_FAILED" in message:
         return "OCR_FAILED"
 
