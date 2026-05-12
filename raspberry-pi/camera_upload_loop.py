@@ -4,7 +4,11 @@ from datetime import datetime
 import cv2
 from picamera2 import Picamera2
 
-from fastapi_client import FastApiClientError, upload_detection_image
+from fastapi_client import (
+    FastApiClientError,
+    summarize_detection_response,
+    upload_detection_image,
+)
 
 from config import (
     CAMERA_HEIGHT,
@@ -38,7 +42,7 @@ def main() -> None:
 
             try:
                 result = upload_detection_image(buffer.tobytes(), captured_at)
-                print(result)
+                print(summarize_detection_response(result))
             except FastApiClientError as exc:
                 print(f"upload failed: {exc}")
 

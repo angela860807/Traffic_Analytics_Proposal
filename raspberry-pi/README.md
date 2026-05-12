@@ -54,6 +54,12 @@ python create_sample_image.py
 python upload_sample_image.py
 ```
 
+Health Check 후 샘플 업로드까지 한 번에 확인:
+
+```bash
+python integration_smoke_test.py
+```
+
 카메라 단발 촬영 테스트:
 
 ```bash
@@ -89,5 +95,18 @@ http://<PC_LAN_IP>:8000/api/camera/live
 - DB 저장용: `POST /api/detections/image/send`
 - 분석만 확인: `POST /api/detections/image`
 - live preview 전용: `POST /api/camera/frame`
+
+## 5. DB 저장 상태 확인
+
+업로드 스크립트는 FastAPI 응답 메시지를 기준으로 예상 저장 상태를 출력한다.
+
+```text
+backendStatus=SENT_TO_BACKEND      정상 인식, Spring에서 flow event 생성 대상
+backendStatus=OCR_FAILED           번호판 미인식, detection_logs만 저장
+backendStatus=DUPLICATE_SKIPPED    FastAPI 중복 판정, detection_logs만 저장
+backendStatus=ANALYSIS_ONLY        /api/detections/image 분석 전용 응답
+```
+
+DB에서 최종 확인할 때는 `detection_logs.status`를 본다.
 
 `.env`, `venv`, 캡처 이미지, 로그 파일은 Git에 올리지 않는다.

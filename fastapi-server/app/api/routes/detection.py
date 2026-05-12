@@ -25,7 +25,7 @@ def should_send_to_backend(result) -> bool:
 def build_unrecognized_plate_response(result) -> DetectionResponse:
     return DetectionResponse(
         accepted=True,
-        message="Detection result created but not sent to backend because plate was not recognized",
+        message="Detection result sent to backend as OCR_FAILED",
         data=result,
     )
 
@@ -33,7 +33,7 @@ def build_unrecognized_plate_response(result) -> DetectionResponse:
 def build_duplicate_detection_response(result) -> DetectionResponse:
     return DetectionResponse(
         accepted=True,
-        message="Duplicate detection skipped because same plate was already sent within duplicate window",
+        message="Duplicate detection sent to backend as DUPLICATE_SKIPPED",
         data=result,
     )
 
@@ -131,8 +131,10 @@ async def create_and_send_mock_detection(
     try:
         result = await inference_service.detect_from_frame(request)
         if not should_send_to_backend(result):
+            await backend_client.send_detection(result, "OCR_FAILED")
             return build_unrecognized_plate_response(result)
         if duplicate_detection_guard.is_duplicate(result):
+            await backend_client.send_detection(result, "DUPLICATE_SKIPPED")
             return build_duplicate_detection_response(result)
         await backend_client.send_detection(result)
         duplicate_detection_guard.remember(result)
@@ -181,8 +183,10 @@ async def create_and_send_detection_from_image(
             image_bytes=image_bytes,
         )
         if not should_send_to_backend(result):
+            await backend_client.send_detection(result, "OCR_FAILED")
             return build_unrecognized_plate_response(result)
         if duplicate_detection_guard.is_duplicate(result):
+            await backend_client.send_detection(result, "DUPLICATE_SKIPPED")
             return build_duplicate_detection_response(result)
         await backend_client.send_detection(result)
         duplicate_detection_guard.remember(result)

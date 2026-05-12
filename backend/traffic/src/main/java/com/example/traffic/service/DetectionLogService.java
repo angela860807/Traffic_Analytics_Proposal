@@ -1,10 +1,12 @@
 package com.example.traffic.service;
 
+import com.example.traffic.common.enums.DetectionLogStatus;
 import com.example.traffic.domain.Camera;
 import com.example.traffic.domain.DetectionLog;
 import com.example.traffic.domain.Vehicle;
 import com.example.traffic.dto.request.DetectionRequest;
 import com.example.traffic.dto.response.DetectionResponse;
+import com.example.traffic.dto.response.FlowEventResponse;
 import com.example.traffic.etc.BusinessException;
 import com.example.traffic.repository.CameraRepository;
 import com.example.traffic.repository.DetectionLogRepository;
@@ -45,8 +47,10 @@ public class DetectionLogService {
         Camera camera = cameraRepository.findByCameraCode(request.getCameraCode())
                 .orElseThrow(() -> new BusinessException("미등록 카메라 코드입니다: " + request.getCameraCode(), HttpStatus.NOT_FOUND));
 
-        // 2. 차량 정보 조회 또는 생성 (plateNumber가 null일 수 있음을 감안한 로직 필요)
-        Vehicle vehicle = vehicleService.getOrCreateVehicle(request.getPlateNumber());
+        DetectionLogStatus requestedStatus = resolveRequestedStatus(request);
+        Vehicle vehicle = hasPlateNumber(request)
+                ? vehicleService.getOrCreateVehicle(request.getPlateNumber())
+                : null;
 
         // 3. DetectionLog 생성 및 저장
         DetectionLog logEntity = DetectionLog.builder()
@@ -58,12 +62,23 @@ public class DetectionLogService {
                 .imagePath(request.getImagePath())
                 .imageUrl(request.getImageUrl())
                 .detectedAt(request.getDetectedAt())
+                .status(requestedStatus)
                 .build();
 
         DetectionLog savedLog = detectionLogRepository.save(logEntity);
 
+        if (requestedStatus == DetectionLogStatus.OCR_FAILED ||
+                requestedStatus == DetectionLogStatus.DUPLICATE_SKIPPED) {
+            return savedLog.getLogId();
+        }
+
         // 4. [규약 반영] 조회한 Camera의 directionType 기준으로 흐름 이벤트 처리
-        vehicleFlowEventService.processFlowEvent(savedLog);
+        FlowEventResponse flowEvent = vehicleFlowEventService.processFlowEvent(savedLog);
+        if (flowEvent == null) {
+            savedLog.markDuplicateSkipped();
+        } else {
+            savedLog.markFlowEventCreated();
+        }
 
         return savedLog.getLogId();
     }
@@ -83,6 +98,20 @@ public class DetectionLogService {
         if (request.getConfidenceScore() < 0.0 || request.getConfidenceScore() > 1.0) {
             throw new BusinessException("신뢰도 점수는 0.0에서 1.0 사이여야 합니다.", HttpStatus.BAD_REQUEST);
         }
+
+        DetectionLogStatus requestedStatus = resolveRequestedStatus(request);
+
+        if (requestedStatus != DetectionLogStatus.OCR_FAILED && !hasPlateNumber(request)) {
+            throw new BusinessException("번호판 없는 탐지 로그는 OCR_FAILED 상태로만 저장할 수 있습니다.", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private DetectionLogStatus resolveRequestedStatus(DetectionRequest request) {
+        return request.getStatus() != null ? request.getStatus() : DetectionLogStatus.RECEIVED;
+    }
+
+    private boolean hasPlateNumber(DetectionRequest request) {
+        return request.getPlateNumber() != null && !request.getPlateNumber().isBlank();
     }
 
     /**

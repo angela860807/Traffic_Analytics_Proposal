@@ -373,7 +373,7 @@ def test_create_and_send_mock_detection_without_backend(monkeypatch, tmp_path) -
         str(tmp_path / "detections"),
     )
 
-    async def raise_request_error(result):
+    async def raise_request_error(result, detection_status=None):
         raise httpx.ConnectError("backend unavailable")
 
     monkeypatch.setattr(
@@ -406,7 +406,7 @@ def test_create_and_send_mock_detection_includes_spring_error_body(
         str(tmp_path / "detections"),
     )
 
-    async def raise_spring_error(result):
+    async def raise_spring_error(result, detection_status=None):
         request = httpx.Request("POST", "http://spring/api/v1/detection-logs")
         response = httpx.Response(
             status_code=500,
@@ -444,14 +444,16 @@ def test_create_and_send_mock_detection_includes_spring_error_body(
     assert "does not exist" in caplog.text
 
 
-def test_create_and_send_mock_detection_skips_backend_when_plate_is_not_recognized(
+def test_create_and_send_mock_detection_sends_ocr_failed_when_plate_is_not_recognized(
     monkeypatch,
 ) -> None:
+    sent_statuses = []
+
     async def return_unrecognized_detection(request):
         return make_unrecognized_detection()
 
-    async def fail_if_called(result):
-        raise AssertionError("backend should not be called for unrecognized plates")
+    async def record_backend_send(result, detection_status=None):
+        sent_statuses.append(detection_status)
 
     monkeypatch.setattr(
         detection_route.inference_service,
@@ -461,7 +463,7 @@ def test_create_and_send_mock_detection_skips_backend_when_plate_is_not_recogniz
     monkeypatch.setattr(
         detection_route.backend_client,
         "send_detection",
-        fail_if_called,
+        record_backend_send,
     )
 
     image_bytes = make_test_image_bytes()
@@ -476,20 +478,23 @@ def test_create_and_send_mock_detection_skips_backend_when_plate_is_not_recogniz
     assert response.status_code == 200
     body = response.json()
     assert body["message"] == (
-        "Detection result created but not sent to backend because plate was not recognized"
+        "Detection result sent to backend as OCR_FAILED"
     )
     assert body["data"]["plateNumber"] is None
     assert body["data"]["detectionType"] == "VEHICLE"
+    assert sent_statuses == ["OCR_FAILED"]
 
 
-def test_create_and_send_image_detection_skips_backend_when_plate_is_not_recognized(
+def test_create_and_send_image_detection_sends_ocr_failed_when_plate_is_not_recognized(
     monkeypatch,
 ) -> None:
+    sent_statuses = []
+
     async def return_unrecognized_detection(*, camera_code, captured_at, image_bytes):
         return make_unrecognized_detection()
 
-    async def fail_if_called(result):
-        raise AssertionError("backend should not be called for unrecognized plates")
+    async def record_backend_send(result, detection_status=None):
+        sent_statuses.append(detection_status)
 
     monkeypatch.setattr(
         detection_route.inference_service,
@@ -499,7 +504,7 @@ def test_create_and_send_image_detection_skips_backend_when_plate_is_not_recogni
     monkeypatch.setattr(
         detection_route.backend_client,
         "send_detection",
-        fail_if_called,
+        record_backend_send,
     )
 
     response = client.post(
@@ -516,24 +521,24 @@ def test_create_and_send_image_detection_skips_backend_when_plate_is_not_recogni
     assert response.status_code == 200
     body = response.json()
     assert body["message"] == (
-        "Detection result created but not sent to backend because plate was not recognized"
+        "Detection result sent to backend as OCR_FAILED"
     )
     assert body["data"]["plateNumber"] is None
     assert body["data"]["detectionType"] == "VEHICLE"
+    assert sent_statuses == ["OCR_FAILED"]
 
 
-def test_create_and_send_image_detection_skips_duplicate_backend_send(
+def test_create_and_send_image_detection_sends_duplicate_status_to_backend(
     monkeypatch,
 ) -> None:
     detection_route.duplicate_detection_guard.clear()
-    send_count = 0
+    sent_statuses = []
 
     async def return_recognized_detection(*, camera_code, captured_at, image_bytes):
         return make_recognized_detection()
 
-    async def count_backend_send(result):
-        nonlocal send_count
-        send_count += 1
+    async def record_backend_send(result, detection_status=None):
+        sent_statuses.append(detection_status)
 
     monkeypatch.setattr(
         detection_route.inference_service,
@@ -543,7 +548,7 @@ def test_create_and_send_image_detection_skips_duplicate_backend_send(
     monkeypatch.setattr(
         detection_route.backend_client,
         "send_detection",
-        count_backend_send,
+        record_backend_send,
     )
 
     request_kwargs = {
@@ -563,8 +568,8 @@ def test_create_and_send_image_detection_skips_duplicate_backend_send(
     assert first_response.json()["message"] == "Detection result sent to backend"
     assert second_response.status_code == 200
     assert second_response.json()["message"] == (
-        "Duplicate detection skipped because same plate was already sent within duplicate window"
+        "Duplicate detection sent to backend as DUPLICATE_SKIPPED"
     )
-    assert send_count == 1
+    assert sent_statuses == [None, "DUPLICATE_SKIPPED"]
 
     detection_route.duplicate_detection_guard.clear()

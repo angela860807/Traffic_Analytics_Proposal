@@ -1,6 +1,7 @@
 package com.example.traffic.domain;
 
 import com.example.traffic.common.enums.DetectionType;
+import com.example.traffic.common.enums.DetectionLogStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -14,7 +15,8 @@ import java.time.LocalDateTime;
 @Table(name = "detection_logs", indexes = {
         // 복합 인덱스로 조회 성능 최적화 (차량번호 + 인식시간)
         @Index(name = "idx_plate_detected", columnList = "plate_number, detected_at"),
-        @Index(name = "idx_detected_at", columnList = "detected_at")
+        @Index(name = "idx_detected_at", columnList = "detected_at"),
+        @Index(name = "idx_status", columnList = "status")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -33,7 +35,7 @@ public class DetectionLog {
     @JoinColumn(name = "vehicle_id")
     private Vehicle vehicle;
 
-    @Column(nullable = false, length = 20)
+    @Column(length = 20)
     private String plateNumber;
 
     @Enumerated(EnumType.STRING)
@@ -53,12 +55,17 @@ public class DetectionLog {
     @Column(nullable = false)
     private LocalDateTime detectedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30, columnDefinition = "varchar(30) default 'RECEIVED'")
+    private DetectionLogStatus status;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
     public DetectionLog(Camera camera, Vehicle vehicle, String plateNumber, DetectionType detectionType,
-                        BigDecimal confidenceScore, String imagePath, String imageUrl, LocalDateTime detectedAt) {
+                        BigDecimal confidenceScore, String imagePath, String imageUrl,
+                        LocalDateTime detectedAt, DetectionLogStatus status) {
         this.camera = camera;
         this.vehicle = vehicle;
         this.plateNumber = plateNumber;
@@ -67,6 +74,15 @@ public class DetectionLog {
         this.imagePath = imagePath;
         this.imageUrl = imageUrl;
         this.detectedAt = (detectedAt != null) ? detectedAt : LocalDateTime.now();
+        this.status = (status != null) ? status : DetectionLogStatus.RECEIVED;
         this.createdAt = LocalDateTime.now();
+    }
+
+    public void markFlowEventCreated() {
+        this.status = DetectionLogStatus.FLOW_EVENT_CREATED;
+    }
+
+    public void markDuplicateSkipped() {
+        this.status = DetectionLogStatus.DUPLICATE_SKIPPED;
     }
 }
