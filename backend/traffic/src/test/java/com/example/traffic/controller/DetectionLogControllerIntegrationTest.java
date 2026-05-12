@@ -1,7 +1,9 @@
 package com.example.traffic.controller;
 
 import com.example.traffic.common.enums.DetectionLogStatus;
+import com.example.traffic.domain.DetectionAnalysisResult;
 import com.example.traffic.domain.DetectionLog;
+import com.example.traffic.repository.DetectionAnalysisResultRepository;
 import com.example.traffic.repository.DetectionLogRepository;
 import com.example.traffic.repository.VehicleFlowEventRepository;
 import com.example.traffic.repository.VehicleRepository;
@@ -25,8 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Sql(
         statements = {
                 "ALTER TABLE detection_logs ALTER COLUMN plate_number DROP NOT NULL",
-                "ALTER TABLE detection_logs DROP CONSTRAINT IF EXISTS detection_logs_status_check",
-                "ALTER TABLE detection_logs ADD CONSTRAINT detection_logs_status_check CHECK (status IN ('RECEIVED', 'OCR_FAILED', 'FLOW_EVENT_CREATED', 'DUPLICATE_SKIPPED'))"
+                "ALTER TABLE detection_logs ALTER COLUMN detection_type DROP NOT NULL"
         },
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
 )
@@ -41,13 +42,16 @@ class DetectionLogControllerIntegrationTest {
     private DetectionLogRepository detectionLogRepository;
 
     @Autowired
+    private DetectionAnalysisResultRepository detectionAnalysisResultRepository;
+
+    @Autowired
     private VehicleRepository vehicleRepository;
 
     @Autowired
     private VehicleFlowEventRepository vehicleFlowEventRepository;
 
     @Test
-    void processDetectionSavesLogVehicleAndFlowEvent() throws Exception {
+    void processDetectionSavesLogAnalysisResultVehicleAndFlowEvent() throws Exception {
         String uniqueSuffix = String.valueOf(System.currentTimeMillis());
         String plateNumber = "TEST" + uniqueSuffix;
         String imageUrl = "/static/detections/2026/05/12/CAM_001_" + uniqueSuffix + "_frame.jpg";
@@ -56,6 +60,7 @@ class DetectionLogControllerIntegrationTest {
         String ocrImagePath = "storage/detections/2026/05/12/CAM_001_" + uniqueSuffix + "_ocr.jpg";
         String ocrImageUrl = "/static/detections/2026/05/12/CAM_001_" + uniqueSuffix + "_ocr.jpg";
         long logCountBefore = detectionLogRepository.count();
+        long resultCountBefore = detectionAnalysisResultRepository.count();
         long flowEventCountBefore = vehicleFlowEventRepository.count();
 
         mockMvc.perform(post("/api/v1/detection-logs")
@@ -82,16 +87,21 @@ class DetectionLogControllerIntegrationTest {
                 .andExpect(jsonPath("$.data").isNumber());
 
         assertThat(detectionLogRepository.count()).isEqualTo(logCountBefore + 1);
+        assertThat(detectionAnalysisResultRepository.count()).isEqualTo(resultCountBefore + 1);
         assertThat(vehicleRepository.findByPlateNumber(plateNumber)).isPresent();
         assertThat(vehicleFlowEventRepository.count()).isEqualTo(flowEventCountBefore + 1);
 
-        DetectionLog savedLog = detectionLogRepository.findByPlateNumberOrderByDetectedAtDesc(plateNumber).get(0);
-        assertThat(savedLog.getStatus()).isEqualTo(DetectionLogStatus.FLOW_EVENT_CREATED);
+        DetectionAnalysisResult savedResult = detectionAnalysisResultRepository
+                .findByPlateNumberOrderByCreatedAtDesc(plateNumber)
+                .get(0);
+        DetectionLog savedLog = savedResult.getDetectionLog();
+
         assertThat(savedLog.getImageUrl()).isEqualTo(imageUrl);
-        assertThat(savedLog.getPlateCropImagePath()).isEqualTo(plateCropImagePath);
-        assertThat(savedLog.getPlateCropImageUrl()).isEqualTo(plateCropImageUrl);
-        assertThat(savedLog.getOcrImagePath()).isEqualTo(ocrImagePath);
-        assertThat(savedLog.getOcrImageUrl()).isEqualTo(ocrImageUrl);
+        assertThat(savedResult.getStatus()).isEqualTo(DetectionLogStatus.FLOW_EVENT_CREATED);
+        assertThat(savedResult.getPlateCropImagePath()).isEqualTo(plateCropImagePath);
+        assertThat(savedResult.getPlateCropImageUrl()).isEqualTo(plateCropImageUrl);
+        assertThat(savedResult.getOcrImagePath()).isEqualTo(ocrImagePath);
+        assertThat(savedResult.getOcrImageUrl()).isEqualTo(ocrImageUrl);
     }
 
     @Test
@@ -112,10 +122,11 @@ class DetectionLogControllerIntegrationTest {
     }
 
     @Test
-    void processDetectionSavesOcrFailedLogWithoutVehicleOrFlowEvent() throws Exception {
+    void processDetectionSavesOcrFailedAnalysisResultWithoutVehicleOrFlowEvent() throws Exception {
         String imageUrl = "/static/detections/2026/05/12/CAM_001_ocr_failed_"
                 + System.currentTimeMillis() + "_frame.jpg";
         long logCountBefore = detectionLogRepository.count();
+        long resultCountBefore = detectionAnalysisResultRepository.count();
         long vehicleCountBefore = vehicleRepository.count();
         long flowEventCountBefore = vehicleFlowEventRepository.count();
 
@@ -137,20 +148,26 @@ class DetectionLogControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
 
+        DetectionLog savedLog = detectionLogRepository.findTop100ByOrderByDetectedAtDesc().stream()
+                .filter(log -> imageUrl.equals(log.getImageUrl()))
+                .findFirst()
+                .orElseThrow();
+        DetectionAnalysisResult savedResult = detectionAnalysisResultRepository
+                .findFirstByDetectionLog_LogIdOrderByAttemptNoDesc(savedLog.getLogId())
+                .orElseThrow();
+
         assertThat(detectionLogRepository.count()).isEqualTo(logCountBefore + 1);
+        assertThat(detectionAnalysisResultRepository.count()).isEqualTo(resultCountBefore + 1);
         assertThat(vehicleRepository.count()).isEqualTo(vehicleCountBefore);
         assertThat(vehicleFlowEventRepository.count()).isEqualTo(flowEventCountBefore);
-        assertThat(detectionLogRepository.findTop100ByOrderByDetectedAtDesc())
-                .filteredOn(log -> imageUrl.equals(log.getImageUrl()))
-                .singleElement()
-                .extracting("status")
-                .isEqualTo(DetectionLogStatus.OCR_FAILED);
+        assertThat(savedResult.getStatus()).isEqualTo(DetectionLogStatus.OCR_FAILED);
     }
 
     @Test
-    void processDetectionSavesFastApiDuplicateLogWithoutFlowEvent() throws Exception {
+    void processDetectionSavesDuplicateAnalysisResultWithoutFlowEvent() throws Exception {
         String plateNumber = "DUP" + System.currentTimeMillis();
         long logCountBefore = detectionLogRepository.count();
+        long resultCountBefore = detectionAnalysisResultRepository.count();
         long flowEventCountBefore = vehicleFlowEventRepository.count();
 
         mockMvc.perform(post("/api/v1/detection-logs")
@@ -171,12 +188,13 @@ class DetectionLogControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
 
+        DetectionAnalysisResult savedResult = detectionAnalysisResultRepository
+                .findByPlateNumberOrderByCreatedAtDesc(plateNumber)
+                .get(0);
+
         assertThat(detectionLogRepository.count()).isEqualTo(logCountBefore + 1);
-        assertThat(vehicleRepository.findByPlateNumber(plateNumber)).isPresent();
+        assertThat(detectionAnalysisResultRepository.count()).isEqualTo(resultCountBefore + 1);
         assertThat(vehicleFlowEventRepository.count()).isEqualTo(flowEventCountBefore);
-        assertThat(detectionLogRepository.findByPlateNumberOrderByDetectedAtDesc(plateNumber))
-                .first()
-                .extracting("status")
-                .isEqualTo(DetectionLogStatus.DUPLICATE_SKIPPED);
+        assertThat(savedResult.getStatus()).isEqualTo(DetectionLogStatus.DUPLICATE_SKIPPED);
     }
 }
