@@ -15,6 +15,10 @@ public class TrafficStatResponse {
     private final Integer inCount;
     private final Integer outCount;
     private final Integer totalCount;
+    private final Double averageSpeed;
+    private final Double congestionScore;
+    private final Double averageStayTime;
+    private final Integer duplicateCount;
 
     public static TrafficStatResponse from(HourlyTrafficStat stat) {
         return TrafficStatResponse.builder()
@@ -24,6 +28,10 @@ public class TrafficStatResponse {
                 .inCount(stat.getInCount())
                 .outCount(stat.getOutCount())
                 .totalCount(stat.getTotalCount())
+                .averageSpeed(stat.getAverageSpeed() != null ? stat.getAverageSpeed().doubleValue() : null)
+                .congestionScore(stat.getCongestionScore() != null ? stat.getCongestionScore().doubleValue() : null)
+                .averageStayTime(stat.getAverageStayTime() != null ? stat.getAverageStayTime().doubleValue() : null)
+                .duplicateCount(stat.getDuplicateVehicleCount())
                 .build();
     }
 }
