@@ -44,6 +44,10 @@ public class VehicleFlowEvent {
     @JoinColumn(name = "source_detection_log_id", nullable = false)
     private DetectionLog sourceDetectionLog;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_analysis_result_id")
+    private DetectionAnalysisResult sourceAnalysisResult;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -56,6 +60,7 @@ public class VehicleFlowEvent {
     @Builder
     public VehicleFlowEvent(Vehicle vehicle, Camera camera, Zone zone, Direction flowDirection,
                             LocalDateTime eventAt, DetectionLog sourceDetectionLog,
+                            DetectionAnalysisResult sourceAnalysisResult,
                             BigDecimal speed, Long stayTime) {
         this.vehicle = vehicle;
         this.camera = camera;
@@ -63,6 +68,7 @@ public class VehicleFlowEvent {
         this.flowDirection = flowDirection;
         this.eventAt = (eventAt != null) ? eventAt : LocalDateTime.now();
         this.sourceDetectionLog = sourceDetectionLog;
+        this.sourceAnalysisResult = sourceAnalysisResult; // 할당 추가
         this.speed = (speed != null) ? speed : BigDecimal.ZERO;
         this.stayTime = (stayTime != null) ? stayTime : 0L;
         this.createdAt = LocalDateTime.now();
