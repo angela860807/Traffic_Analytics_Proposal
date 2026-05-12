@@ -1,6 +1,6 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import requests
 
@@ -13,6 +13,38 @@ from config import (
 
 class FastApiClientError(RuntimeError):
     pass
+
+
+def summarize_detection_response(result: dict[str, Any]) -> str:
+    data = result.get("data") or {}
+    message = result.get("message", "")
+    backend_status = _infer_backend_status(message)
+
+    return (
+        "upload result: "
+        f"accepted={result.get('accepted')}, "
+        f"backendStatus={backend_status}, "
+        f"cameraCode={data.get('cameraCode')}, "
+        f"plateNumber={data.get('plateNumber') or '-'}, "
+        f"detectionType={data.get('detectionType')}, "
+        f"confidenceScore={data.get('confidenceScore')}, "
+        f"detectedAt={data.get('detectedAt')}, "
+        f"imageUrl={data.get('imageUrl') or '-'}, "
+        f"message={message}"
+    )
+
+
+def _infer_backend_status(message: str) -> str:
+    if "OCR_FAILED" in message:
+        return "OCR_FAILED"
+
+    if "DUPLICATE_SKIPPED" in message:
+        return "DUPLICATE_SKIPPED"
+
+    if "sent to backend" in message:
+        return "SENT_TO_BACKEND"
+
+    return "ANALYSIS_ONLY"
 
 
 def _captured_at_text(captured_at: datetime) -> str:
@@ -61,7 +93,7 @@ def _post_image(
 
 def upload_detection_image(
     image_bytes: bytes,
-    captured_at: datetime | None = None,
+    captured_at: Optional[datetime] = None,
     filename: str = "capture.jpg",
 ) -> dict[str, Any]:
     response = _post_image(
@@ -75,7 +107,7 @@ def upload_detection_image(
 
 def upload_live_frame(
     image_bytes: bytes,
-    captured_at: datetime | None = None,
+    captured_at: Optional[datetime] = None,
     filename: str = "frame.jpg",
 ) -> None:
     _post_image(
@@ -88,7 +120,7 @@ def upload_live_frame(
 
 def upload_detection_image_file(
     image_path: Path,
-    captured_at: datetime | None = None,
+    captured_at: Optional[datetime] = None,
 ) -> dict[str, Any]:
     return upload_detection_image(
         image_bytes=image_path.read_bytes(),

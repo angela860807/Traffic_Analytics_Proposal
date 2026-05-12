@@ -68,10 +68,7 @@ public class HourlyTrafficStat {
         this.statHour = statHour;
         this.inCount = (inCount != null) ? inCount : 0;
         this.outCount = (outCount != null) ? outCount : 0;
-
-        // ★ 필독: totalCount 계산 로직 추가
         this.totalCount = this.inCount + this.outCount;
-
         this.averageSpeed = (averageSpeed != null) ? averageSpeed : BigDecimal.ZERO;
         this.congestionScore = (congestionScore != null) ? congestionScore : BigDecimal.ZERO;
         this.averageStayTime = (averageStayTime != null) ? averageStayTime : BigDecimal.ZERO;
@@ -85,11 +82,11 @@ public class HourlyTrafficStat {
                             Integer duplicateVehicleCount, Long lastLogId) {
         this.inCount = inCount;
         this.outCount = outCount;
-        this.totalCount = inCount + outCount; // 토탈 자동 갱신
+        this.totalCount = inCount + outCount;
         this.averageSpeed = averageSpeed;
         this.congestionScore = congestionScore;
         this.averageStayTime = averageStayTime;
         this.duplicateVehicleCount = duplicateVehicleCount;
-        this.lastLogId = lastLogId; // 어디까지 분석했는지 기록
+        this.lastLogId = lastLogId;
     }
 }

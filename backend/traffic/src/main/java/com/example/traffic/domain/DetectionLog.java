@@ -1,6 +1,7 @@
 package com.example.traffic.domain;
 
 import com.example.traffic.common.enums.DetectionType;
+import com.example.traffic.common.enums.DetectionLogStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -34,24 +35,18 @@ public class DetectionLog {
     @JoinColumn(name = "vehicle_id")
     private Vehicle vehicle;
 
-    @Column(nullable = false, length = 20)
+    @Column(length = 20)
     private String plateNumber;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private DetectionType detectionType;
 
-    @Column(precision = 5, scale = 2)
+    @Column(precision = 5, scale = 4)
     private BigDecimal confidenceScore;
 
     @Column(length = 255)
     private String imagePath;
-
-    @Column(length = 255)
-    private String preprocessedPath; // 전처리 이미지  추가
-
-    @Column(length = 20, nullable = false)
-    private String status; // PENDING, COMPLETED, FAILED 등
 
     // 하달 사항: Vue 화면 표시용 URL 필드 추가
     @Column(length = 500)
@@ -60,33 +55,34 @@ public class DetectionLog {
     @Column(nullable = false)
     private LocalDateTime detectedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30, columnDefinition = "varchar(30) default 'RECEIVED'")
+    private DetectionLogStatus status;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
     public DetectionLog(Camera camera, Vehicle vehicle, String plateNumber, DetectionType detectionType,
-                        BigDecimal confidenceScore, String imagePath, String preprocessedPath,
-                        String status, String imageUrl, LocalDateTime detectedAt) {
+                        BigDecimal confidenceScore, String imagePath, String imageUrl,
+                        LocalDateTime detectedAt, DetectionLogStatus status) {
         this.camera = camera;
         this.vehicle = vehicle;
         this.plateNumber = plateNumber;
         this.detectionType = detectionType;
         this.confidenceScore = confidenceScore;
         this.imagePath = imagePath;
-        this.preprocessedPath = preprocessedPath; // 파라미터 추가 [cite: 17]
-        this.status = (status != null) ? status : "PENDING"; // 기본값 설정 [cite: 117]
         this.imageUrl = imageUrl;
         this.detectedAt = (detectedAt != null) ? detectedAt : LocalDateTime.now();
+        this.status = (status != null) ? status : DetectionLogStatus.RECEIVED;
         this.createdAt = LocalDateTime.now();
     }
 
-    public void completeAnalysis(String plateNumber, BigDecimal confidenceScore) {
-        this.plateNumber = plateNumber;
-        this.confidenceScore = confidenceScore;
-        this.status = "COMPLETED";
+    public void markFlowEventCreated() {
+        this.status = DetectionLogStatus.FLOW_EVENT_CREATED;
     }
 
-    public void updateStatus(String status) {
-        this.status = status;
+    public void markDuplicateSkipped() {
+        this.status = DetectionLogStatus.DUPLICATE_SKIPPED;
     }
 }

@@ -28,16 +28,16 @@ export CAMERA_CODE=CAM_001
 ## 2. 설치
 
 ```bash
-python -m venv venv
+python -m venv --system-site-packages venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-`picamera2`는 Raspberry Pi OS에서 별도로 설치되어 있어야 한다.
+`picamera2`와 `cv2`는 Raspberry Pi OS에서 apt 패키지로 설치한다.
 
 ```bash
 sudo apt update
-sudo apt install -y python3-picamera2
+sudo apt install -y python3-picamera2 python3-opencv
 ```
 
 ## 3. 실행 순서
@@ -52,6 +52,12 @@ python create_sample_image.py
 
 ```bash
 python upload_sample_image.py
+```
+
+Health Check 후 샘플 업로드까지 한 번에 확인:
+
+```bash
+python integration_smoke_test.py
 ```
 
 카메라 단발 촬영 테스트:
@@ -89,5 +95,18 @@ http://<PC_LAN_IP>:8000/api/camera/live
 - DB 저장용: `POST /api/detections/image/send`
 - 분석만 확인: `POST /api/detections/image`
 - live preview 전용: `POST /api/camera/frame`
+
+## 5. DB 저장 상태 확인
+
+업로드 스크립트는 FastAPI 응답 메시지를 기준으로 예상 저장 상태를 출력한다.
+
+```text
+backendStatus=SENT_TO_BACKEND      정상 인식, Spring에서 flow event 생성 대상
+backendStatus=OCR_FAILED           번호판 미인식, detection_logs만 저장
+backendStatus=DUPLICATE_SKIPPED    FastAPI 중복 판정, detection_logs만 저장
+backendStatus=ANALYSIS_ONLY        /api/detections/image 분석 전용 응답
+```
+
+DB에서 최종 확인할 때는 `detection_logs.status`를 본다.
 
 `.env`, `venv`, 캡처 이미지, 로그 파일은 Git에 올리지 않는다.

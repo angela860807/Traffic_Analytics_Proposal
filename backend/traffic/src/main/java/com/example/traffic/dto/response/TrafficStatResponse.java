@@ -15,10 +15,10 @@ public class TrafficStatResponse {
     private final Integer inCount;
     private final Integer outCount;
     private final Integer totalCount;
-    private final Double averageSpeed;      // 평균 속도
-    private final Double congestionScore;   // 혼잡도 점수
-    private final Double averageStayTime;   // 평균 체류 시간
-    private final Integer duplicateCount;   // 중복 차량 수
+    private final Double averageSpeed;
+    private final Double congestionScore;
+    private final Double averageStayTime;
+    private final Integer duplicateCount;
 
     public static TrafficStatResponse from(HourlyTrafficStat stat) {
         return TrafficStatResponse.builder()

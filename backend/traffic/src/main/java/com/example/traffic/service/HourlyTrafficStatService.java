@@ -56,19 +56,19 @@ public class HourlyTrafficStatService {
         }
 
         long currentInCount = eventsForAnalysis.stream()
-                .filter(e -> e.getFlowDirection() == Direction.IN)
+                .filter(event -> event.getFlowDirection() == Direction.IN)
                 .count();
         long currentOutCount = eventsForAnalysis.stream()
-                .filter(e -> e.getFlowDirection() == Direction.OUT)
+                .filter(event -> event.getFlowDirection() == Direction.OUT)
                 .count();
 
         double avgSpeed = eventsForAnalysis.stream()
-                .mapToDouble(e -> e.getSpeed() != null ? e.getSpeed().doubleValue() : 0.0)
+                .mapToDouble(event -> event.getSpeed() != null ? event.getSpeed().doubleValue() : 0.0)
                 .average()
                 .orElse(0.0);
 
         double avgStayTime = eventsForAnalysis.stream()
-                .mapToDouble(e -> e.getStayTime() != null ? e.getStayTime() : 0.0)
+                .mapToDouble(event -> event.getStayTime() != null ? event.getStayTime() : 0.0)
                 .average()
                 .orElse(0.0);
 
@@ -93,7 +93,7 @@ public class HourlyTrafficStatService {
                 BigDecimal.valueOf(congestionScore),
                 BigDecimal.valueOf(avgStayTime),
                 duplicateCount,
-                0L // lastLogId는 더 이상 의미가 없으므로 0으로 처리하거나 필드 제거 고려
+                0L
         );
 
         hourlyTrafficStatRepository.save(stat);
