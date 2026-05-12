@@ -55,3 +55,10 @@ ADD COLUMN IF NOT EXISTS duplicate_vehicle_count INTEGER NOT NULL DEFAULT 0;
 
 ALTER TABLE hourly_traffic_stats
 ADD COLUMN IF NOT EXISTS last_log_id BIGINT NOT NULL DEFAULT 0;
+
+-- 5. detection_logs 컬럼 4개 추가
+ALTER TABLE detection_logs
+  ADD COLUMN IF NOT EXISTS plate_crop_image_path TEXT,
+  ADD COLUMN IF NOT EXISTS plate_crop_image_url TEXT,
+  ADD COLUMN IF NOT EXISTS ocr_image_path TEXT,
+  ADD COLUMN IF NOT EXISTS ocr_image_url TEXT;

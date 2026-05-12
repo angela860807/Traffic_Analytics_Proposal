@@ -61,6 +61,10 @@ public class DetectionLogService {
                 .confidenceScore(java.math.BigDecimal.valueOf(request.getConfidenceScore()))
                 .imagePath(request.getImagePath())
                 .imageUrl(request.getImageUrl())
+                .plateCropImagePath(request.getPlateCropImagePath())
+                .plateCropImageUrl(request.getPlateCropImageUrl())
+                .ocrImagePath(request.getOcrImagePath())
+                .ocrImageUrl(request.getOcrImageUrl())
                 .detectedAt(request.getDetectedAt())
                 .status(requestedStatus)
                 .build();
