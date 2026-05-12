@@ -8,5 +8,8 @@ import java.util.Optional;
 
 public interface TrafficAnalysisIndexRepository extends JpaRepository<TrafficAnalysisIndex, Long> {
     Optional<TrafficAnalysisIndex> findTopByOrderByIdDesc();
+
     Optional<TrafficAnalysisIndex> findByZone(Zone zone);
+
+    Optional<TrafficAnalysisIndex> findByZoneZoneId(Long zoneId);
 }

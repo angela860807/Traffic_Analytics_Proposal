@@ -2,6 +2,7 @@ package com.example.traffic.service;
 
 import com.example.traffic.common.enums.Direction;
 import com.example.traffic.domain.HourlyTrafficStat;
+import com.example.traffic.domain.VehicleFlowEvent;
 import com.example.traffic.domain.Zone;
 import com.example.traffic.dto.request.TrafficStatSearchRequest;
 import com.example.traffic.dto.response.TrafficStatResponse;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -20,33 +22,24 @@ import java.util.List;
 @RequiredArgsConstructor
 public class HourlyTrafficStatService {
 
-    // 목록에 있는 실제 파일명으로 주입받습니다.
     private final HourlyTrafficStatRepository hourlyTrafficStatRepository;
     private final VehicleFlowEventRepository vehicleFlowEventRepository;
 
-    /**
-     * [조회] 사용자님이 만드신 13개 DTO 중 TrafficStatResponse를 사용해 데이터를 반환합니다.[cite: 7, 8]
-     */
     public List<TrafficStatResponse> getHourlyStats(TrafficStatSearchRequest request) {
         List<HourlyTrafficStat> stats;
 
         if (request.getZoneId() != null) {
-            // 특정 구역 조회 시[cite: 6, 7]
             stats = hourlyTrafficStatRepository.findByZoneZoneIdAndStatDateOrderByStatHourAsc(
                     request.getZoneId(), request.getStatDate());
         } else {
-            // 날짜별 전체 조회 시[cite: 6, 7]
             stats = hourlyTrafficStatRepository.findByStatDateOrderByStatHourAsc(request.getStatDate());
         }
 
         return stats.stream()
-                .map(TrafficStatResponse::from) // TrafficStatResponse.java의 from 메서드 호출[cite: 8]
+                .map(TrafficStatResponse::from)
                 .toList();
     }
 
-    /**
-     * [집계] 통계 데이터를 생성하거나 업데이트합니다.[cite: 5, 6]
-     */
     @Transactional
     public void aggregateHourlyStats(Zone zone, LocalDateTime targetTime) {
         LocalDate statDate = targetTime.toLocalDate();
@@ -55,13 +48,36 @@ public class HourlyTrafficStatService {
         LocalDateTime start = targetTime.withMinute(0).withSecond(0).withNano(0);
         LocalDateTime end = targetTime.withMinute(59).withSecond(59).withNano(999999999);
 
-        // VehicleFlowEventRepository를 통해 IN/OUT 집계
-        int inCount = (int) vehicleFlowEventRepository.countByZoneAndFlowDirectionAndEventAtBetween(
-                zone, Direction.IN, start, end);
-        int outCount = (int) vehicleFlowEventRepository.countByZoneAndFlowDirectionAndEventAtBetween(
-                zone, Direction.OUT, start, end);
+        List<VehicleFlowEvent> eventsForAnalysis = vehicleFlowEventRepository.findEventsForAnalysis(
+                zone, start, end);
 
-        // HourlyTrafficStatRepository 사용[cite: 5, 6]
+        if (eventsForAnalysis.isEmpty()) {
+            return;
+        }
+
+        long currentInCount = eventsForAnalysis.stream()
+                .filter(event -> event.getFlowDirection() == Direction.IN)
+                .count();
+        long currentOutCount = eventsForAnalysis.stream()
+                .filter(event -> event.getFlowDirection() == Direction.OUT)
+                .count();
+
+        double avgSpeed = eventsForAnalysis.stream()
+                .mapToDouble(event -> event.getSpeed() != null ? event.getSpeed().doubleValue() : 0.0)
+                .average()
+                .orElse(0.0);
+
+        double avgStayTime = eventsForAnalysis.stream()
+                .mapToDouble(event -> event.getStayTime() != null ? event.getStayTime() : 0.0)
+                .average()
+                .orElse(0.0);
+
+        long totalUniqueVehicles = vehicleFlowEventRepository.countUniqueVehicles(zone, start, end);
+        int duplicateCount = (int) ((currentInCount + currentOutCount) - totalUniqueVehicles);
+        duplicateCount = Math.max(0, duplicateCount);
+
+        double congestionScore = calculateCongestionScore((int) (currentInCount + currentOutCount), avgSpeed);
+
         HourlyTrafficStat stat = hourlyTrafficStatRepository.findByZoneZoneIdAndStatDateAndStatHour(
                         zone.getZoneId(), statDate, statHour)
                 .orElseGet(() -> HourlyTrafficStat.builder()
@@ -70,7 +86,25 @@ public class HourlyTrafficStatService {
                         .statHour(statHour)
                         .build());
 
-        stat.updateCounts(inCount, outCount); // HourlyTrafficStat_7.java의 메서드[cite: 5]
+        stat.updateStats(
+                (int) currentInCount,
+                (int) currentOutCount,
+                BigDecimal.valueOf(avgSpeed),
+                BigDecimal.valueOf(congestionScore),
+                BigDecimal.valueOf(avgStayTime),
+                duplicateCount,
+                0L
+        );
+
         hourlyTrafficStatRepository.save(stat);
+    }
+
+    private double calculateCongestionScore(int totalCount, double avgSpeed) {
+        if (totalCount == 0) {
+            return 0.0;
+        }
+
+        double score = (totalCount * 2.0) + (100 - avgSpeed);
+        return Math.min(100.0, Math.max(0.0, score));
     }
 }

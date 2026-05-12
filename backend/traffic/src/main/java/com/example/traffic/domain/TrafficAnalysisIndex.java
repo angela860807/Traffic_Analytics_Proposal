@@ -27,7 +27,7 @@ public class TrafficAnalysisIndex {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "zone_id")
+    @JoinColumn(name = "zone_id", nullable = false)
     private Zone zone;
 
     // Last processed vehicle_flow_events.flow_event_id.
@@ -44,8 +44,7 @@ public class TrafficAnalysisIndex {
 
     @Builder
     public TrafficAnalysisIndex(Zone zone, Long lastSeq, Long lastLogId,
-                                LocalDateTime lastLogTime,
-                                LocalDateTime fetchedTime) {
+                                LocalDateTime lastLogTime, LocalDateTime fetchedTime) {
         this.zone = zone;
         this.lastSeq = lastSeq;
         this.lastLogId = lastLogId;

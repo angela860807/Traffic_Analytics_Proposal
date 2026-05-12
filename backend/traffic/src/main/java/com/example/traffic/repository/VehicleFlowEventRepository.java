@@ -29,4 +29,24 @@ public interface VehicleFlowEventRepository extends JpaRepository<VehicleFlowEve
             com.example.traffic.common.enums.Direction flowDirection,
             LocalDateTime start,
             LocalDateTime end);
+
+    @Query("SELECT vfe FROM VehicleFlowEvent vfe " +
+            "WHERE vfe.zone = :zone " +
+            "AND vfe.eventAt BETWEEN :start AND :end " +
+            "ORDER BY vfe.flowEventId ASC")
+    List<VehicleFlowEvent> findEventsForAnalysis(
+            @Param("zone") Zone zone,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
+
+    /**
+     * [추가 - 정의서 3.6절 중복 차량 분석]
+     * 특정 시간대 내에 재진입한 차량(중복 차량)의 수를 파악하기 위한 쿼리입니다.
+     */
+    @Query("SELECT COUNT(DISTINCT vfe.vehicle) FROM VehicleFlowEvent vfe " +
+            "WHERE vfe.zone = :zone " +
+            "AND vfe.eventAt BETWEEN :start AND :end")
+    long countUniqueVehicles(@Param("zone") Zone zone,
+                             @Param("start") LocalDateTime start,
+                             @Param("end") LocalDateTime end);
 }
