@@ -57,23 +57,23 @@
 import { ref, computed } from 'vue'
 import { useDashboardData } from '@/composables/useDashboardData'
 
-const { levelLabel } = useDashboardData()
+const { levelLabel, todayStr } = useDashboardData()
 
 const eventFilter = ref('all')
 
 const eventsList = [
-  { id: 1, time: '2024-05-28 14:32:18', level: 'critical', cam: '테헤란로 교차로', msg: '교차로 혼잡 감지 — 진입 +42%' },
-  { id: 2, time: '2024-05-28 14:28:42', level: 'warning',  cam: '강남역 사거리',   msg: 'CAM-03 OCR 인식률 저하 (78%)' },
-  { id: 3, time: '2024-05-28 14:15:09', level: 'warning',  cam: '반포IC',          msg: '이탈 차량 급증 — 평소 대비 +35%' },
-  { id: 4, time: '2024-05-28 13:58:21', level: 'info',     cam: '올림픽대로',      msg: '교통 흐름 원활 전환' },
-  { id: 5, time: '2024-05-28 13:45:33', level: 'info',     cam: '시스템',          msg: 'OCR 파이프라인 정상 가동' },
-  { id: 6, time: '2024-05-28 13:30:11', level: 'warning',  cam: '잠실역 사거리',   msg: '진입 트래픽 급증 — +42%' },
-  { id: 7, time: '2024-05-28 13:02:08', level: 'info',     cam: '양재역 사거리',   msg: '흐름 정상화' },
-  { id: 8, time: '2024-05-28 12:36:02', level: 'critical', cam: '남부터미널',      msg: '정체 시작 — 흐름 정체율 88%' },
-  { id: 9, time: '2024-05-28 12:14:48', level: 'info',     cam: '석촌역 사거리',   msg: '이탈 차량 통행 증가 추세' },
-  { id:10, time: '2024-05-28 11:55:30', level: 'info',     cam: '강남구',          msg: '전역 평균 정상 운행' },
-  { id:11, time: '2024-05-28 11:30:12', level: 'info',     cam: '시스템',          msg: '중복 감지 178건 자동 제거 완료' },
-  { id:12, time: '2024-05-28 11:00:05', level: 'info',     cam: '시스템',          msg: 'WebSocket 연결 정상' },
+  { id: 1, time: `${todayStr} 14:32:18`, level: 'critical', cam: '테헤란로 교차로', msg: '교차로 혼잡 감지 — 진입 +42%' },
+  { id: 2, time: `${todayStr} 14:28:42`, level: 'warning',  cam: '강남역 사거리',   msg: 'CAM-03 OCR 인식률 저하 (78%)' },
+  { id: 3, time: `${todayStr} 14:15:09`, level: 'warning',  cam: '반포IC',          msg: '이탈 차량 급증 — 평소 대비 +35%' },
+  { id: 4, time: `${todayStr} 13:58:21`, level: 'info',     cam: '올림픽대로',      msg: '교통 흐름 원활 전환' },
+  { id: 5, time: `${todayStr} 13:45:33`, level: 'info',     cam: '시스템',          msg: 'OCR 파이프라인 정상 가동' },
+  { id: 6, time: `${todayStr} 13:30:11`, level: 'warning',  cam: '잠실역 사거리',   msg: '진입 트래픽 급증 — +42%' },
+  { id: 7, time: `${todayStr} 13:02:08`, level: 'info',     cam: '양재역 사거리',   msg: '흐름 정상화' },
+  { id: 8, time: `${todayStr} 12:36:02`, level: 'critical', cam: '남부터미널',      msg: '정체 시작 — 흐름 정체율 88%' },
+  { id: 9, time: `${todayStr} 12:14:48`, level: 'info',     cam: '석촌역 사거리',   msg: '이탈 차량 통행 증가 추세' },
+  { id:10, time: `${todayStr} 11:55:30`, level: 'info',     cam: '강남구',          msg: '전역 평균 정상 운행' },
+  { id:11, time: `${todayStr} 11:30:12`, level: 'info',     cam: '시스템',          msg: '중복 감지 178건 자동 제거 완료' },
+  { id:12, time: `${todayStr} 11:00:05`, level: 'info',     cam: '시스템',          msg: 'WebSocket 연결 정상' },
 ]
 
 const filteredEvents = computed(() =>

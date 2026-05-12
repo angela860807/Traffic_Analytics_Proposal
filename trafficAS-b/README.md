@@ -13,11 +13,10 @@ CCTV 기반 번호판 자동 인식(ANPR), 구역별 혼잡도 히트맵, 차량
 본 프로젝트는 **Vue 3 + Vite 기반 SPA(Single Page Application)** 구조로 개발되었습니다.
 
 - **Frontend:** Vue 3 (`<script setup>` Composition API) + Vue Router 4
-- **실시간 통신:** WebSocket (`ws://localhost:8000/ws`) — 차량 감지 데이터 수신
-- **백엔드 API:** FastAPI (`VITE_FASTAPI_BASE_URL`) — 혼잡도 데이터, 카메라 통계 등
+- **백엔드 API:** FastAPI (`VITE_FASTAPI_BASE_URL`) — 도로 혼잡도, 최근 OCR 인식 결과 등
 - **AI 채팅:** Groq API (LLaMA 3.3-70B) 기반 교통 관제 어시스턴트
-- **시각화:** ECharts (혼잡도/도넛/통계 차트), Leaflet (지도/히트맵), Canvas/SVG
-- **드래그 재배치:** vuedraggable (SortableJS 기반)
+- **시각화:** ECharts (혼잡도/도넛/통계 차트), Leaflet (지도/히트맵)
+- **도로 geometry:** OpenStreetMap Overpass API + 24시간 localStorage 캐시
 - **배포:** Vite 정적 빌드 → 웹 서버 배포
 
 ### 연결 방식
@@ -25,13 +24,14 @@ CCTV 기반 번호판 자동 인식(ANPR), 구역별 혼잡도 히트맵, 차량
 ```
 브라우저 (Vue 3 SPA)
     │
-    ├── WebSocket ──→ 백엔드 서버 (ws://localhost:8000/ws)
-    │                  └── YOLO-ITS CCTV 감지 데이터
+    ├── REST API ───→ FastAPI 서버 (${VITE_FASTAPI_BASE_URL})
+    │                  ├── /api/v1/road-congestion   (도로 혼잡도)
+    │                  └── /api/v1/plates/recent     (최근 OCR 인식)
     │
-    ├── REST API ───→ FastAPI 서버
-    │                  └── 차량 통행 흐름 / 혼잡도 / 카메라 통계
+    ├── Overpass API → overpass-api.de (다중 미러 + 캐시)
+    │                  └── 강남/서초/송파 주요 도로 geometry
     │
-    └── Groq API ──→ LLaMA 3.3-70B
+    └── Groq API ───→ LLaMA 3.3-70B
                        └── AI 교통 관제 어시스턴트
 ```
 
@@ -66,24 +66,25 @@ CCTV 기반 번호판 자동 인식(ANPR), 구역별 혼잡도 히트맵, 차량
 - Vue Router 4
 - Vite 5
 - ECharts 6 (혼잡도/도넛/통계 차트)
-- Leaflet 1.9 + OpenStreetMap / CartoDB Dark Matter / VWorld 다크 타일
-- vuedraggable 4 (드래그 재배치)
+- Leaflet 1.9 + VWorld 다크 / CartoDB Dark Matter 타일
+- OpenStreetMap Overpass API (실제 도로 geometry)
 - Bootstrap Icons 1.11.3 (CDN)
-- Pretendard Variable, JetBrains Mono (폰트)
+- Pretendard Variable, Syne, IBM Plex Mono, JetBrains Mono (폰트)
 
-### 6-2 실시간 / AI
+### 6-2 백엔드 / AI
 
-- WebSocket (YOLO-ITS CCTV 연동)
-- FastAPI REST 호출 (`/api/v1/road-congestion` 등)
-- Groq API — LLaMA 3.3-70B-Versatile
+- FastAPI REST 호출 (`/api/v1/road-congestion`, `/api/v1/plates/recent`)
+- Spring Boot (Java 백엔드 — 도메인 엔티티 / DB)
+- YOLO + OCR 엔진 (차량/번호판 감지)
+- Groq API — LLaMA 3.3-70B-Versatile (교통 관제 어시스턴트)
 - HTMLVideoElement (실시간 CCTV 영상 6분할)
 
 ### 6-3 인증 / 상태 관리
 
 - LocalStorage 기반 사용자 인증
-- Vue Composables (`useAuth`, `useTheme`, `useDashboardData`)
-- 대시보드 카드 순서도 LocalStorage 저장 (편집 모드)
+- Vue Composables (`useAuth`, `useTheme`, `useDashboardData`, `useStats`)
 - Vue Router Navigation Guard (관리자 전용 라우트 보호)
+- Overpass 응답 24시간 localStorage 캐시
 
 ### 6-4 협업 / DevOps
 
@@ -100,16 +101,17 @@ CCTV 기반 번호판 자동 인식(ANPR), 구역별 혼잡도 히트맵, 차량
     ▼
 Vue 3 SPA (Vite)
     │
-    ├── Vue Router ──→ / (메인) / /intro / /usage / /login / /signup / /dashboard
+    ├── Vue Router ──→ / (메인) /sub/intro /sub/usage /sub/support /login /signup /dashboard
     │
     ├── useAuth.js ───────→ LocalStorage (사용자 세션)
-    ├── useDashboardData ─→ 공유 상태 (KPI / OCR / 카메라 / 설정)
-    │
-    ├── WebSocket ────→ ws://localhost:8000/ws
-    │                     └── 실시간 차량 / 번호판 데이터
+    ├── useDashboardData ─→ 공유 상태 (KPI / OCR / 카메라 / 카메라 혼잡도 / 설정)
     │
     ├── FastAPI ──────→ ${VITE_FASTAPI_BASE_URL}/api/v1/...
-    │                     └── 혼잡도 / 카메라 통계 / 흐름 분석
+    │                     ├── road-congestion       (도로별 혼잡도 갱신)
+    │                     └── plates/recent?limit   (최근 OCR 결과)
+    │
+    ├── Overpass API → 다중 미러 (overpass-api.de / kumi.systems / private.coffee / lz4)
+    │                     └── 강남/서초/송파 motorway~secondary 도로
     │
     └── Groq API ─────→ LLaMA 3.3-70B
                           └── AI 교통 관제 어시스턴트 (한국어 전용)
@@ -144,26 +146,35 @@ cd trafficAS-b
 npm install
 ```
 
-### 9-3 개발 서버 실행
+### 9-3 환경 변수 설정 (`.env`)
+
+```env
+VITE_FASTAPI_BASE_URL=http://localhost:8000   # FastAPI 서버 주소 (비어있으면 데모 모드)
+VITE_GROQ_API_KEY=gsk_...                     # Groq API 키 (선택)
+```
+
+> `VITE_FASTAPI_BASE_URL`이 비어있으면 모든 API 호출이 우회되고 데모 데이터(랜덤)로 동작합니다.
+
+### 9-4 개발 서버 실행
 
 ```bash
 npm run dev
 ```
 
-### 9-4 프로덕션 빌드
+### 9-5 프로덕션 빌드
 
 ```bash
 npm run build
 npm run preview
 ```
 
-### 9-5 웹 접속
+### 9-6 웹 접속
 
 ```
 http://localhost:5173
 ```
 
-### 9-6 관리자 계정
+### 9-7 관리자 계정
 
 ```
 이메일 : admin@trafficAS.com
@@ -181,7 +192,7 @@ trafficAS-b/
 │
 ├── src/
 │   ├── views/
-│   │   ├── MainView.vue              # 메인 소개 페이지
+│   │   ├── MainView.vue              # 메인 랜딩 페이지 (Hero / 시스템 소개 / Features / CTA)
 │   │   ├── IntroView.vue             # 서비스 소개
 │   │   ├── UsageView.vue             # 이용 방법
 │   │   ├── LoginView.vue             # 로그인
@@ -190,31 +201,47 @@ trafficAS-b/
 │   │   └── RoadDashboardView.vue     # 관리자 대시보드 (셸 + 오버뷰 탭)
 │   │
 │   ├── components/
-│   │   ├── AppNav.vue                # 공통 네비게이션
+│   │   ├── AppNav.vue                # 공통 네비게이션 (다크/라이트 토글)
 │   │   ├── AppFab.vue                # 플로팅 버튼 (채팅/테마/상단이동)
 │   │   ├── AuthModal.vue             # 로그인/회원가입 모달
 │   │   ├── ChatTab.vue               # AI 채팅 (Groq API)
 │   │   ├── BoardTab.vue              # 커뮤니티 게시판
 │   │   ├── QnaTab.vue                # Q&A
-│   │   ├── HeroStats.vue             # 메인 히어로 통계
+│   │   ├── HeroStats.vue             # 메인 히어로 통계 카운터
 │   │   │
 │   │   └── dashboard/
 │   │       ├── MonitoringTab.vue     # 실시간 카메라 상세 모니터링 (인식률/FPS/신뢰도)
 │   │       ├── EventsTab.vue         # 이벤트 로그 + 등급별 필터
-│   │       ├── SearchTab.vue         # 차량/번호판 검색
+│   │       ├── SearchTab.vue         # 차량/번호판 검색 + OCR 상세 모달
 │   │       ├── StatsTab.vue          # 통계 분석 (ECharts 4종)
-│   │       └── SettingsTab.vue       # 시스템 설정 (알림/임계값/중복제거)
+│   │       └── SettingsTab.vue       # 시스템 설정
 │   │
 │   ├── composables/
 │   │   ├── useAuth.js                # 인증 상태 관리
 │   │   ├── useTheme.js               # 다크/라이트 테마
 │   │   ├── useStats.js               # 메인 페이지 통계
-│   │   └── useDashboardData.js       # 대시보드 공유 상태 (KPI/OCR/카메라/설정)
+│   │   └── useDashboardData.js       # 대시보드 공유 상태
+│   │                                 #  ├── plates / cameraGroups / camCongestion
+│   │                                 #  ├── plateImg / plateStatus 헬퍼
+│   │                                 #  └── tickCamCongestion (3초 갱신)
+│   │
+│   ├── data/
+│   │   └── weather.js                # 강남/서초/송파 날씨 프리셋
+│   │
+│   ├── styles/
+│   │   ├── base.css                  # 전역 + 네이비 테마 변수
+│   │   ├── light.css                 # 라이트 모드 오버라이드
+│   │   └── dashboard.css             # 대시보드 전용 (외부 분리, 2,170줄)
 │   │
 │   └── router/
 │       └── index.js                  # 라우터 + 네비게이션 가드
 │
-├── public/                           # 정적 파일 (road1.mp4~road8.mp4 등)
+├── public/
+│   ├── car1.jpg                      # OCR 미리보기용 차량 이미지
+│   ├── road1.mp4 ~ road8.mp4         # 실시간 CCTV 영상 데모
+│   ├── hero-main.mp4 / detect-video.mp4 / classify-video.mp4   # 랜딩 페이지 비디오
+│   └── favicon.ico
+│
 ├── index.html
 ├── vite.config.js
 └── package.json
@@ -229,25 +256,36 @@ trafficAS-b/
 - **대시보드 (overview)** — 셸 내부, KPI / 실시간 카메라 / 차량 통행 / OCR / HeatMap / 카메라 상태 / OCR 로그
 - **모니터링** — 카메라별 상세 통계 (인식률·검출수·FPS·신뢰도, 2초마다 실시간 갱신)
 - **이벤트** — 등급별 필터(중요/경고/정보) 이벤트 로그
-- **검색** — 차량 번호 / 카메라 / 흐름 방향 / 신뢰도로 차량 검색
+- **검색** — LIVE 배지 + 결과 고정 토글 + 7가지 조건 필터 + OCR 상세 모달
 - **통계** — 요일별 통행량, 시간대별 진입/이탈 추이, 도로별 정체, 카메라별 비교 (ECharts)
 - **설정** — 알림 / 임계값 / 중복 제거 정책 / 시스템 정보
 
 ### 11-2 차량 통행 (IN / OUT) 분석
 
-- KPI: 총 감지 / 진입(IN) / 이탈(OUT) / 혼잡도
-- 차량 통행 분석 카드: 진입·이탈 카운트 + 12시간 추이 스파크라인 + 중복 제거 안내
+- KPI: 총 감지 / 진입(IN) / 이탈(OUT) / 중복 제거
+- 차량 통행 분석 카드: 진입·이탈 카운트 + 12시간 추이 스파크라인
 - OCR 로그에 흐름 방향(진입/이탈) 컬럼 표시
 - 통계 탭에 시간대별 IN/OUT 추이 + 카메라별 IN/OUT 비교 차트
 
 ### 11-3 번호판 인식 (ANPR)
 
-- 실시간 OCR 인식 결과 (번호판 시각화 + 6항목 메타정보)
+- 실시간 OCR 인식 결과 (사진 + 번호판 시각 오버레이 + 6항목 메타정보)
+- **차량 이미지 위 번호판 합성**: `car1.jpg`의 실제 번호판 위치(45.3%, 52.8%)에 더미 번호판 텍스트 오버레이, `container query`(`cqw`)로 컨테이너 너비에 비례해 자동 스케일
 - 최근 5건 썸네일
-- OCR 로그 테이블 (시간/카메라/번호/방향/신뢰도)
-- 중복 제거 정책 설정 (간격, 방향 분리, WebSocket 알림)
+- 인식 상태 배지: 정상 / 실패 / 중복 (FLOW_EVENT_CREATED / OCR_FAILED / DUPLICATE_SKIPPED)
+- 클릭 시 그 plate가 메인 OCR 카드에 표시 (`최신` 버튼으로 자동 트래킹 복귀)
 
-### 11-4 실시간 카메라 모니터링
+### 11-4 차량 검색 (Search Tab)
+
+- **LIVE 배지** — 헤더에 녹색 펄스 도트 + "N초 전 갱신" 카운터
+- **결과 고정 토글** — 데이터가 실시간으로 흔들리지 않게 스냅샷 잠금
+- **+N건 대기 카운터** — 고정 모드 중 신규 결과 누적, 클릭 시 즉시 실시간 복귀
+- **신규 행 글로우** — 새 plate 들어오면 행이 1.8초간 파란색으로 깜빡
+- **7가지 필터** — 날짜 범위 / 시간 범위 / 차량 번호 / 카메라 / 흐름 방향 / 인식 상태 / 최소 신뢰도
+- **빠른 프리셋** — `[오늘]` `[최근 7일]`
+- **OCR 상세 모달** — 행 클릭 시 큰 사진 + 번호판 + 세부정보 팝업 (배경/X 버튼/Esc 닫기)
+
+### 11-5 실시간 카메라 모니터링
 
 - 메인 대시보드: 6분할 3×2 그리드 (실시간 영상)
 - 모니터링 탭: 카메라별 상세 패널
@@ -256,42 +294,44 @@ trafficAS-b/
   - 인식률 / 검출 수 / FPS / 가동 시간
   - 카메라 클릭 시 풀스크린 모달
 
-### 11-5 혼잡도 히트맵 (Leaflet)
+### 11-6 혼잡도 히트맵 (Leaflet + OSM Overpass)
 
-- Leaflet + CartoDB Dark Matter 타일 (메인) / VWorld 다크 폴백
-- 다층 글로우 펄스 라이프 마커 (12개 핫스팟)
-- 혼잡 지점 드롭다운 → 클릭 시 `flyTo` 부드러운 이동
+- VWorld 다크 (메인) / CartoDB Dark Matter (폴백) 타일
+- **실제 도로 geometry**: OpenStreetMap Overpass API로 강남/서초/송파 motorway~secondary 도로를 동적 로드
+  - 4개 미러 순차 시도 (overpass-api.de / kumi.systems / private.coffee / lz4)
+  - 성공 응답 24시간 localStorage 캐시 → 재방문 시 즉시 표시
+  - 모두 실패 시 어긋난 폴백 대신 안내 배너 + 재시도 버튼
+- 도로 등급별 굵기 차등 (motorway 6px / trunk 5.5 / primary 5 / secondary 4)
+- 도로명 한글(`name:ko`) 우선, 영문/태그명 폴백
+- 3초마다 도로 색상 실시간 갱신 (`applyRoadCongestion`)
+- **혼잡 지점 드롭다운** — 사이드바 카메라 그룹 24개(online 23개)와 동일 리스트, 각 카메라별 혼잡도 ±15% 흔들림 → 정렬 순서/색/% 실시간 변경
+- 클릭 시 `flyTo` 부드러운 이동
 - 전체 보기 — CSS 토글 방식 (검은 화면 없음)
 - 줌 한계 설정 (`minZoom: 10`, `maxZoom: 20`, `maxNativeZoom`)
 
-### 11-6 날씨 / 대기 환경 패널 (사이드바 상단)
+### 11-7 날씨 / 대기 환경 패널 (사이드바 상단)
 
 - 강남구 → 서초구 → 송파구 5초마다 자동 슬라이드 (수동 클릭도 가능)
 - 9가지 날씨 프리셋 (맑음/구름/비/눈/뇌우/안개/미세먼지 등) + 한국어 라벨
 - 미세먼지 / 초미세먼지 / 오존 등급 색상 (좋음/보통/나쁨/매우나쁨)
 - 확대 모달: 3개 구 가로 카드 + 내일 예보 (최고/최저, 강수확률, 미세먼지)
 
-### 11-7 알림 시스템
+### 11-8 알림 시스템
 
 - 헤더 종 아이콘 + 카운트 뱃지
 - 알림 패널: 12건 표시 + 편집 모드 (개별 X 삭제 / 전체 삭제)
 - 외부 클릭 시 자동 닫힘
 
-### 11-8 카드 드래그 재배치 (편집 모드)
-
-- 헤더 **편집** 버튼 토글
-- 4개 영역 드래그 가능:
-  - 사이드바 2개 (날씨 / 카메라 그룹)
-  - KPI 4개
-  - Row 2 우측 2개 (시간대별 혼잡도 ↔ 차량 통행 분석)
-  - Row 3 3개 (OCR / HeatMap / 카메라 상태)
-- `localStorage` 자동 저장 (새로고침 후에도 유지)
-- 버튼/입력/지도 영역은 `filter` 옵션으로 드래그 제외
-
 ### 11-9 AI 교통 어시스턴트
 
 - Groq API (LLaMA 3.3-70B) 기반 한국어 전용 챗봇
 - 교통 관제 특화 시스템 프롬프트
+
+### 11-10 동적 날짜 처리
+
+- 모든 시각 표시는 `todayStr`(`new Date()` 기반 로컬 yyyy-MM-dd)로 일원화
+- 카메라 lastSeen / 이벤트 시각 / 시스템 정보 모두 자동 갱신
+- 검색 탭 날짜 필터도 동일 기준으로 동작
 
 ---
 
@@ -300,7 +340,6 @@ trafficAS-b/
 - 교통 관제 정보 통합 제공으로 대응 속도 향상
 - CCTV 기반 번호판 자동 인식 + 진입/이탈 흐름 분석으로 수동 모니터링 부담 감소
 - 실시간 혼잡도 알림으로 선제적 교통 관리 가능
-- 카드 드래그 재배치로 관제관 선호에 맞는 UI 커스터마이즈
 - 날씨/대기 환경 통합으로 교통 영향 요인 동시 모니터링
 - Vue 3 + Composable 컴포넌트 기반 확장 가능한 구조
 
@@ -308,8 +347,11 @@ trafficAS-b/
 
 ## 13. 향후 개선 사항
 
-- 실제 YOLO 모델 + FastAPI 연동 (`VITE_FASTAPI_BASE_URL` 설정 시 자동 동작)
-- 카카오/VWorld API 키 정식 등록으로 한국어 라벨 강화
+- 실제 FastAPI 백엔드 연동 실전 검증 (`.env`의 `VITE_FASTAPI_BASE_URL` 채우면 즉시 통신 시도)
+- WebSocket 도입 (현재는 3초 폴링)
+- 검색 결과 서버사이드 페이지네이션 + 가상 스크롤
+- 차량 이미지 다양화 + 번호판 좌표 메타데이터 기반 자동 합성
+- 에러 / 로딩 상태 통합 안내 (현재는 console.warn 중심)
 - 사용자별 알림 구독 설정
 - 모바일 반응형 대시보드
 - 데이터 내보내기 (CSV / PDF 리포트)

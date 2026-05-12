@@ -192,7 +192,7 @@ const features = [
     desc: "50ms 이내 응답. 감지 결과 즉시 화면 렌더링.",
   },
 ];
-const stack = ["Vue.js 3", "Spring Boot", "PostgreSQL", "YOLO", "OCR 엔진", "Docker"];
+const stack = ["Vue.js 3", "Spring Boot", "FastAPI", "YOLO", "OCR 엔진", "Leaflet", "ECharts"];
 </script>
 
 <style scoped>

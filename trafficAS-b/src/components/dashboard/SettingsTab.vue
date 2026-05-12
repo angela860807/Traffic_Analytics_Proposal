@@ -67,7 +67,7 @@
         <div class="v2-card-h"><span><i class="bi bi-shield-lock-fill"></i> 시스템 정보</span></div>
         <div class="v2-settings-list">
           <div class="v2-setting-row v2-setting-info"><span>버전</span><span class="mono">v1.0.0</span></div>
-          <div class="v2-setting-row v2-setting-info"><span>최종 업데이트</span><span class="mono">2024-05-28</span></div>
+          <div class="v2-setting-row v2-setting-info"><span>최종 업데이트</span><span class="mono">{{ todayStr }}</span></div>
           <div class="v2-setting-row v2-setting-info"><span>등록 카메라</span><span class="mono">{{ totalCamCount }}대</span></div>
           <div class="v2-setting-row v2-setting-info"><span>API 상태</span><span class="v2-set-status ok">정상</span></div>
         </div>
@@ -78,5 +78,5 @@
 
 <script setup>
 import { useDashboardData } from '@/composables/useDashboardData'
-const { settings, totalCamCount } = useDashboardData()
+const { settings, totalCamCount, todayStr } = useDashboardData()
 </script>
