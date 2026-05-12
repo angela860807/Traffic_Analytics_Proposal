@@ -359,7 +359,11 @@
                 </div>
                 <div class="v2-ocr-body">
                   <div class="v2-ocr-photo">
-                    <img v-if="latestPlate.id" :src="plateImg(latestPlate)" class="v2-ocr-photo-img" :alt="latestPlate.num" />
+                    <img v-if="latestPlate.id && plateImg(latestPlate)" :src="plateImg(latestPlate)" class="v2-ocr-photo-img" :alt="latestPlate.num" />
+                    <div v-else-if="latestPlate.id" class="v2-ocr-photo-empty">
+                      <i class="bi bi-image"></i>
+                      <span>이미지 없음</span>
+                    </div>
                     <div class="v2-plate-vis">
                       <div class="v2-plate-num mono">{{
                         latestPlate.status === 'OCR_FAILED' ? '미인식' : (latestPlate.num || '128가 4567')
@@ -390,7 +394,8 @@
                     :class="{ active: p.id === latestPlate.id }"
                     @click="selectPlate(p)"
                   >
-                    <img :src="plateImg(p)" class="v2-ocr-thumb-img" :alt="p.num" />
+                    <img v-if="plateImg(p)" :src="plateImg(p)" class="v2-ocr-thumb-img" :alt="p.num" />
+                    <div v-else class="v2-ocr-thumb-empty"><i class="bi bi-image"></i></div>
                     <div class="v2-ocr-thumb-time mono">{{ p.time }}</div>
                     <div class="v2-ocr-thumb-plate mono">{{ p.num }}</div>
                   </div>
@@ -578,19 +583,19 @@
         <!-- /대시보드 탭 -->
 
         <!-- ════════ 모니터링 탭 ════════ -->
-        <MonitoringTab :active="activeTab === 'monitoring'" />
+        <MonitoringTab v-if="visitedTabs.has('monitoring')" :active="activeTab === 'monitoring'" />
 
         <!-- ════════ 이벤트 탭 ════════ -->
-        <EventsTab v-show="activeTab === 'events'" />
+        <EventsTab v-if="visitedTabs.has('events')" v-show="activeTab === 'events'" />
 
         <!-- ════════ 검색 탭 ════════ -->
-        <SearchTab v-show="activeTab === 'search'" />
+        <SearchTab v-if="visitedTabs.has('search')" v-show="activeTab === 'search'" />
 
         <!-- ════════ 통계 탭 ════════ -->
-        <StatsTab :active="activeTab === 'stats'" />
+        <StatsTab v-if="visitedTabs.has('stats')" :active="activeTab === 'stats'" />
 
         <!-- ════════ 설정 탭 ════════ -->
-        <SettingsTab v-show="activeTab === 'settings'" />
+        <SettingsTab v-if="visitedTabs.has('settings')" v-show="activeTab === 'settings'" />
 
         <footer class="v2-foot">© 2026 TrafficAS Analytics Hub</footer>
       </main>
@@ -690,19 +695,21 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, defineAsyncComponent } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "@/composables/useAuth";
 import { useDashboardData } from "@/composables/useDashboardData";
-import EventsTab from "@/components/dashboard/EventsTab.vue";
-import SearchTab from "@/components/dashboard/SearchTab.vue";
-import StatsTab from "@/components/dashboard/StatsTab.vue";
-import SettingsTab from "@/components/dashboard/SettingsTab.vue";
-import MonitoringTab from "@/components/dashboard/MonitoringTab.vue";
 import * as echarts from "echarts";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DISTRICT_LIST, INITIAL_DISTRICTS_WEATHER } from "@/data/weather";
+
+/* 대시보드 탭은 클릭 시점에 로드 — 첫 진입 시 overview만 빠르게 표시 */
+const EventsTab     = defineAsyncComponent(() => import("@/components/dashboard/EventsTab.vue"));
+const SearchTab     = defineAsyncComponent(() => import("@/components/dashboard/SearchTab.vue"));
+const StatsTab      = defineAsyncComponent(() => import("@/components/dashboard/StatsTab.vue"));
+const SettingsTab   = defineAsyncComponent(() => import("@/components/dashboard/SettingsTab.vue"));
+const MonitoringTab = defineAsyncComponent(() => import("@/components/dashboard/MonitoringTab.vue"));
 
 /* ── 공유 상태(composable) ── */
 const {
@@ -739,6 +746,9 @@ const TABS = [
   { id: "settings",   label: "설정" },
 ];
 const activeTab = ref("overview");
+/* 한 번이라도 클릭된 탭만 마운트 — 첫 진입 시 overview 외 탭 컴포넌트는 다운로드/렌더 안 됨 */
+const visitedTabs = ref(new Set(["overview"]));
+watch(activeTab, (v) => { visitedTabs.value.add(v); });
 
 /* ── 헤더 ── */
 const showNotif = ref(false);
@@ -895,16 +905,26 @@ const logPlates = computed(() => plates.value.slice(0, 8))
 /* 이미지 우선순위: plateCropImageUrl → cropUrl → imageUrl → placeholder */
 /* 백엔드 응답 → 프론트 데이터 정규화 (설계서 필드명 호환) */
 function normalizePlate(p) {
+  /* detectedAt이 UTC ISO든 로컬이든 Date 객체로 한 번 거쳐서 로컬 yyyy-MM-dd / HH:mm:ss 추출 */
+  let d = '', t = ''
+  if (p.detectedAt) {
+    const dt = new Date(p.detectedAt)
+    if (!isNaN(dt)) {
+      d = dt.toLocaleDateString('sv-SE')              // 'sv-SE' → yyyy-MM-dd
+      t = dt.toLocaleTimeString('en-GB', { hour12: false })  // HH:mm:ss
+    }
+  }
   return {
     id:       p.id ?? p.detectionLogId,
     num:      p.plateNumber ?? p.num ?? '미인식',
     cam:      p.cameraName ?? p.cameraCode ?? p.cam ?? '-',
-    date:     p.date ?? (p.detectedAt ? p.detectedAt.slice(0, 10) : todayStr),
-    time:     p.time ?? (p.detectedAt ? p.detectedAt.slice(11, 19) : ''),
+    date:     p.date ?? d ?? todayStr,
+    time:     p.time ?? t,
     conf:     p.conf ?? Math.round((p.confidenceScore ?? 0) * 100),
     dir:      p.dir ?? 'in',
     cropUrl:  p.cropUrl ?? p.plateCropImageUrl,
     imageUrl: p.imageUrl,
+    ocrUrl:   p.ocrUrl ?? p.ocrImageUrl,
     status:   p.status ?? 'FLOW_EVENT_CREATED',
   }
 }

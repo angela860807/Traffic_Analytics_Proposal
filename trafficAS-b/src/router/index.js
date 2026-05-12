@@ -1,12 +1,14 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import MainView          from '@/views/MainView.vue'
-import UsageView         from '@/views/UsageView.vue'
-import IntroView         from '@/views/IntroView.vue'
-import SupportView       from '@/views/SupportView.vue'
-import LoginView         from '@/views/LoginView.vue'
-import SignupView        from '@/views/SignupView.vue'
-import RoadDashboardView from '@/views/RoadDashboardView.vue'
-import { useAuth }       from '@/composables/useAuth'
+import { useAuth } from '@/composables/useAuth'
+
+/* 라우트 lazy loading — 메인 페이지 방문자는 대시보드/ECharts/Leaflet 코드를 받지 않음 */
+const MainView          = () => import('@/views/MainView.vue')
+const UsageView         = () => import('@/views/UsageView.vue')
+const IntroView         = () => import('@/views/IntroView.vue')
+const SupportView       = () => import('@/views/SupportView.vue')
+const LoginView         = () => import('@/views/LoginView.vue')
+const SignupView        = () => import('@/views/SignupView.vue')
+const RoadDashboardView = () => import('@/views/RoadDashboardView.vue')
 
 const router = createRouter({
   history: createWebHistory(),

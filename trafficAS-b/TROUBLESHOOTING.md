@@ -20,6 +20,11 @@
 12. [날짜가 과거(2024-05-28)로 박혀있는 문제](#12-날짜-하드코딩)
 13. [index.html 폰트가 적용 안 되는 문제](#13-indexhtml-폰트-누락)
 14. [FastAPI 연동이 안 되는 것 같은 문제](#14-fastapi-연동-미실행)
+15. [메인 페이지 첫 진입이 너무 느린 문제](#15-메인-페이지-첫-진입-속도)
+16. [대시보드 탭이 다 마운트되어 메모리 많이 쓰는 문제](#16-대시보드-탭-사전-마운트)
+17. [UTC 응답이 자정 근처 날짜 어긋남](#17-utc-응답-날짜-어긋남)
+18. [프로덕션에서 가짜 차량 사진이 보이는 문제](#18-프로덕션-가짜-차량-사진)
+19. [백엔드 응답에 이미지 URL이 없을 때 ＜img＞ 깨짐](#19-이미지-없을-때-img-깨짐)
 
 ---
 
@@ -593,6 +598,220 @@ function normalizePlate(p) {
 fetch(`${import.meta.env.VITE_FASTAPI_BASE_URL}/api/v1/plates/recent?limit=5`)
   .then(r => r.json())
   .then(console.log)
+```
+
+---
+
+## 15. 메인 페이지 첫 진입 속도
+
+### 증상
+일반 사용자가 메인 페이지(`/`)만 방문하는데도 다운로드해야 하는 JS가 수백 KB. 사용자 동시 접속 시 첫 화면 표시(LCP)가 느려짐.
+
+### 원인
+라우터에서 모든 view를 **eager import**로 한 번에 번들링:
+
+```js
+// ❌ 이러면 메인 페이지 진입자도 RoadDashboardView + ECharts + Leaflet 다 받음
+import RoadDashboardView from '@/views/RoadDashboardView.vue'
+import StatsTab from '@/components/dashboard/StatsTab.vue'
+```
+
+Vite는 한 청크에 다 묶어서 빌드 → 최초 진입 시 전체 다운로드.
+
+### 해결 방법
+**라우트별 lazy loading**:
+
+```js
+// src/router/index.js
+const MainView          = () => import('@/views/MainView.vue')
+const RoadDashboardView = () => import('@/views/RoadDashboardView.vue')
+```
+
+Vite가 자동으로 view별 청크 분리. 메인 페이지 진입자는 `MainView.js`만 받고, `/dashboard` 클릭 시점에 추가 청크 다운로드.
+
+**효과 (gzip 기준)**:
+- 메인 페이지 첫 진입: 약 480KB → **약 51KB** (90% 감소)
+- 대시보드는 진입 시점에 비로소 다운로드
+
+### 검증
+```bash
+npm run build
+# dist/assets/ 에 view별 청크가 분리되어 생성됨
+# index-*.js (공통) / MainView-*.js / RoadDashboardView-*.js ...
+```
+
+---
+
+## 16. 대시보드 탭 사전 마운트
+
+### 증상
+대시보드 진입 시 모든 탭(모니터링/이벤트/검색/통계/설정)의 컴포넌트가 마운트되어 메모리·타이머·차트 인스턴스를 동시 점유. 저사양 PC에서 초기 렌더 느림.
+
+### 원인
+`v-show`로 탭을 숨기면 컴포넌트는 마운트된 상태로 DOM만 hidden. ECharts 차트도 초기화되고, 자체 타이머도 동작.
+
+```vue
+<!-- ❌ 마운트는 즉시, 가려져만 있음 -->
+<StatsTab v-show="activeTab === 'stats'" />
+```
+
+### 해결 방법
+**`defineAsyncComponent` + "처음 방문한 탭만 마운트" 패턴**:
+
+```js
+// src/views/RoadDashboardView.vue
+import { defineAsyncComponent } from "vue";
+
+const StatsTab = defineAsyncComponent(() => import("@/components/dashboard/StatsTab.vue"));
+
+const activeTab = ref("overview");
+const visitedTabs = ref(new Set(["overview"]));
+watch(activeTab, (v) => { visitedTabs.value.add(v); });
+```
+
+```vue
+<!-- ✅ visitedTabs에 추가된 후에만 마운트, 이후엔 v-show로 visibility 토글 -->
+<StatsTab v-if="visitedTabs.has('stats')" :active="activeTab === 'stats'" />
+<EventsTab v-if="visitedTabs.has('events')" v-show="activeTab === 'events'" />
+```
+
+### 효과
+- overview 탭만 본 사용자: 다른 4개 탭 컴포넌트는 다운로드/마운트 안 됨 (메모리 0)
+- 한 번 방문한 탭은 마운트 유지 → 상태(검색 필터 등) 보존
+- 대시보드 진입 직후 메모리 사용량 절반 이하
+
+---
+
+## 17. UTC 응답 날짜 어긋남
+
+### 증상
+백엔드가 보낸 `detectedAt: "2026-05-12T20:30:00Z"`(UTC) 데이터가 한국 시각으론 `2026-05-13 05:30:00`인데, 프론트엔 `2026-05-12 20:30:00`으로 표시. 검색 탭 "오늘" 필터에도 어제 데이터가 잡힘.
+
+### 원인
+기존 `normalizePlate()`가 단순 문자열 슬라이스:
+```js
+date: p.detectedAt.slice(0, 10),  // ← UTC 그대로 자름
+time: p.detectedAt.slice(11, 19), // ← 한국 시각 변환 안 됨
+```
+
+### 해결 방법
+**`new Date()` + `toLocaleDateString('sv-SE')` 조합** — 'sv-SE' 로케일은 ISO 형식(`yyyy-MM-dd`)을 반환하므로 비교 가능:
+
+```js
+function normalizePlate(p) {
+  let d = '', t = ''
+  if (p.detectedAt) {
+    const dt = new Date(p.detectedAt)
+    if (!isNaN(dt)) {
+      d = dt.toLocaleDateString('sv-SE')             // yyyy-MM-dd (로컬 기준)
+      t = dt.toLocaleTimeString('en-GB', { hour12: false })  // HH:mm:ss
+    }
+  }
+  return {
+    date: p.date ?? d ?? todayStr,
+    time: p.time ?? t,
+    ...
+  }
+}
+```
+
+### 권장 백엔드 규칙
+- 항상 UTC ISO 8601로 송신 (`...Z` 또는 `+00:00`)
+- 프론트가 사용자 로컬 시각으로 변환
+- 그래야 다중 지역·서머타임 대응 가능
+
+---
+
+## 18. 프로덕션 가짜 차량 사진
+
+### 증상
+백엔드 연동 완료 후에도 OCR 실패·bbox 못 찾은 데이터에 `car1.jpg`(개발용 더미 차량 사진)이 표시됨. 발표나 시연 시 "실제 차량 데이터처럼" 보여 오해 유발.
+
+### 원인
+`plateImg()`의 최종 폴백이 무조건 `/car1.jpg`:
+```js
+return p.plateCropImageUrl
+    || p.cropUrl
+    || p.imageUrl
+    || '/car1.jpg'   // ❌ 프로덕션에서도 항상 보임
+```
+
+### 해결 방법
+**Vite 환경 변수 `import.meta.env.DEV`로 모드별 분기**:
+
+```js
+// src/composables/useDashboardData.js
+function plateImg(p) {
+  if (!p) return ''
+  return p.plateCropImageUrl
+      || p.cropUrl
+      || p.imageUrl
+      || (import.meta.env.DEV ? '/car1.jpg' : '')
+}
+```
+
+- `npm run dev` → DEV 모드, 데이터 없을 때 `car1.jpg` 표시 (시연·디자인 작업 편리)
+- `npm run build` → PROD 모드, 빈 문자열 → 가짜 이미지 노출 0
+
+### 보완 — 빈 이미지 placeholder
+빈 문자열일 때 `<img>`가 깨지므로 템플릿에 가드 + placeholder 추가 (트러블슈팅 19번 참조).
+
+---
+
+## 19. 이미지 없을 때 img 깨짐
+
+### 증상
+백엔드 응답에 `plateCropImageUrl` / `imageUrl` 모두 null인데 프론트가 `<img :src="">`로 렌더 → 브라우저가 X 아이콘 표시. 보기 흉함.
+
+### 원인
+- bbox 못 찾은 OCR_FAILED는 crop URL이 null
+- 백엔드 통신 실패 직후 imageUrl도 null인 케이스 존재
+- 프로덕션에선 폴백 이미지도 없음 (#18 참조)
+
+### 해결 방법
+**`v-if`로 plateImg 결과 가드 + `v-else`로 placeholder div 표시**:
+
+```vue
+<!-- 메인 OCR 카드 -->
+<img v-if="latestPlate.id && plateImg(latestPlate)"
+     :src="plateImg(latestPlate)"
+     class="v2-ocr-photo-img"
+     :alt="latestPlate.num" />
+<div v-else-if="latestPlate.id" class="v2-ocr-photo-empty">
+  <i class="bi bi-image"></i>
+  <span>이미지 없음</span>
+</div>
+
+<!-- OCR 썸네일 5개 -->
+<img v-if="plateImg(p)" :src="plateImg(p)" class="v2-ocr-thumb-img" :alt="p.num" />
+<div v-else class="v2-ocr-thumb-empty"><i class="bi bi-image"></i></div>
+
+<!-- 검색 탭 OCR 모달 -->
+<img v-if="plateImg(modalPlate)" :src="plateImg(modalPlate)" ... />
+<div v-else class="v2-ocr-photo-empty">
+  <i class="bi bi-image"></i>
+  <span>이미지 없음</span>
+</div>
+```
+
+### CSS
+```css
+.v2-ocr-photo-empty {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #1a2b44, #0f1d30);
+  color: rgba(228,238,255,.35);
+  font-size: 12px;
+}
+.v2-ocr-photo-empty i { font-size: 28px; color: #60a5fa; opacity: .5; }
+.v2-ocr-thumb-empty {
+  width: 100%; aspect-ratio: 16/9;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.04);
+  border-radius: 3px;
+}
 ```
 
 ---
