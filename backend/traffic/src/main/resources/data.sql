@@ -23,7 +23,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO members (email, password, name, phone, role, status, created_at)
 VALUES (
     'admin@email.com',
-    '$2y$10$UxDhYVBOy1yX6q8T25kmdu19pXXn4YuBZ8Tpiw6sCA2K.T2RK',
+    '$2y$10$UxDhYVBOy1yX6q8T25kmdu19pXXn4YuBZ8Tpiw6LPP6sCA2K.T2RK',
     '관리자',
     '010-1234-1234',
     'ADMIN',

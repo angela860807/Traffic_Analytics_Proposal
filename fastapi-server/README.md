@@ -26,6 +26,8 @@
 - `confidenceScore` 기준값은 `0.7`로 시작한다.
 - 이미지는 FastAPI 서버가 저장한다.
 - 번호판 인식 실패 시 `plateNumber`는 `null`로 둔다.
+- 번호판 인식 실패 결과도 Spring으로 전송하며 `detection_logs.status=OCR_FAILED`로 저장한다.
+- FastAPI 중복 판정 결과도 Spring으로 전송하며 `detection_logs.status=DUPLICATE_SKIPPED`로 저장한다.
 - `UNKNOWN` 문자열은 사용하지 않는다.
 - 대시보드 통계는 `vehicle_flow_events` 기준으로 보여준다.
 
@@ -66,7 +68,7 @@ APP_NAME=traffic-ai-server
 APP_ENV=local
 
 SPRING_BACKEND_BASE_URL=http://127.0.0.1:8080
-SPRING_DETECTION_PATH=/api/detections
+SPRING_DETECTION_PATH=/api/v1/detection-logs
 
 DEFAULT_TIMEZONE=Asia/Seoul
 DETECTION_CONFIDENCE_THRESHOLD=0.7
@@ -75,8 +77,19 @@ IMAGE_STORAGE_DIR=storage/detections
 STATIC_DETECTIONS_URL_PREFIX=/static/detections
 PUBLIC_BASE_URL=
 
-MODEL_PATH=
+MODEL_PATH=best.pt
 OCR_LANG=korean
+YOLO_CONF_THRESHOLD=0.5
+YOLO_IOU_THRESHOLD=0.4
+YOLO_MAX_DET=5
+DETECTION_PREPROCESS_MODE=none
+PLATE_CROP_PADDING_RATIO=0.10
+OCR_MIN_CONFIDENCE=0.5
+OCR_PREPROCESS_SCALE=2.0
+OCR_ADAPTIVE_BLOCK_SIZE=31
+OCR_ADAPTIVE_C=5
+SAVE_PLATE_CROP=true
+SAVE_OCR_PREPROCESSED_IMAGE=true
 ```
 
 ## Health Check
@@ -202,6 +215,11 @@ python -m pytest
 ```powershell
 python -m compileall app
 ```
+
+## 병합 테스트 주의사항
+
+mock inference 단계에서는 번호판이 `123가4567`로 고정됩니다.
+`DUPLICATE_WINDOW_SECONDS` 안에 같은 `cameraCode`와 번호판이 반복되면 FastAPI가 Spring에 `DUPLICATE_SKIPPED` 상태로 전송합니다. 따라서 DB row는 증가하지만 `vehicle_flow_events`는 증가하지 않는 것이 정상입니다.
 
 ## 에러 응답
 

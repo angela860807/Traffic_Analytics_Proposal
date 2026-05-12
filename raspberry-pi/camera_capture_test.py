@@ -16,8 +16,10 @@ def main() -> None:
     picam2.configure(config)
     picam2.start()
 
-    frame = picam2.capture_array()
-    picam2.stop()
+    try:
+        frame = picam2.capture_array()
+    finally:
+        picam2.stop()
 
     frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 

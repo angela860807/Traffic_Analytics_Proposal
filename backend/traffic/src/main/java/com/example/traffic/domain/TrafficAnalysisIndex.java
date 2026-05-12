@@ -9,7 +9,15 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "traffic_analysis_index")
+@Table(
+        name = "traffic_analysis_index",
+        indexes = {
+                @Index(name = "idx_traffic_analysis_index_zone", columnList = "zone_id")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_traffic_analysis_index_zone", columnNames = "zone_id")
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TrafficAnalysisIndex {
