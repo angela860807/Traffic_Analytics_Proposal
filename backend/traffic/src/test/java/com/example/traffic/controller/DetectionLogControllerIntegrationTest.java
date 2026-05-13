@@ -84,7 +84,9 @@ class DetectionLogControllerIntegrationTest {
                                 ocrImagePath, ocrImageUrl)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data").isNumber());
+                .andExpect(jsonPath("$.data.logId").isNumber())
+                .andExpect(jsonPath("$.data.status").value("FLOW_EVENT_CREATED"))
+                .andExpect(jsonPath("$.data.plateNumber").value(plateNumber));
 
         assertThat(detectionLogRepository.count()).isEqualTo(logCountBefore + 1);
         assertThat(detectionAnalysisResultRepository.count()).isEqualTo(resultCountBefore + 1);
@@ -144,9 +146,10 @@ class DetectionLogControllerIntegrationTest {
                                   "detectionType": "VEHICLE",
                                   "status": "OCR_FAILED"
                                 }
-                                """.formatted(imageUrl)))
+                """.formatted(imageUrl)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("OCR_FAILED"));
 
         DetectionLog savedLog = detectionLogRepository.findTop100ByOrderByDetectedAtDesc().stream()
                 .filter(log -> imageUrl.equals(log.getImageUrl()))
@@ -184,9 +187,10 @@ class DetectionLogControllerIntegrationTest {
                                   "detectionType": "PLATE",
                                   "status": "DUPLICATE_SKIPPED"
                                 }
-                                """.formatted(plateNumber)))
+                """.formatted(plateNumber)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("DUPLICATE_SKIPPED"));
 
         DetectionAnalysisResult savedResult = detectionAnalysisResultRepository
                 .findByPlateNumberOrderByCreatedAtDesc(plateNumber)

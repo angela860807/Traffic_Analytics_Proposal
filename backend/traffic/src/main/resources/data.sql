@@ -8,6 +8,15 @@ FROM zones
 WHERE zone_code = 'ZONE_001'
 ON CONFLICT (camera_code) DO NOTHING;
 
+ALTER TABLE detection_logs ALTER COLUMN plate_number DROP NOT NULL;
+ALTER TABLE detection_logs ALTER COLUMN detection_type DROP NOT NULL;
+
+ALTER TABLE detection_logs DROP CONSTRAINT IF EXISTS detection_logs_status_check;
+ALTER TABLE detection_logs
+ADD CONSTRAINT detection_logs_status_check
+CHECK (status IN ('RECEIVED', 'OCR_FAILED', 'FLOW_EVENT_CREATED', 'DUPLICATE_SKIPPED'));
+
+
 INSERT INTO members (email, password, name, phone, role, status, created_at)
 VALUES (
     'user1@email.com',

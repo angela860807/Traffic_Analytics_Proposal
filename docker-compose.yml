@@ -13,7 +13,8 @@ services:
 
   spring-backend:
     build:
-      context: ./backend/traffic
+      context: .
+      dockerfile: backend/traffic/Dockerfile
     container_name: traffic-spring-backend
     depends_on:
       - postgres-db
@@ -26,7 +27,8 @@ services:
 
   fastapi-server:
     build:
-      context: ./fastapi-server
+      context: .
+      dockerfile: fastapi-server/Dockerfile
     container_name: traffic-fastapi-server
     depends_on:
       - spring-backend
@@ -35,6 +37,7 @@ services:
       SPRING_DETECTION_PATH: /api/v1/detection-logs
       BACKEND_INTERNAL_API_KEY: traffic-ai-internal-key-2026
       IMAGE_STORAGE_DIR: storage/detections
+      MODEL_PATH: /app/models/best.pt
       DETECTION_PREPROCESS_MODE: none
       SAVE_PLATE_CROP: "true"
       SAVE_OCR_PREPROCESSED_IMAGE: "true"
@@ -42,10 +45,12 @@ services:
       - "8000:8000"
     volumes:
       - ./fastapi-server/storage:/app/storage
+      - ./fastapi-server/models:/app/models:ro
 
   frontend:
     build:
-      context: ./trafficAS-b
+      context: .
+      dockerfile: trafficAS-b/Dockerfile
       args:
         VITE_API_BASE_URL: ""
         VITE_FASTAPI_BASE_URL: ""

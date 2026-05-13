@@ -1,13 +1,17 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+import axios from 'axios'
 
-export async function apiGet(path) {
+export const apiClient = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || '',
+  timeout: 5000,
+})
+
+apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('tas_access_token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
 
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
-
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
-
-  return res.json()
+export async function apiGet(path, config) {
+  const response = await apiClient.get(path, config)
+  return response.data
 }
