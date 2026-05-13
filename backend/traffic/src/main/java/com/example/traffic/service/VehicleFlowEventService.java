@@ -1,0 +1,74 @@
+package com.example.traffic.service;
+
+import com.example.traffic.common.enums.Direction;
+import com.example.traffic.domain.DetectionAnalysisResult;
+import com.example.traffic.domain.DetectionLog;
+import com.example.traffic.domain.Vehicle;
+import com.example.traffic.domain.VehicleFlowEvent;
+import com.example.traffic.dto.response.FlowEventResponse;
+import com.example.traffic.repository.VehicleFlowEventRepository;
+import com.example.traffic.repository.ZoneRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Slf4j
+@Service
+@Transactional(readOnly = true)
+@RequiredArgsConstructor
+public class VehicleFlowEventService {
+
+    private final VehicleFlowEventRepository flowEventRepository;
+    private final ZoneRepository zoneRepository;
+
+    public List<FlowEventResponse> getVehicleHistory(Long vehicleId) {
+        return flowEventRepository.findByVehicleIdWithDetails(vehicleId).stream()
+                .map(FlowEventResponse::from)
+                .toList();
+    }
+
+    public boolean hasRecentDuplicate(Vehicle vehicle, DetectionLog detectionLog) {
+        LocalDateTime windowTime = detectionLog.getDetectedAt().minusSeconds(10);
+        return flowEventRepository.existsByVehicleAndZoneAndEventAtAfter(
+                vehicle,
+                detectionLog.getCamera().getZone(),
+                windowTime
+        );
+    }
+
+    @Transactional
+    public FlowEventResponse processFlowEvent(DetectionLog detectionLog,
+                                              DetectionAnalysisResult analysisResult,
+                                              Vehicle vehicle) {
+        if (hasRecentDuplicate(vehicle, detectionLog)) {
+            log.info("Duplicate detection skipped. plateNumber={}", analysisResult.getPlateNumber());
+            return null;
+        }
+
+        Direction direction = detectionLog.getCamera().getDirectionType();
+        VehicleFlowEvent flowEvent = VehicleFlowEvent.builder()
+                .vehicle(vehicle)
+                .camera(detectionLog.getCamera())
+                .zone(detectionLog.getCamera().getZone())
+                .flowDirection(direction)
+                .eventAt(detectionLog.getDetectedAt())
+                .sourceDetectionLog(detectionLog)
+                .sourceAnalysisResult(analysisResult)
+                .build();
+
+        VehicleFlowEvent savedEvent = flowEventRepository.save(flowEvent);
+        return FlowEventResponse.from(savedEvent);
+    }
+
+    public long getFlowCount(Long zoneId, Direction direction, LocalDateTime start, LocalDateTime end) {
+        com.example.traffic.domain.Zone zone = zoneRepository.findById(zoneId)
+                .orElseThrow(() -> new IllegalArgumentException("Zone not found."));
+
+        return flowEventRepository.countByZoneAndFlowDirectionAndEventAtBetween(
+                zone, direction, start, end);
+    }
+}

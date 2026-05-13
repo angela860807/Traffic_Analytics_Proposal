@@ -1,0 +1,108 @@
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+DirectionType = Literal["IN", "OUT", "BOTH"]
+DetectionType = Literal["VEHICLE", "PLATE"]
+AnalysisStatus = Literal[
+    "ANALYSIS_ONLY",
+    "SENT_TO_BACKEND",
+    "OCR_FAILED",
+    "DUPLICATE_SKIPPED",
+]
+
+
+class RaspberryFrameRequest(BaseModel):
+    camera_code: str = Field(
+        alias="cameraCode",
+        min_length=1,
+        examples=["CAM_001"],
+    )
+    captured_at: datetime = Field(
+        alias="capturedAt",
+        examples=["2026-04-30T10:30:00"],
+    )
+    image_base64: str = Field(
+        alias="imageBase64",
+        min_length=1,
+        examples=["/9j/4AAQSkZJRgABAQAAAQABAAD..."],
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class DetectionResult(BaseModel):
+    camera_code: str = Field(
+        alias="cameraCode",
+        examples=["CAM_001"],
+    )
+    plate_number: str | None = Field(
+        default=None,
+        alias="plateNumber",
+        examples=["123가4567"],
+    )
+    detection_type: DetectionType = Field(
+        alias="detectionType",
+        examples=["PLATE"],
+    )
+    direction_type: DirectionType = Field(
+        alias="directionType",
+        examples=["IN"],
+    )
+    confidence_score: float = Field(
+        alias="confidenceScore",
+        ge=0,
+        le=1,
+        examples=[0.9321],
+    )
+    image_path: str | None = Field(
+        default=None,
+        alias="imagePath",
+        examples=["storage/detections/2026/04/30/CAM_001_103000_plate_01.jpg"],
+    )
+    image_url: str | None = Field(
+        default=None,
+        alias="imageUrl",
+        examples=["/static/detections/2026/04/30/CAM_001_103000_frame.jpg"],
+    )
+    plate_crop_image_path: str | None = Field(
+        default=None,
+        alias="plateCropImagePath",
+        examples=["storage/detections/2026/04/30/CAM_001_103000_plate_crop.jpg"],
+    )
+    plate_crop_image_url: str | None = Field(
+        default=None,
+        alias="plateCropImageUrl",
+        examples=["/static/detections/2026/04/30/CAM_001_103000_plate_crop.jpg"],
+    )
+    ocr_image_path: str | None = Field(
+        default=None,
+        alias="ocrImagePath",
+        examples=["storage/detections/2026/04/30/CAM_001_103000_ocr.jpg"],
+    )
+    ocr_image_url: str | None = Field(
+        default=None,
+        alias="ocrImageUrl",
+        examples=["/static/detections/2026/04/30/CAM_001_103000_ocr.jpg"],
+    )
+    detected_at: datetime = Field(
+        alias="detectedAt",
+        examples=["2026-04-30T10:30:00"],
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class DetectionResponse(BaseModel):
+    accepted: bool = Field(examples=[True])
+    message: str = Field(examples=["Detection result accepted"])
+    analysis_status: AnalysisStatus | None = Field(
+        default=None,
+        alias="analysisStatus",
+        examples=["OCR_FAILED"],
+    )
+    data: DetectionResult | None = None
+
+    model_config = ConfigDict(populate_by_name=True)
