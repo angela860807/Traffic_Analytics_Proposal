@@ -118,7 +118,7 @@
 
     <footer>
       <span class="fl">Traffic<em>AS</em></span>
-      <span class="fr">© 2025 네바퀴 1조 · 스마트 모빌리티 DX Academy</span>
+      <span class="fr">© 2026 네바퀴 1조 · 스마트 모빌리티 DX Academy</span>
     </footer>
   </div>
 </template>
@@ -192,7 +192,7 @@ const features = [
     desc: "50ms 이내 응답. 감지 결과 즉시 화면 렌더링.",
   },
 ];
-const stack = ["Vue.js 3", "Spring Boot", "PostgreSQL", "YOLO", "OCR 엔진", "Docker"];
+const stack = ["Vue.js 3", "Spring Boot", "FastAPI", "YOLO", "OCR 엔진", "Leaflet", "ECharts"];
 </script>
 
 <style scoped>
