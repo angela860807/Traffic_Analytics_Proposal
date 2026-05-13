@@ -1,205 +1,181 @@
 <template>
-  <div class="stats-layout">
-
-    <!-- ── 상단 KPI ── -->
-    <div class="stats-kpi-row">
-      <div class="sk" v-for="s in topKpis" :key="s.label">
-        <div class="sk-icon" :style="{ background: s.color + '18', color: s.color }">{{ s.icon }}</div>
-        <div class="sk-right">
-          <div class="sk-v mono" :style="{ color: s.color }">{{ s.value }}</div>
-          <div class="sk-l">{{ s.label }}</div>
-        </div>
-        <div class="sk-bar-wrap"><div class="sk-bar-fill" :style="{ width: s.pct+'%', background: s.color }"></div></div>
+  <div v-show="active" class="v2-tab-page">
+    <div class="v2-page-h">
+      <h2><i class="bi bi-bar-chart-fill"></i> 통계 분석</h2>
+      <div class="v2-page-actions">
+        <select v-model="statsPeriod" class="v2-select">
+          <option value="day">일간</option>
+          <option value="week">주간</option>
+          <option value="month">월간</option>
+        </select>
       </div>
     </div>
-
-    <!-- ── 메인 3패널 ── -->
-    <div class="stats-main">
-
-      <!-- 좌: 차트 -->
-      <div class="stat-panel chart-panel">
-        <div class="panel-head"><span class="ph-bar"></span>시간대별 통행량</div>
-        <canvas ref="chartRef" class="stat-canvas"></canvas>
-        <div class="chart-legend">
-          <span class="cl-dot" style="background:#3ec9d6"></span>
-          <span class="cl-txt">통행량 추이 (대/시)</span>
-          <span class="cl-peak mono">최고 {{ Math.max(...chartData).toLocaleString() }}대</span>
-        </div>
-      </div>
-
-      <!-- 중: 히트맵 -->
-      <div class="stat-panel">
-        <div class="panel-head"><span class="ph-bar"></span>구역별 혼잡도</div>
-        <div class="heatmap">
-          <div v-for="zone in heatZones" :key="zone.name" class="hm-cell">
-            <div class="hm-top">
-              <span class="hm-name">{{ zone.name }}</span>
-              <span class="hm-pct mono" :style="{ color: hmBarColor(zone.pct) }">{{ zone.pct }}%</span>
-            </div>
-            <div class="hm-bar-wrap">
-              <div class="hm-bar-fill" :style="{ width: zone.pct+'%', background: hmBarColor(zone.pct) }"></div>
-            </div>
-            <div class="hm-status-dot" :style="{ background: hmBarColor(zone.pct) }"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 우: 실시간 집계 -->
-      <div class="stat-panel">
-        <div class="panel-head"><span class="ph-bar"></span>실시간 집계</div>
-        <div class="rt-grid">
-          <div class="rt-card" v-for="s in rtStats" :key="s.label">
-            <div class="rt-top">
-              <div class="rt-v mono" :style="{ color: s.color }">{{ s.value }}</div>
-              <div class="rt-trend" :style="{ color: s.color }">▲</div>
-            </div>
-            <div class="rt-l">{{ s.label }}</div>
-            <div class="rt-bar-wrap"><div class="rt-bar-fill" :style="{ width: s.pct+'%', background: s.color }"></div></div>
-          </div>
-        </div>
-      </div>
+    <div class="v2-stats-grid">
+      <section class="v2-card">
+        <div class="v2-card-h"><span><i class="bi bi-calendar3"></i> 요일별 평균 통행량</span></div>
+        <div ref="dowEl" class="v2-stat-chart"></div>
+      </section>
+      <section class="v2-card">
+        <div class="v2-card-h"><span><i class="bi bi-arrow-left-right"></i> 시간대별 진입 / 이탈 추이</span></div>
+        <div ref="typeEl" class="v2-stat-chart"></div>
+      </section>
+      <section class="v2-card">
+        <div class="v2-card-h"><span><i class="bi bi-hourglass-split"></i> 도로별 평균 정체 시간</span></div>
+        <div ref="jamEl" class="v2-stat-chart"></div>
+      </section>
+      <section class="v2-card">
+        <div class="v2-card-h"><span><i class="bi bi-camera-video"></i> 카메라별 진입 / 이탈 비교</span></div>
+        <div ref="camStatEl" class="v2-stat-chart"></div>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import * as echarts from 'echarts'
+import { useDashboardData } from '@/composables/useDashboardData'
 
-const props = defineProps({
-  heatZones: Array, flowIn: Number, flowOut: Number,
-  segments: Array,  accCnt: Number,  chartData: Array,
+const props = defineProps({ active: { type: Boolean, default: false } })
+const { cameraFeeds } = useDashboardData()
+
+const statsPeriod = ref('day')
+const dowEl     = ref(null)
+const typeEl    = ref(null)
+const jamEl     = ref(null)
+const camStatEl = ref(null)
+const charts = {}
+let initialized = false
+
+const TT = { trigger: 'axis', backgroundColor: '#0a1727', borderColor: 'rgba(255,255,255,.12)', textStyle: { color: '#e4eeff', fontSize: 12 } }
+
+function dowOpt() {
+  const vals = [72, 68, 75, 71, 90, 55, 42]
+  return {
+    backgroundColor: 'transparent',
+    grid: { top: 20, right: 16, bottom: 30, left: 40 },
+    tooltip: { ...TT, formatter: p => `${p[0].name}<br/>평균 통행량: <b>${p[0].value}%</b>` },
+    xAxis: { type: 'category', data: ['월','화','수','목','금','토','일'],
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,.1)' } },
+      axisTick: { show: false },
+      axisLabel: { color: 'rgba(228,238,255,.5)', fontSize: 11 } },
+    yAxis: { type: 'value', max: 100,
+      axisLabel: { color: 'rgba(228,238,255,.4)', fontSize: 10, formatter: '{value}%' },
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,.05)' } }, axisLine: { show: false } },
+    series: [{ type: 'bar',
+      data: vals.map(v => ({ value: v, itemStyle: { color: v > 80 ? '#d4845a' : v > 60 ? '#60a5fa' : '#4caf7d', borderRadius: [4, 4, 0, 0] } })),
+      barMaxWidth: 26,
+      label: { show: true, position: 'top', color: 'rgba(228,238,255,.55)', fontSize: 10, formatter: '{c}%' } }],
+  }
+}
+
+function typeOpt() {
+  const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2,'0')}:00`)
+  const inData  = [5,3,2,2,4,8,28,55,78,68,62,58,55,60,65,72,82,88,75,55,38,25,15,8]
+  const outData = [4,3,2,2,3,6,22,48,72,75,68,62,58,62,68,75,85,82,68,48,32,22,12,6]
+  return {
+    backgroundColor: 'transparent',
+    grid: { top: 32, right: 16, bottom: 24, left: 40 },
+    tooltip: TT,
+    legend: { top: 4, left: 'center', textStyle: { color: 'rgba(228,238,255,.7)', fontSize: 11 }, itemWidth: 12, itemHeight: 8 },
+    xAxis: { type: 'category', data: hours, boundaryGap: false,
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,.1)' } }, axisTick: { show: false },
+      axisLabel: { color: 'rgba(228,238,255,.4)', fontSize: 10, interval: 3 } },
+    yAxis: { type: 'value',
+      axisLabel: { color: 'rgba(228,238,255,.4)', fontSize: 10 },
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,.05)' } }, axisLine: { show: false } },
+    series: [
+      { name: '진입 (IN)',  type: 'line', data: inData,  smooth: true, symbol: 'none',
+        lineStyle: { color: '#4caf7d', width: 2 },
+        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [{ offset: 0, color: 'rgba(76,175,125,.4)' }, { offset: 1, color: 'rgba(76,175,125,0)' }] } } },
+      { name: '이탈 (OUT)', type: 'line', data: outData, smooth: true, symbol: 'none',
+        lineStyle: { color: '#d4845a', width: 2 },
+        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [{ offset: 0, color: 'rgba(212,132,90,.35)' }, { offset: 1, color: 'rgba(212,132,90,0)' }] } } },
+    ],
+  }
+}
+
+function jamOpt() {
+  const roads = ['테헤란로', '반포IC', '영동대로', '올림픽대로', '잠실대교']
+  const vals  = [28, 21, 15, 18, 12]
+  return {
+    backgroundColor: 'transparent',
+    grid: { top: 20, right: 16, bottom: 30, left: 70 },
+    tooltip: { ...TT, formatter: p => `${p[0].name}<br/>평균 정체: <b>${p[0].value}분</b>` },
+    xAxis: { type: 'value',
+      axisLabel: { color: 'rgba(228,238,255,.4)', fontSize: 10, formatter: '{value}분' },
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,.05)' } }, axisLine: { show: false } },
+    yAxis: { type: 'category', data: roads,
+      axisLabel: { color: 'rgba(228,238,255,.6)', fontSize: 11 },
+      axisLine: { show: false }, axisTick: { show: false } },
+    series: [{ type: 'bar',
+      data: vals.map(v => ({ value: v, itemStyle: { color: v > 20 ? '#e05260' : v > 15 ? '#d4845a' : '#4caf7d', borderRadius: [0, 4, 4, 0] } })),
+      barMaxWidth: 22,
+      label: { show: true, position: 'right', color: 'rgba(228,238,255,.7)', fontSize: 11, formatter: '{c}분' } }],
+  }
+}
+
+function camStatOpt() {
+  const cams = cameraFeeds.map(c => c.name.replace(' 사거리', '').replace(' 교차로', ''))
+  const inVals  = [187, 145, 220, 98,  158, 120]
+  const outVals = [165, 132, 195, 105, 142, 110]
+  return {
+    backgroundColor: 'transparent',
+    grid: { top: 32, right: 16, bottom: 42, left: 40 },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' },
+      backgroundColor: '#0a1727', borderColor: 'rgba(255,255,255,.12)', textStyle: { color: '#e4eeff' } },
+    legend: { top: 4, left: 'center', textStyle: { color: 'rgba(228,238,255,.7)', fontSize: 11 }, itemWidth: 12, itemHeight: 8 },
+    xAxis: { type: 'category', data: cams,
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,.1)' } }, axisTick: { show: false },
+      axisLabel: { color: 'rgba(228,238,255,.5)', fontSize: 10, rotate: 20 } },
+    yAxis: { type: 'value',
+      axisLabel: { color: 'rgba(228,238,255,.4)', fontSize: 10 },
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,.05)' } }, axisLine: { show: false } },
+    series: [
+      { name: '진입 (IN)',  type: 'bar', data: inVals,  barMaxWidth: 18,
+        itemStyle: { color: '#4caf7d', borderRadius: [3, 3, 0, 0] } },
+      { name: '이탈 (OUT)', type: 'bar', data: outVals, barMaxWidth: 18,
+        itemStyle: { color: '#d4845a', borderRadius: [3, 3, 0, 0] } },
+    ],
+  }
+}
+
+function init(key, el, opt) {
+  if (!el) return
+  if (charts[key]) { try { charts[key].dispose() } catch {} }
+  const c = echarts.init(el, null, { renderer: 'canvas' })
+  c.setOption(opt)
+  charts[key] = c
+}
+
+function initAll() {
+  init('dow',     dowEl.value,     dowOpt())
+  init('type',    typeEl.value,    typeOpt())
+  init('jam',     jamEl.value,     jamOpt())
+  init('camStat', camStatEl.value, camStatOpt())
+}
+function resizeAll() {
+  Object.values(charts).forEach(c => { try { c.resize() } catch {} })
+}
+
+watch(() => props.active, async (v) => {
+  if (!v) return
+  await nextTick()
+  if (!initialized) { initAll(); initialized = true }
+  else setTimeout(resizeAll, 60)
 })
 
-const chartRef = ref(null)
-const CHART_H = ['07','08','09','10','11','12','13','14','15','16','17','18']
-
-const topKpis = computed(() => [
-  { label:'총 통행량',   value:(props.flowIn+props.flowOut).toLocaleString(), color:'var(--a)',  icon:'≡',  pct:80 },
-  { label:'입차',        value:props.flowIn.toLocaleString(),                  color:'#4caf7d',  icon:'↑',  pct:Math.min(Math.round(props.flowIn/1000*100),100) },
-  { label:'출차',        value:props.flowOut.toLocaleString(),                 color:'#d4845a',  icon:'↓',  pct:Math.min(Math.round(props.flowOut/1000*100),100) },
-  { label:'혼잡 구간',   value:props.segments.filter(s=>s.lv==='H').length+'개', color:'#e05260', icon:'⚠', pct:props.segments.filter(s=>s.lv==='H').length/props.segments.length*100 },
-  { label:'이상 감지',   value:props.accCnt+'건',                               color:'#e05260', icon:'!',  pct:Math.min(props.accCnt/5*100,100) },
-  { label:'평균 인식률', value:'96.2%',                                          color:'var(--a)', icon:'✓', pct:96 },
-])
-
-const rtStats = computed(() => [
-  { label:'총 통행량',   value:(props.flowIn+props.flowOut).toLocaleString(), color:'var(--a)',  pct:80 },
-  { label:'입차',        value:props.flowIn.toLocaleString(),  color:'#4caf7d', pct:Math.min(Math.round(props.flowIn/1000*100),100) },
-  { label:'출차',        value:props.flowOut.toLocaleString(), color:'#d4845a', pct:Math.min(Math.round(props.flowOut/1000*100),100) },
-  { label:'혼잡 구간',   value:props.segments.filter(s=>s.lv==='H').length+'개', color:'#e05260', pct:props.segments.filter(s=>s.lv==='H').length/props.segments.length*100 },
-  { label:'이상 감지',   value:props.accCnt+'건', color:'#e05260', pct:Math.min(props.accCnt/5*100,100) },
-  { label:'인식률',      value:'96.2%', color:'var(--a)', pct:96 },
-])
-
-function hmBarColor(pct) {
-  return pct > 70 ? '#e05260' : pct > 45 ? '#d4845a' : '#4caf7d'
-}
-
-function drawChart() {
-  const canvas = chartRef.value
-  if (!canvas) return
-  const W = canvas.offsetWidth || 600, H = canvas.offsetHeight || 160
-  canvas.width = W; canvas.height = H
-  const ctx = canvas.getContext('2d')
-  ctx.clearRect(0, 0, W, H)
-  const pl=14, pr=14, pt=18, pb=32, cw=W-pl-pr, ch=H-pt-pb
-  const data = props.chartData
-  const mx = Math.max(...data)*1.08, mn = Math.min(...data)*0.94
-  const pts = data.map((v,i) => ({ px: pl+i*(cw/(data.length-1)), py: pt+ch*(1-(v-mn)/(mx-mn)) }))
-
-  // Y axis grid lines
-  for (let i = 0; i <= 4; i++) {
-    const y = pt + ch*(i/4)
-    ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(pl,y); ctx.lineTo(W-pr,y); ctx.stroke()
-    const val = Math.round(mx - (mx-mn)*(i/4))
-    ctx.fillStyle='rgba(150,170,200,.35)'; ctx.font='8px IBM Plex Mono,monospace'; ctx.textAlign='right'
-    ctx.fillText(val >= 1000 ? (val/1000).toFixed(1)+'k' : val, pl-3, y+3)
+onMounted(() => {
+  window.addEventListener('resize', resizeAll)
+  if (props.active) {
+    nextTick().then(() => { initAll(); initialized = true })
   }
+})
 
-  // Gradient fill
-  const gr = ctx.createLinearGradient(0,pt,0,pt+ch)
-  gr.addColorStop(0,'rgba(62,201,214,0.28)'); gr.addColorStop(0.7,'rgba(62,201,214,0.06)'); gr.addColorStop(1,'rgba(62,201,214,0)')
-  ctx.beginPath(); ctx.moveTo(pts[0].px, pt+ch)
-  pts.forEach(p => ctx.lineTo(p.px, p.py))
-  ctx.lineTo(pts[pts.length-1].px, pt+ch); ctx.closePath()
-  ctx.fillStyle = gr; ctx.fill()
-
-  // Smooth line (bezier)
-  ctx.beginPath()
-  pts.forEach((p,i) => {
-    if (i === 0) { ctx.moveTo(p.px, p.py); return }
-    const px0 = pts[i-1]
-    const cpx1 = px0.px + (p.px-px0.px)/3
-    const cpx2 = p.px  - (p.px-px0.px)/3
-    ctx.bezierCurveTo(cpx1, px0.py, cpx2, p.py, p.px, p.py)
-  })
-  ctx.strokeStyle='#3ec9d6'; ctx.lineWidth=2.5; ctx.shadowColor='#3ec9d6'; ctx.shadowBlur=10; ctx.stroke(); ctx.shadowBlur=0
-
-  // Dots + labels
-  pts.forEach((p,i) => {
-    ctx.beginPath(); ctx.arc(p.px,p.py,3.5,0,Math.PI*2)
-    ctx.fillStyle='#3ec9d6'; ctx.shadowColor='#3ec9d6'; ctx.shadowBlur=8; ctx.fill(); ctx.shadowBlur=0
-    ctx.fillStyle='rgba(150,170,200,.55)'; ctx.font='8.5px IBM Plex Mono,monospace'; ctx.textAlign='center'
-    ctx.fillText(CHART_H[i]+'시', p.px, H-8)
-  })
-}
-
-watch(() => props.chartData, () => drawChart(), { deep: true })
-onMounted(async () => { await nextTick(); setTimeout(drawChart, 300) })
+onUnmounted(() => {
+  window.removeEventListener('resize', resizeAll)
+  Object.values(charts).forEach(c => { try { c.dispose() } catch {} })
+})
 </script>
-
-<style scoped>
-.stats-layout { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; padding-bottom: 12px; }
-
-.panel-head { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; color: var(--t); letter-spacing: .04em; margin-bottom: 10px; }
-.ph-bar { width: 3px; height: 13px; background: var(--a); border-radius: 2px; flex-shrink: 0; }
-
-/* ── 상단 KPI ── */
-.stats-kpi-row { display: grid; grid-template-columns: repeat(6,1fr); gap: 7px; flex-shrink: 0; }
-.sk { background: var(--bg2); border: 1px solid var(--b); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; position: relative; overflow: hidden; }
-.sk-icon { width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; font-family: 'IBM Plex Mono',monospace; }
-.sk-right { flex: 1; min-width: 0; }
-.sk-v { font-size: 16px; font-weight: 700; line-height: 1; }
-.sk-l { font-size: 8px; color: var(--t3); letter-spacing: .5px; text-transform: uppercase; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sk-bar-wrap { position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: rgba(255,255,255,.04); }
-.sk-bar-fill { height: 100%; transition: width 1s ease; }
-
-/* ── 메인 3패널 ── */
-.stats-main { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; flex: 1; min-height: 0; }
-.stat-panel { background: var(--bg2); border: 1px solid var(--b); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; overflow: hidden; }
-
-/* 차트 */
-.stat-canvas { display: block; width: 100%; flex: 1; min-height: 0; }
-.chart-legend { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-shrink: 0; }
-.cl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.cl-txt { font-size: 9px; color: var(--t3); }
-.cl-peak { font-size: 9px; color: var(--a); margin-left: auto; }
-
-/* 히트맵 */
-.heatmap { display: flex; flex-direction: column; gap: 7px; flex: 1; overflow-y: auto; }
-.hm-cell { background: var(--card); border: 1px solid var(--b); border-radius: 6px; padding: 8px 10px; position: relative; }
-.hm-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-.hm-name { font-size: 10px; color: var(--t); font-weight: 500; }
-.hm-pct { font-size: 12px; font-weight: 700; }
-.hm-bar-wrap { height: 5px; background: rgba(255,255,255,.06); border-radius: 2px; overflow: hidden; }
-.hm-bar-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
-.hm-status-dot { position: absolute; top: 8px; right: 8px; width: 5px; height: 5px; border-radius: 50%; opacity: .7; }
-
-/* 실시간 집계 */
-.rt-grid { display: flex; flex-direction: column; gap: 7px; flex: 1; overflow-y: auto; }
-.rt-card { background: var(--card); border: 1px solid var(--b); border-radius: 7px; padding: 9px 11px; }
-.rt-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
-.rt-v { font-size: 15px; font-weight: 700; line-height: 1; }
-.rt-trend { font-size: 9px; opacity: .7; }
-.rt-l { font-size: 8px; color: var(--t3); letter-spacing: .5px; text-transform: uppercase; margin-bottom: 5px; }
-.rt-bar-wrap { height: 3px; background: rgba(255,255,255,.06); border-radius: 2px; overflow: hidden; }
-.rt-bar-fill { height: 100%; border-radius: 2px; transition: width 1.2s ease; }
-
-.mono { font-family: 'IBM Plex Mono',monospace; }
-
-@media (max-width: 1200px) {
-  .stats-kpi-row { grid-template-columns: repeat(3,1fr); }
-  .stats-main { grid-template-columns: 1fr 1fr; }
-}
-</style>
