@@ -9,7 +9,9 @@ DetectionType = Literal["VEHICLE", "PLATE"]
 AnalysisStatus = Literal[
     "ANALYSIS_ONLY",
     "SENT_TO_BACKEND",
+    "RECEIVED",
     "OCR_FAILED",
+    "FLOW_EVENT_CREATED",
     "DUPLICATE_SKIPPED",
 ]
 
