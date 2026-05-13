@@ -62,16 +62,14 @@
       </div>
     </main>
 
-    <footer>
-      <span class="fl">Traffic<em>AS</em></span>
-      <span class="fr">© 2026 네바퀴 1조 · 스마트 모빌리티 DX Academy</span>
-    </footer>
+    <AppFooter />
   </div>
 </template>
 
 <script setup>
 import AppNav from '@/components/AppNav.vue'
 import AppFab from '@/components/AppFab.vue'
+import AppFooter from '@/components/AppFooter.vue'
 import { useTheme } from '@/composables/useTheme'
 
 const { isDark } = useTheme()
@@ -156,7 +154,7 @@ const arch = [
 }
 .ph-ey {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9px; letter-spacing: .22em;
+  font-size: 11px; letter-spacing: .22em;
   color: var(--a); opacity: .6;
   margin-bottom: 10px;
   display: flex; align-items: center; gap: 8px;
@@ -172,8 +170,8 @@ h1 {
 }
 h1 em { color: var(--a); font-style: normal; }
 .ph-sub {
-  font-size: 13px; color: var(--t2); font-weight: 300;
-  line-height: 1.85; max-width: 600px; margin-bottom: 20px; margin-top: 16px;
+  font-size: 15px; color: var(--t2); font-weight: 300;
+  line-height: 1.85; max-width: 640px; margin-bottom: 20px; margin-top: 16px;
 }
 
 /* ── Body ── */
@@ -181,16 +179,16 @@ h1 em { color: var(--a); font-style: normal; }
 .sec { padding-top: 52px; }
 .sec-label {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9px; letter-spacing: .2em;
+  font-size: 11px; letter-spacing: .2em;
   color: var(--a); opacity: .55; margin-bottom: 8px;
 }
 .sh {
   font-family: 'Pretendard Variable', Pretendard, sans-serif;
-  font-size: 20px; font-weight: 700;
+  font-size: 22px; font-weight: 700;
   letter-spacing: -.4px; color: var(--t); margin-bottom: 6px;
 }
 .sec-desc {
-  font-size: 13px; color: var(--t2);
+  font-size: 14.5px; color: var(--t2);
   font-weight: 300; line-height: 1.8; margin-bottom: 28px;
 }
 .divider { height: 1px; background: var(--b); margin-top: 8px; }
@@ -218,13 +216,13 @@ h1 em { color: var(--a); font-style: normal; }
 }
 .kpi-label {
   font-family: 'Pretendard Variable', Pretendard, sans-serif;
-  font-size: 13px; font-weight: 700;
+  font-size: 14.5px; font-weight: 700;
   color: var(--t); margin-bottom: 5px;
   white-space: nowrap;
 }
 .kpi-desc {
   font-family: 'Pretendard Variable', Pretendard, sans-serif;
-  font-size: 11px; color: var(--t2);
+  font-size: 12.5px; color: var(--t2);
   font-weight: 400; line-height: 1.65;
 }
 
@@ -244,15 +242,15 @@ h1 em { color: var(--a); font-style: normal; }
 .feat-card:hover { border-color: var(--ba); transform: translateY(-2px); }
 .feat-num {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px; letter-spacing: .1em;
+  font-size: 11.5px; letter-spacing: .1em;
   color: var(--a); opacity: .45; margin-bottom: 10px;
 }
 .feat-title {
-  font-size: 14px; font-weight: 700;
+  font-size: 15.5px; font-weight: 700;
   color: var(--t); margin-bottom: 8px;
 }
 .feat-desc {
-  font-size: 12px; color: var(--t2);
+  font-size: 13.5px; color: var(--t2);
   line-height: 1.75; font-weight: 300;
 }
 
@@ -283,33 +281,23 @@ h1 em { color: var(--a); font-style: normal; }
 .theme-navy.light .arch-step { opacity: .35; color: var(--a); }
 .arch-tag {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9px; letter-spacing: .14em;
+  font-size: 11px; letter-spacing: .14em;
   color: var(--a); opacity: .6; margin-bottom: 8px;
 }
 .arch-title {
-  font-size: 14px; font-weight: 700;
+  font-size: 15.5px; font-weight: 700;
   color: var(--t); margin-bottom: 8px;
 }
 .arch-desc {
-  font-size: 12px; color: var(--t2);
+  font-size: 13.5px; color: var(--t2);
   line-height: 1.7; font-weight: 300; margin-bottom: 14px;
 }
 .arch-tech {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9px; color: var(--a);
+  font-size: 11px; color: var(--a);
   opacity: .45; line-height: 1.6;
 }
 
-
-/* ── Footer ── */
-footer {
-  border-top: 1px solid var(--b); padding: 26px 60px;
-  background: var(--bg2); display: flex;
-  align-items: center; justify-content: space-between;
-}
-.fl { font-family: 'Pretendard Variable', Pretendard, sans-serif; font-size: 15px; font-weight: 800; letter-spacing: -.3px; color: var(--t); }
-.fl em { color: var(--a); font-style: normal; }
-.fr { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--t3); }
 
 @media (max-width: 1100px) {
   .kpi-row { grid-template-columns: repeat(2, 1fr); }

@@ -22,12 +22,14 @@
               :class="{ on: tab === ch.key }"
               @click="tab = ch.key"
             >
-              <div class="sb-item-top">
-                <span class="sb-tag">{{ ch.tag }}</span>
-                <span class="sb-badge" :class="{ live: ch.live }">{{ ch.badge }}</span>
+              <div class="sb-icon"><i :class="ch.icon"></i></div>
+              <div class="sb-body">
+                <div class="sb-item-top">
+                  <span class="sb-name">{{ ch.name }}</span>
+                  <span class="sb-badge" :class="{ live: ch.live }">{{ ch.badge }}</span>
+                </div>
+                <div class="sb-desc">{{ ch.desc }}</div>
               </div>
-              <div class="sb-name">{{ ch.name }}</div>
-              <div class="sb-desc">{{ ch.desc }}</div>
             </button>
           </nav>
 
@@ -80,6 +82,7 @@ const channels = [
   {
     key: "board",
     tag: "BOARD",
+    icon: "bi bi-megaphone-fill",
     name: "게시판",
     desc: "공지사항, 사용 후기, 활용 사례를 공유합니다.",
     badge: "6",
@@ -88,6 +91,7 @@ const channels = [
   {
     key: "qna",
     tag: "Q&A",
+    icon: "bi bi-patch-question-fill",
     name: "질문 & 답변",
     desc: "기술적인 질문을 올리고 전문 답변을 받습니다.",
     badge: "5",
@@ -96,6 +100,7 @@ const channels = [
   {
     key: "chat",
     tag: "LIVE CHAT",
+    icon: "bi bi-chat-dots-fill",
     name: "실시간 채팅",
     desc: "운영팀과 실시간으로 즉시 소통합니다.",
     badge: "Live",
@@ -127,14 +132,14 @@ watch(
 
 /* ── Header (사용법/시스템소개와 동일) ── */
 .ph {
-  padding: 64px 60px 52px;
+  padding: 40px 60px 32px;
   border-bottom: 1px solid var(--b);
   background: var(--bg2);
   flex-shrink: 0;
 }
 .ph-ey {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.22em;
   color: var(--a);
   opacity: 0.6;
@@ -152,25 +157,24 @@ watch(
 }
 h1 {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: clamp(36px, 5vw, 68px);
+  font-size: clamp(28px, 3.5vw, 44px);
   font-weight: 800;
-  letter-spacing: -3px;
+  letter-spacing: -1.5px;
   color: var(--t);
-  line-height: 0.95;
-  margin-bottom: 16px;
+  line-height: 1;
+  margin-bottom: 12px;
 }
 h1 em {
   color: var(--a);
   font-style: normal;
 }
 .ph-sub {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--t2);
   font-weight: 300;
-  line-height: 1.85;
-  max-width: 600px;
-  margin-bottom: 20px;
-  margin-top: 16px;
+  line-height: 1.7;
+  max-width: 640px;
+  margin: 8px 0 0;
 }
 
 .layout {
@@ -182,13 +186,13 @@ h1 em {
 
 /* ── Sidebar ── */
 .sidebar {
-  width: 272px;
+  width: 312px;
   flex-shrink: 0;
   border-right: 1px solid var(--b);
   background: var(--bg2);
   display: flex;
   flex-direction: column;
-  padding: 24px 24px 28px;
+  padding: 24px 20px 24px;
   overflow-y: auto;
 }
 
@@ -196,7 +200,7 @@ h1 em {
 .sb-nav {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   flex: 1;
 }
 
@@ -205,61 +209,86 @@ h1 em {
   text-align: left;
   background: transparent;
   border: 1px solid var(--b);
-  border-radius: 8px;
-  padding: 14px 16px;
+  border-radius: 10px;
+  padding: 14px 14px;
   cursor: pointer;
   transition: all 0.2s;
   position: relative;
-  border-left: 2px solid transparent;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
 .sb-item:hover {
   background: rgba(255, 255, 255, 0.03);
   border-color: var(--ba);
+  transform: translateX(2px);
 }
 .sb-item.on {
-  background: rgba(96, 165, 250, 0.05);
-  border-color: rgba(96, 165, 250, 0.25);
-  border-left-color: var(--a);
+  background: rgba(96, 165, 250, 0.06);
+  border-color: rgba(96, 165, 250, 0.35);
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.15) inset;
 }
+
+.sb-icon {
+  width: 38px; height: 38px;
+  border-radius: 8px;
+  background: rgba(96, 165, 250, 0.08);
+  border: 1px solid rgba(96, 165, 250, 0.15);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--a);
+  font-size: 18px;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.sb-item.on .sb-icon {
+  background: rgba(96, 165, 250, 0.18);
+  border-color: rgba(96, 165, 250, 0.4);
+  box-shadow: 0 0 14px rgba(96, 165, 250, 0.25);
+}
+.sb-body { flex: 1; min-width: 0; }
 
 .sb-item-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 5px;
-}
-.sb-tag {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  color: var(--a);
-  opacity: 0.55;
-}
-.sb-item.on .sb-tag {
-  opacity: 1;
+  gap: 8px;
+  margin-bottom: 4px;
 }
 
 .sb-badge {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
   background: rgba(96, 165, 250, 0.1);
   color: var(--a);
-  padding: 1px 7px;
+  padding: 2px 9px;
   border-radius: 100px;
+  white-space: nowrap;
 }
 .sb-badge.live {
-  background: rgba(52, 211, 153, 0.12);
+  background: rgba(52, 211, 153, 0.14);
   color: #34d399;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sb-badge.live::before {
+  content: "";
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 6px #34d399;
+  animation: livePulse 1.4s ease-in-out infinite;
 }
 
 .sb-name {
-  font-size: 13px;
+  font-size: 15.5px;
   font-weight: 700;
   color: var(--t);
-  margin-bottom: 3px;
+  letter-spacing: -0.2px;
 }
 .sb-desc {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--t3);
   font-weight: 300;
   line-height: 1.55;
@@ -287,24 +316,26 @@ h1 em {
 }
 .st-text {
   font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 600;
   color: #34d399;
+  letter-spacing: 0.03em;
 }
 .st-sep {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
 }
 .st-meta {
   font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--t3);
 }
 .st-copy {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 10px;
   color: var(--t3);
-  opacity: 0.5;
-  line-height: 1.5;
+  opacity: 0.55;
+  line-height: 1.55;
 }
 
 /* ── Content Panel ── */
@@ -317,43 +348,48 @@ h1 em {
 }
 
 .panel-head {
-  padding: 20px 36px;
+  padding: 22px 40px;
   border-bottom: 1px solid var(--b);
   background: var(--bg2);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
 }
 .ph-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 .ph-tag {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.14em;
   color: var(--a);
-  opacity: 0.6;
+  opacity: 0.7;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: rgba(96, 165, 250, 0.08);
+  border: 1px solid rgba(96, 165, 250, 0.2);
 }
 .ph-name {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
   color: var(--t);
 }
 .ph-desc {
-  font-size: 11px;
-  color: var(--t3);
+  font-size: 13.5px;
+  color: var(--t2);
   font-weight: 300;
+  margin-top: 2px;
 }
 
 .panel-body {
   flex: 1;
   overflow-y: auto;
-  padding: 28px 36px;
+  padding: 32px 40px;
 }
 .panel-body.chat-mode {
   padding: 0;

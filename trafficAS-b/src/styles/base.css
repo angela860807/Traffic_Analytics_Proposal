@@ -14,7 +14,7 @@ a { text-decoration: none; color: inherit; }
 nav.appnav {
   position: fixed !important;
   top: 0; left: 0; right: 0;
-  z-index: 200; height: 62px;
+  z-index: 200; height: 68px;
   background: var(--nav);
   backdrop-filter: blur(22px);
   border-bottom: 1px solid var(--b);

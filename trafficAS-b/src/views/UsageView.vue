@@ -105,10 +105,7 @@
       </div>
     </main>
 
-    <footer>
-      <span class="fl">Traffic<em>AS</em></span>
-      <span class="fr">© 2025 네바퀴 1조 · 스마트 모빌리티 DX Academy</span>
-    </footer>
+    <AppFooter />
   </div>
 </template>
 
@@ -116,6 +113,7 @@
 import { ref } from "vue";
 import AppNav from "@/components/AppNav.vue";
 import AppFab from "@/components/AppFab.vue";
+import AppFooter from "@/components/AppFooter.vue";
 import { useTheme } from "@/composables/useTheme";
 
 const { isDark } = useTheme();
@@ -236,7 +234,7 @@ const faq = [
 }
 .ph-ey {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.22em;
   color: var(--a);
   opacity: 0.6;
@@ -266,11 +264,11 @@ h1 em {
   font-style: normal;
 }
 .ph-sub {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--t2);
   font-weight: 300;
   line-height: 1.85;
-  max-width: 600px;
+  max-width: 640px;
   margin-bottom: 20px;
   margin-top: 16px;
 }
@@ -281,11 +279,11 @@ h1 em {
 }
 .badge {
   font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
+  font-size: 11.5px;
   color: var(--t3);
   border: 1px solid var(--b);
   border-radius: 100px;
-  padding: 4px 12px;
+  padding: 5px 13px;
   letter-spacing: 0.04em;
 }
 
@@ -345,17 +343,17 @@ h1 em {
 }
 .step-tag {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.12em;
   color: var(--a);
   background: rgba(96, 165, 250, 0.08);
   border: 1px solid rgba(96, 165, 250, 0.2);
   border-radius: 4px;
-  padding: 3px 10px;
+  padding: 4px 11px;
 }
 .step-idx {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   color: var(--t3);
 }
@@ -368,12 +366,12 @@ h1 em {
   margin-bottom: 12px;
 }
 .step-desc {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--t2);
   line-height: 1.85;
   font-weight: 300;
   margin-bottom: 20px;
-  max-width: 580px;
+  max-width: 620px;
 }
 
 /* ── 터미널 ── */
@@ -439,7 +437,7 @@ h1 em {
 .tcode {
   padding: 16px 18px;
   font-family: "JetBrains Mono", monospace;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 2;
   background: var(--bg);
   display: flex;
@@ -464,7 +462,7 @@ h1 em {
 }
 .ref-label {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.2em;
   color: var(--a);
   opacity: 0.55;
@@ -482,7 +480,7 @@ h1 em {
 }
 .ref-title {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.5px;
   color: var(--t);
@@ -531,13 +529,13 @@ h1 em {
 }
 .arch-tech {
   font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
+  font-size: 11.5px;
   letter-spacing: 0.04em;
   color: var(--nc);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 3px;
-  padding: 2px 8px;
+  padding: 3px 9px;
 }
 .arch-dot {
   width: 7px;
@@ -548,13 +546,13 @@ h1 em {
   box-shadow: 0 0 8px currentColor;
 }
 .arch-name {
-  font-size: 14px;
+  font-size: 15.5px;
   font-weight: 700;
   color: var(--t);
   margin-bottom: 6px;
 }
 .arch-role {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--t2);
   line-height: 1.6;
   font-weight: 300;
@@ -589,14 +587,14 @@ h1 em {
 }
 .faq-n {
   font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
+  font-size: 11.5px;
   color: var(--a);
   opacity: 0.4;
   flex-shrink: 0;
 }
 .faq-text {
   flex: 1;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 500;
   color: var(--t);
 }
@@ -614,7 +612,7 @@ h1 em {
 }
 .faq-a {
   padding: 0 20px 18px 52px;
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--t2);
   line-height: 1.8;
   font-weight: 300;
@@ -627,32 +625,6 @@ h1 em {
 .slide-leave-to {
   opacity: 0;
   transform: translateY(-5px);
-}
-
-/* ── 푸터 ── */
-footer {
-  border-top: 1px solid var(--b);
-  padding: 26px 60px;
-  background: var(--bg2);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.fl {
-  font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: -0.3px;
-  color: var(--t);
-}
-.fl em {
-  color: var(--a);
-  font-style: normal;
-}
-.fr {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
-  color: var(--t3);
 }
 
 @media (max-width: 900px) {

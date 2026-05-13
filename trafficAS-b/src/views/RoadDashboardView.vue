@@ -728,6 +728,7 @@ const {
   stats,
   camCongestion,
   tickCamCongestion,
+  notifications,
 } = useDashboardData();
 
 const router = useRouter();
@@ -777,25 +778,6 @@ function handleClickOutside(e) {
   if (showHotspot.value && !e.target.closest(".v2-hotspot-wrap")) showHotspot.value = false;
 }
 const notifEdit = ref(false);
-const notifications = ref([
-  {
-    id: 1,
-    msg: "테헤란로 교차로 혼잡 감지 — 진입 +42%",
-    time: "14:32",
-    color: "#e05260",
-  },
-  { id: 2, msg: "CAM-03 강남역 OCR 인식률 저하 (78%)", time: "14:28", color: "#d4845a" },
-  { id: 3, msg: "반포IC 이탈 차량 급증", time: "14:15", color: "#d4845a" },
-  { id: 4, msg: "올림픽대로 흐름 원활 전환", time: "13:58", color: "#4caf7d" },
-  { id: 5, msg: "OCR 파이프라인 정상 가동", time: "13:45", color: "#4caf7d" },
-  { id: 6, msg: "잠실역 사거리 진입 트래픽 급증", time: "13:30", color: "#d4845a" },
-  { id: 7, msg: "양재역 사거리 흐름 정상화", time: "13:02", color: "#4caf7d" },
-  { id: 8, msg: "남부터미널 정체 시작 — 평균 12 km/h", time: "12:36", color: "#e05260" },
-  { id: 9, msg: "석촌역 이탈 차량 통행 증가", time: "12:14", color: "#d4845a" },
-  { id: 10, msg: "강남구 전역 평균 정상", time: "11:55", color: "#4caf7d" },
-  { id: 11, msg: "중복 감지 178건 자동 제거 완료", time: "11:30", color: "#4caf7d" },
-  { id: 12, msg: "WebSocket 연결 정상", time: "11:00", color: "#4caf7d" },
-]);
 function removeNotif(id) {
   notifications.value = notifications.value.filter((n) => n.id !== id);
 }
