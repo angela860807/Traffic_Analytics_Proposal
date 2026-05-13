@@ -44,13 +44,13 @@ const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
 }
 .logo {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 800;
   letter-spacing: -0.4px;
   color: var(--t);
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   margin-right: 32px;
   white-space: nowrap;
   text-decoration: none;
@@ -70,16 +70,16 @@ const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
 }
 .links {
   display: flex;
-  height: 60px;
+  height: 66px;
   align-items: stretch;
   flex: 1;
 }
 .links a {
   display: flex;
   align-items: center;
-  padding: 0 14px;
-  font-size: 12px;
-  letter-spacing: 0.04em;
+  padding: 0 16px;
+  font-size: 14px;
+  letter-spacing: 0.02em;
   color: var(--t3);
   transition: color 0.2s;
   white-space: nowrap;
@@ -97,7 +97,7 @@ const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
   gap: 8px;
 }
 .uname {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--t2);
   letter-spacing: 0.02em;
   white-space: nowrap;
@@ -105,12 +105,12 @@ const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
 .btn-login {
   display: inline-flex;
   align-items: center;
-  padding: 7px 16px;
+  padding: 8px 18px;
   background: none;
   border: 1px solid var(--b);
   border-radius: 6px;
   color: var(--t2);
-  font-size: 12px;
+  font-size: 13.5px;
   transition: all 0.2s;
   white-space: nowrap;
   text-decoration: none;
@@ -122,13 +122,13 @@ const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
 .btn-signup {
   display: inline-flex;
   align-items: center;
-  padding: 7px 16px;
+  padding: 8px 18px;
   background: var(--a);
   border: none;
   border-radius: 6px;
   color: var(--bg);
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 700;
   transition: opacity 0.2s, transform 0.15s;
   white-space: nowrap;
@@ -141,12 +141,12 @@ const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
 .btn-dash {
   display: inline-flex;
   align-items: center;
-  padding: 7px 16px;
+  padding: 8px 18px;
   background: var(--a);
   border: none;
   border-radius: 6px;
   color: var(--bg);
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 700;
   transition: opacity 0.2s, transform 0.15s;
   white-space: nowrap;
@@ -154,12 +154,12 @@ const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
 }
 .btn-dash:hover { opacity: 0.87; transform: translateY(-1px); }
 .btn-out {
-  padding: 7px 16px;
+  padding: 8px 18px;
   background: none;
   border: 1px solid var(--b);
   border-radius: 6px;
   color: var(--t3);
-  font-size: 12px;
+  font-size: 13.5px;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
@@ -173,8 +173,8 @@ const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
     padding: 0 16px;
   }
   .links a {
-    padding: 0 9px;
-    font-size: 11px;
+    padding: 0 10px;
+    font-size: 12.5px;
   }
 }
 </style>

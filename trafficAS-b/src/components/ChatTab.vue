@@ -269,7 +269,7 @@ function resetChat() {
 }
 .olabel {
   font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
+  font-size: 11.5px;
   color: var(--in);
   display: flex;
   align-items: center;
@@ -284,7 +284,7 @@ function resetChat() {
 }
 .meta {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--t3);
   flex: 1;
 }
@@ -292,12 +292,12 @@ function resetChat() {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 10px;
+  padding: 5px 12px;
   background: none;
   border: 1px solid var(--b);
   border-radius: 4px;
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--t3);
   cursor: pointer;
   transition: all 0.2s;
@@ -328,7 +328,7 @@ function resetChat() {
 .sys {
   text-align: center;
   font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
+  font-size: 11.5px;
   color: var(--t3);
   display: flex;
   align-items: center;
@@ -351,14 +351,14 @@ function resetChat() {
   flex-direction: row-reverse;
 }
 .av {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: 1px solid var(--b);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 15px;
   flex-shrink: 0;
   background: var(--bg2);
 }
@@ -367,7 +367,7 @@ function resetChat() {
 }
 .name {
   font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
+  font-size: 11.5px;
   color: var(--t3);
   margin-bottom: 4px;
 }
@@ -376,9 +376,9 @@ function resetChat() {
 }
 
 .bubble {
-  padding: 10px 14px;
+  padding: 12px 16px;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.7;
   background: var(--card);
   border: 1px solid var(--b);
@@ -433,9 +433,9 @@ function resetChat() {
 
 .time {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--t3);
-  margin-top: 4px;
+  margin-top: 5px;
 }
 .msg.mine .time {
   text-align: right;
@@ -444,21 +444,21 @@ function resetChat() {
 /* API 키 없음 경고 */
 .no-key {
   margin: 0 20px 0;
-  padding: 10px 14px;
+  padding: 11px 16px;
   background: rgba(251, 146, 60, 0.08);
   border: 1px solid rgba(251, 146, 60, 0.25);
   border-radius: 6px;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13.5px;
   color: #fb923c;
 }
 .no-key code {
   font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   background: rgba(251, 146, 60, 0.12);
-  padding: 1px 5px;
+  padding: 1px 6px;
   border-radius: 3px;
 }
 
@@ -475,8 +475,8 @@ function resetChat() {
   background: var(--bg);
   border: 1px solid var(--b);
   border-radius: 6px;
-  padding: 10px 14px;
-  font-size: 13px;
+  padding: 12px 16px;
+  font-size: 14.5px;
   color: var(--t);
   font-family: "Noto Sans KR", sans-serif;
   outline: none;
@@ -493,19 +493,19 @@ function resetChat() {
   cursor: not-allowed;
 }
 .sbtn {
-  padding: 10px 20px;
+  padding: 12px 22px;
   background: var(--a);
   color: var(--bg);
   border: none;
   border-radius: 6px;
   font-family: "JetBrains Mono", monospace;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 56px;
+  min-width: 60px;
   transition: opacity 0.2s;
 }
 .sbtn:hover:not(:disabled) {

@@ -45,6 +45,32 @@
       </section>
 
       <section class="v2-card">
+        <div class="v2-card-h"><span><i class="bi bi-shield-exclamation"></i> 관제 임계값 (자동 알람)</span></div>
+        <div class="v2-settings-list">
+          <div class="v2-setting-row v2-setting-stack">
+            <div class="v2-set-name">인식률 경고 임계값 (%)</div>
+            <div class="v2-set-desc">카메라 인식률이 이 값 미만으로 떨어지면 자동 알람</div>
+            <input type="number" v-model.number="settings.thresholdRecognition" min="0" max="100" />
+          </div>
+          <div class="v2-setting-row v2-setting-stack">
+            <div class="v2-set-name">FPS 경고 임계값</div>
+            <div class="v2-set-desc">초당 프레임 수가 이 값 미만이면 영상 품질 저하 경고</div>
+            <input type="number" v-model.number="settings.thresholdFps" min="1" max="30" />
+          </div>
+          <div class="v2-setting-row v2-setting-stack">
+            <div class="v2-set-name">프레임 끊김 경고 (초)</div>
+            <div class="v2-set-desc">마지막 프레임 수신 후 이 시간 초과 시 "지연" 표시</div>
+            <input type="number" v-model.number="settings.thresholdHeartbeatSec" min="3" max="60" />
+          </div>
+          <div class="v2-setting-row v2-setting-stack">
+            <div class="v2-set-name">오프라인 판정 (초)</div>
+            <div class="v2-set-desc">이 시간 초과 시 "끊김" + critical 알람</div>
+            <input type="number" v-model.number="settings.thresholdHeartbeatOfflineSec" min="10" max="300" />
+          </div>
+        </div>
+      </section>
+
+      <section class="v2-card">
         <div class="v2-card-h"><span><i class="bi bi-shield-fill-check"></i> 중복 제거 정책</span></div>
         <div class="v2-settings-list">
           <div class="v2-setting-row v2-setting-stack">

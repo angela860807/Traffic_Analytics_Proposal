@@ -33,10 +33,7 @@
         <div class="vintro fu" ref="fuRef1">
           <div class="vstack">
             <div class="vmain">
-              <video autoplay muted loop playsinline>
-                <source src="/hero-main.mp4" type="video/mp4" />
-                <source src="/hero-banner.mp4" type="video/mp4" />
-              </video>
+              <img src="/hero-poster.jpg" alt="YOLO 차량 감지" />
               <div class="vovl">
                 <span class="vbg"><span class="vdot in"></span>YOLO DETECTING</span>
                 <span class="vcnt"
@@ -47,7 +44,7 @@
             <div class="vrow">
               <div class="vsm">
                 <video autoplay muted loop playsinline>
-                  <source src="/detect-video.mp4" type="video/mp4" />
+                  <source src="/seoul_traffic1.mp4" type="video/mp4" />
                 </video>
                 <div class="vslbl">
                   <span class="vdot in" style="animation-delay: 0.3s"></span>INCIDENT
@@ -55,7 +52,7 @@
               </div>
               <div class="vsm">
                 <video autoplay muted loop playsinline>
-                  <source src="/classify-video.mp4" type="video/mp4" />
+                  <source src="/road3.mp4" type="video/mp4" />
                   <source src="/hero-alt.mp4" type="video/mp4" />
                 </video>
                 <div class="vslbl"><span class="vdot"></span>CLASSIFY</div>
@@ -104,22 +101,7 @@
       </div>
     </div>
 
-    <div class="sbar">
-      <div
-        class="sw"
-        style="display: flex; align-items: center; gap: 36px; flex-wrap: wrap"
-      >
-        <span class="slbl">TECH STACK</span>
-        <div class="chips">
-          <span class="chip" v-for="c in stack" :key="c">{{ c }}</span>
-        </div>
-      </div>
-    </div>
-
-    <footer>
-      <span class="fl">Traffic<em>AS</em></span>
-      <span class="fr">© 2026 네바퀴 1조 · 스마트 모빌리티 DX Academy</span>
-    </footer>
+    <AppFooter />
   </div>
 </template>
 
@@ -128,6 +110,7 @@ import { ref, onMounted } from "vue";
 import { RouterLink } from "vue-router";
 import AppNav from "@/components/AppNav.vue";
 import AppFab from "@/components/AppFab.vue";
+import AppFooter from "@/components/AppFooter.vue";
 import HeroStats from "@/components/HeroStats.vue";
 import { useStats } from "@/composables/useStats";
 import { useTheme } from "@/composables/useTheme";
@@ -192,7 +175,6 @@ const features = [
     desc: "50ms 이내 응답. 감지 결과 즉시 화면 렌더링.",
   },
 ];
-const stack = ["Vue.js 3", "Spring Boot", "FastAPI", "YOLO", "OCR 엔진", "Leaflet", "ECharts"];
 </script>
 
 <style scoped>
@@ -353,7 +335,7 @@ h1 em {
 }
 .ey-tag {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.2em;
   color: var(--a);
   opacity: 0.6;
@@ -382,11 +364,11 @@ h2 em {
   font-style: normal;
 }
 .desc {
-  font-size: 14px;
+  font-size: 15.5px;
   font-weight: 300;
   color: var(--t2);
   line-height: 1.85;
-  max-width: 540px;
+  max-width: 580px;
   margin-bottom: 48px;
 }
 /* 비디오 3개 레이아웃 */
@@ -407,7 +389,8 @@ h2 em {
   border: 1px solid var(--b);
   position: relative;
 }
-.vmain video {
+.vmain video,
+.vmain img {
   width: 100%;
   aspect-ratio: 16/9;
   object-fit: cover;
@@ -505,20 +488,20 @@ h2 em {
 }
 .vi-n {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
+  font-size: 10.5px;
   letter-spacing: 0.14em;
   color: var(--a);
   opacity: 0.55;
   margin-bottom: 6px;
 }
 .vi-t {
-  font-size: 15px;
+  font-size: 16.5px;
   font-weight: 600;
   margin-bottom: 5px;
   color: var(--t);
 }
 .vi-d {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--t2);
   line-height: 1.75;
   font-weight: 300;
@@ -543,7 +526,7 @@ h2 em {
 }
 .ft {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
+  font-size: 10.5px;
   letter-spacing: 0.14em;
   color: var(--a);
   opacity: 0.5;
@@ -551,14 +534,14 @@ h2 em {
 }
 .ftt {
   font-family: "Syne", sans-serif;
-  font-size: 16px;
+  font-size: 17.5px;
   font-weight: 700;
   letter-spacing: -0.3px;
   margin-bottom: 8px;
   color: var(--t);
 }
 .fd {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--t2);
   line-height: 1.75;
   font-weight: 300;
@@ -586,11 +569,11 @@ h2 em {
 .btn-a {
   display: inline-flex;
   align-items: center;
-  padding: 12px 24px;
+  padding: 13px 26px;
   background: var(--a);
   color: var(--bg);
   font-family: "Syne", sans-serif;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 700;
   letter-spacing: 0.04em;
   border-radius: 6px;
@@ -615,65 +598,9 @@ h2 em {
   border-color: var(--ba);
   color: var(--a);
 }
-.sbar {
-  padding: 28px 60px;
-  border-top: 1px solid var(--b);
-  background: var(--bg2);
-}
-.slbl {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  color: var(--t3);
-  white-space: nowrap;
-}
-.chips {
-  display: flex;
-  gap: 7px;
-  flex-wrap: wrap;
-}
-.chip {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  padding: 5px 12px;
-  border: 1px solid var(--b);
-  border-radius: 5px;
-  color: var(--t2);
-  transition: all 0.2s;
-}
-.chip:hover {
-  border-color: var(--ba);
-  color: var(--a);
-}
-footer {
-  border-top: 1px solid var(--b);
-  padding: 26px 60px;
-  background: var(--bg2);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.fl {
-  font-family: "Syne", sans-serif;
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: -0.3px;
-  color: var(--t);
-}
-.fl em {
-  color: var(--a);
-  font-style: normal;
-}
-.fr {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  color: var(--t3);
-}
 @media (max-width: 768px) {
   .sec,
-  .cta-in,
-  .sbar,
-  footer {
+  .cta-in {
     padding-left: 24px;
     padding-right: 24px;
   }
