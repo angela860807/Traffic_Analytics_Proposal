@@ -1,46 +1,74 @@
-# ─── Dependencies ───────────────────────────────
-node_modules/
-trafficAS-b/node_modules/
+# Dependencies
+**/node_modules/
 
-# ─── Build output ───────────────────────────────
-dist/
+# Build outputs
 trafficAS-b/dist/
+backend/traffic/build/
+backend/traffic/out/
+backend/traffic/.gradle/
+**/dist/
+**/build/
 
-# ─── Environment (secrets!) ─────────────────────
-.env
-.env.local
-.env.*.local
-trafficAS-b/.env
-trafficAS-b/.env.local
-trafficAS-b/.env.*.local
-!.env.example
+# Environment and secrets
+**/.env
+**/.env.local
+**/.env.*.local
+!**/.env.example
 
-# ─── Vite cache ─────────────────────────────────
-**/node_modules/.vite/
-.vite/
+# Python
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+**/.venv/
+**/venv/
+**/env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# ─── IDE / Editor ───────────────────────────────
-.vscode/
-.idea/
-*.swp
-*.swo
+# FastAPI runtime artifacts
+fastapi-server/storage/
+fastapi-server/models/*.pt
+fastapi-server/sample.jpg
+fastapi-server/capture.jpg
+fastapi-server/capture*.jpg
+fastapi-server/*.png
+fastapi-server/examples/*.jpg
+fastapi-server/examples/*.jpeg
+fastapi-server/examples/*.png
 
-# ─── OS ─────────────────────────────────────────
-.DS_Store
-Thumbs.db
+# Local test media and generated captures
+/no_plate.jpg
+/capture*.jpg
+/test_*.jpg
+raspberry-pi/*.jpg
+raspberry-pi/*.jpeg
+raspberry-pi/*.png
+raspberry-pi/*.mp4
 
-# ─── Logs ───────────────────────────────────────
+# Logs
 *.log
+logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# ─── Python ─────────────────────────────────────
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-venv/
+# IDE and editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*.iws
+*.iml
+*.ipr
 
-# ─── Claude / 임시 산출물 ───────────────────────
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local agent/tooling
 .claude/settings.local.json

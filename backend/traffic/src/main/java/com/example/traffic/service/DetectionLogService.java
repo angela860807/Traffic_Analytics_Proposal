@@ -31,13 +31,13 @@ public class DetectionLogService {
     private final VehicleFlowEventService vehicleFlowEventService;
 
     @Transactional
-    public Long processDetection(DetectionRequest request) {
+    public DetectionResponse processDetection(DetectionRequest request) {
         validateDetectionRequest(request);
         return saveDetectionData(request);
     }
 
     @Transactional
-    public Long saveDetectionData(DetectionRequest request) {
+    public DetectionResponse saveDetectionData(DetectionRequest request) {
         Camera camera = cameraRepository.findByCameraCode(request.getCameraCode())
                 .orElseThrow(() -> new BusinessException("Unknown camera code: " + request.getCameraCode(), HttpStatus.NOT_FOUND));
 
@@ -57,7 +57,7 @@ public class DetectionLogService {
             vehicleFlowEventService.processFlowEvent(savedLog, analysisResult, vehicle);
         }
 
-        return savedLog.getLogId();
+        return DetectionResponse.of(savedLog, analysisResult);
     }
 
     private void validateDetectionRequest(DetectionRequest request) {

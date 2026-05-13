@@ -683,8 +683,10 @@ def test_create_and_send_image_detection_sends_duplicate_status_to_backend(
     second_response = client.post("/api/detections/image/send", **request_kwargs)
 
     assert first_response.status_code == 200
-    assert first_response.json()["message"] == "Detection result sent to backend"
-    assert first_response.json()["analysisStatus"] == "SENT_TO_BACKEND"
+    assert first_response.json()["message"] == (
+        "Detection result saved as FLOW_EVENT_CREATED"
+    )
+    assert first_response.json()["analysisStatus"] == "FLOW_EVENT_CREATED"
     assert second_response.status_code == 200
     assert second_response.json()["message"] == (
         "Duplicate detection sent to backend as DUPLICATE_SKIPPED"
