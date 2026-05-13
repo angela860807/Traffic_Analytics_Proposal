@@ -6,6 +6,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 DirectionType = Literal["IN", "OUT", "BOTH"]
 DetectionType = Literal["VEHICLE", "PLATE"]
+AnalysisStatus = Literal[
+    "ANALYSIS_ONLY",
+    "SENT_TO_BACKEND",
+    "OCR_FAILED",
+    "DUPLICATE_SKIPPED",
+]
 
 
 class RaspberryFrameRequest(BaseModel):
@@ -61,6 +67,26 @@ class DetectionResult(BaseModel):
         alias="imageUrl",
         examples=["/static/detections/2026/04/30/CAM_001_103000_frame.jpg"],
     )
+    plate_crop_image_path: str | None = Field(
+        default=None,
+        alias="plateCropImagePath",
+        examples=["storage/detections/2026/04/30/CAM_001_103000_plate_crop.jpg"],
+    )
+    plate_crop_image_url: str | None = Field(
+        default=None,
+        alias="plateCropImageUrl",
+        examples=["/static/detections/2026/04/30/CAM_001_103000_plate_crop.jpg"],
+    )
+    ocr_image_path: str | None = Field(
+        default=None,
+        alias="ocrImagePath",
+        examples=["storage/detections/2026/04/30/CAM_001_103000_ocr.jpg"],
+    )
+    ocr_image_url: str | None = Field(
+        default=None,
+        alias="ocrImageUrl",
+        examples=["/static/detections/2026/04/30/CAM_001_103000_ocr.jpg"],
+    )
     detected_at: datetime = Field(
         alias="detectedAt",
         examples=["2026-04-30T10:30:00"],
@@ -72,4 +98,11 @@ class DetectionResult(BaseModel):
 class DetectionResponse(BaseModel):
     accepted: bool = Field(examples=[True])
     message: str = Field(examples=["Detection result accepted"])
+    analysis_status: AnalysisStatus | None = Field(
+        default=None,
+        alias="analysisStatus",
+        examples=["OCR_FAILED"],
+    )
     data: DetectionResult | None = None
+
+    model_config = ConfigDict(populate_by_name=True)
