@@ -31,11 +31,10 @@ public class DetectionLogController {
 
     @Operation(summary = "AI 탐지 데이터 처리", description = "AI 서버로부터 받은 데이터를 검증하고 저장합니다.")
     @PostMapping
-    public CommonResponse<Long> processDetection(
-            @RequestHeader(value = "X-Internal-Api-Key", required = false) String apiKey, // 헤더 추가
+    public CommonResponse<DetectionResponse> processDetection(
+            @RequestHeader(value = "X-Internal-Api-Key", required = false) String apiKey,
             @Valid @RequestBody DetectionRequest request) {
 
-        // 1. API Key 존재 여부 및 값 검증 (규약 반영)
         if (apiKey == null) {
             throw new BusinessException("API Key가 누락되었습니다.", HttpStatus.UNAUTHORIZED);
         }
@@ -43,8 +42,8 @@ public class DetectionLogController {
             throw new BusinessException("잘못된 API Key입니다.", HttpStatus.FORBIDDEN);
         }
 
-        Long logId = detectionLogService.processDetection(request);
-        return CommonResponse.success(logId, "탐지 데이터가 성공적으로 처리되었습니다.");
+        DetectionResponse response = detectionLogService.processDetection(request);
+        return CommonResponse.success(response, "탐지 데이터가 성공적으로 처리되었습니다.");
     }
 
     @Operation(summary = "최신 탐지 로그 조회", description = "최근 발생한 탐지 로그 100건을 조회합니다.")

@@ -40,6 +40,40 @@ def build_duplicate_detection_response(result) -> DetectionResponse:
     )
 
 
+def extract_backend_analysis_status(
+    backend_response: dict | None,
+    fallback: str,
+) -> str:
+    if not isinstance(backend_response, dict):
+        return fallback
+
+    data = backend_response.get("data")
+
+    if isinstance(data, dict):
+        status_value = data.get("status")
+        if isinstance(status_value, str) and status_value:
+            return status_value
+
+    return fallback
+
+
+def build_backend_success_response(
+    result,
+    backend_response: dict | None,
+    fallback_status: str = "FLOW_EVENT_CREATED",
+) -> DetectionResponse:
+    analysis_status = extract_backend_analysis_status(
+        backend_response,
+        fallback_status,
+    )
+    return DetectionResponse(
+        accepted=True,
+        message=f"Detection result saved as {analysis_status}",
+        analysis_status=analysis_status,
+        data=result,
+    )
+
+
 def build_spring_error_detail(exc: httpx.HTTPStatusError) -> str:
     status_code = exc.response.status_code
     response_body = exc.response.text.strip()
@@ -140,7 +174,7 @@ async def create_and_send_mock_detection(
         if duplicate_detection_guard.is_duplicate(result):
             await backend_client.send_detection(result, "DUPLICATE_SKIPPED")
             return build_duplicate_detection_response(result)
-        await backend_client.send_detection(result)
+        backend_response = await backend_client.send_detection(result)
         duplicate_detection_guard.remember(result)
     except ValueError as exc:
         raise HTTPException(
@@ -160,12 +194,7 @@ async def create_and_send_mock_detection(
             detail=str(exc),
         ) from exc
 
-    return DetectionResponse(
-        accepted=True,
-        message="Mock detection result sent to backend",
-        analysis_status="SENT_TO_BACKEND",
-        data=result,
-    )
+    return build_backend_success_response(result, backend_response)
 
 @router.post("/image/send", response_model=DetectionResponse)
 async def create_and_send_detection_from_image(
@@ -193,7 +222,7 @@ async def create_and_send_detection_from_image(
         if duplicate_detection_guard.is_duplicate(result):
             await backend_client.send_detection(result, "DUPLICATE_SKIPPED")
             return build_duplicate_detection_response(result)
-        await backend_client.send_detection(result)
+        backend_response = await backend_client.send_detection(result)
         duplicate_detection_guard.remember(result)
     except ValueError as exc:
         raise HTTPException(
@@ -213,9 +242,4 @@ async def create_and_send_detection_from_image(
             detail=str(exc),
         ) from exc
 
-    return DetectionResponse(
-        accepted=True,
-        message="Detection result sent to backend",
-        analysis_status="SENT_TO_BACKEND",
-        data=result,
-    )
+    return build_backend_success_response(result, backend_response)

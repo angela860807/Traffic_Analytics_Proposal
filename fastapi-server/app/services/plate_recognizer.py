@@ -40,18 +40,30 @@ class PlateRecognizer:
 
             self._ocr = PaddleOCR(
                 lang=OCR_LANG,
-                use_angle_cls=True,
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
+                use_textline_orientation=False,
+                text_rec_score_thresh=OCR_MIN_CONFIDENCE,
+                enable_mkldnn=False,
             )
 
         return self._ocr
 
     def _merge_ocr_result(self, ocr_result) -> tuple[str | None, float]:
-        if not ocr_result or not ocr_result[0]:
+        if not ocr_result:
+            return None, 0.0
+
+        first_result = ocr_result[0]
+
+        if isinstance(first_result, dict):
+            return self._merge_paddleocr_v3_result(first_result)
+
+        if not first_result:
             return None, 0.0
 
         ocr_lines = []
 
-        for line in ocr_result[0]:
+        for line in first_result:
             points = line[0]
             text = line[1][0]
             prob = float(line[1][1])
@@ -66,12 +78,57 @@ class PlateRecognizer:
                 }
             )
 
+        return self._merge_sorted_lines(ocr_lines)
+
+    def _merge_paddleocr_v3_result(self, ocr_result: dict) -> tuple[str | None, float]:
+        texts = ocr_result.get("rec_texts") or []
+        scores = ocr_result.get("rec_scores") or []
+        boxes = ocr_result.get("rec_boxes")
+
+        if boxes is None or len(boxes) == 0:
+            boxes = ocr_result.get("rec_polys")
+
+        if boxes is None:
+            boxes = []
+
+        if not texts:
+            return None, 0.0
+
+        ocr_lines = []
+
+        for index, text in enumerate(texts):
+            prob = float(scores[index]) if index < len(scores) else 0.0
+            box = boxes[index] if index < len(boxes) else None
+            x_min = self._extract_min_x(box) if box is not None else index
+
+            ocr_lines.append(
+                {
+                    "text": text,
+                    "prob": prob,
+                    "x": x_min,
+                }
+            )
+
+        return self._merge_sorted_lines(ocr_lines)
+
+    def _merge_sorted_lines(self, ocr_lines: list[dict]) -> tuple[str | None, float]:
+        if not ocr_lines:
+            return None, 0.0
+
         ocr_lines.sort(key=lambda item: item["x"])
 
         full_text = "".join(item["text"] for item in ocr_lines)
         avg_prob = sum(item["prob"] for item in ocr_lines) / len(ocr_lines)
 
         return full_text, avg_prob
+
+    def _extract_min_x(self, box) -> float:
+        points = np.asarray(box)
+
+        if points.ndim == 1:
+            return float(points[0])
+
+        return float(points[:, 0].min())
 
     def _normalize_plate_number(self, text: str | None) -> str | None:
         if not text:

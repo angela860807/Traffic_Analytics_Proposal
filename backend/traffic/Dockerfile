@@ -1,6 +1,6 @@
 FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
-COPY . .
+COPY backend/traffic/ .
 RUN ./gradlew clean bootJar -x test
 
 FROM eclipse-temurin:21-jre
