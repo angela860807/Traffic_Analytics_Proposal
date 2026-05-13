@@ -101,12 +101,12 @@ http://<PC_LAN_IP>:8000/api/camera/live
 업로드 스크립트는 FastAPI 응답 메시지를 기준으로 예상 저장 상태를 출력한다.
 
 ```text
-backendStatus=SENT_TO_BACKEND      정상 인식, Spring에서 flow event 생성 대상
-backendStatus=OCR_FAILED           번호판 미인식, detection_logs만 저장
-backendStatus=DUPLICATE_SKIPPED    FastAPI 중복 판정, detection_logs만 저장
-backendStatus=ANALYSIS_ONLY        /api/detections/image 분석 전용 응답
+analysisStatus=SENT_TO_BACKEND      정상 인식, Spring에서 분석 결과/flow event 생성 대상
+analysisStatus=OCR_FAILED           번호판 미인식, detection_analysis_results에 결과 저장
+analysisStatus=DUPLICATE_SKIPPED    FastAPI 중복 판정, detection_analysis_results에 결과 저장
+analysisStatus=ANALYSIS_ONLY        /api/detections/image 분석 전용 응답
 ```
 
-DB에서 최종 확인할 때는 `detection_logs.status`를 본다.
+DB에서 최종 확인할 때는 원본 수신 여부는 `detection_logs`, 처리 결과는 `detection_analysis_results.status`를 본다.
 
 `.env`, `venv`, 캡처 이미지, 로그 파일은 Git에 올리지 않는다.

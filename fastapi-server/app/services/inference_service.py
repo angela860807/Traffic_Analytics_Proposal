@@ -86,17 +86,19 @@ class InferenceService:
             image_path = existing_image_path.replace("\\", "/")
 
         image_url = self.image_storage_service.build_detection_image_url(image_path)
+        plate_crop_image_path = None
+        plate_crop_image_url = None
+        ocr_image_path = None
+        ocr_image_url = None
 
         detection_image = preprocess_frame_for_detection(image)
         detection = self.plate_detector.detect(detection_image)
+        confidence_score = detection.confidence_score
 
         if detection.bbox is None:
-            if detection.detection_type == "PLATE":
-                plate_number = "123가4567"
-                detection_type = "PLATE"
-            else:
-                plate_number = None
-                detection_type = "VEHICLE"
+            plate_number = None
+            detection_type = "VEHICLE"
+            confidence_score = 0.0
         elif detection.confidence_score < DETECTION_CONFIDENCE_THRESHOLD:
             plate_number = None
             detection_type = "VEHICLE"
@@ -104,21 +106,27 @@ class InferenceService:
             plate_crop = crop_plate_with_padding(image, detection.bbox)
 
             if SAVE_PLATE_CROP:
-                self.image_storage_service.save_detection_image(
+                plate_crop_image_path = self.image_storage_service.save_detection_image(
                     image=plate_crop,
                     camera_code=camera_code,
                     captured_at=captured_at,
                     suffix="plate_crop",
                 )
+                plate_crop_image_url = self.image_storage_service.build_detection_image_url(
+                    plate_crop_image_path,
+                )
 
             ocr_image = preprocess_plate_for_ocr(plate_crop)
 
             if SAVE_OCR_PREPROCESSED_IMAGE:
-                self.image_storage_service.save_detection_image(
+                ocr_image_path = self.image_storage_service.save_detection_image(
                     image=ocr_image,
                     camera_code=camera_code,
                     captured_at=captured_at,
                     suffix="ocr",
+                )
+                ocr_image_url = self.image_storage_service.build_detection_image_url(
+                    ocr_image_path,
                 )
 
             recognition = self.plate_recognizer.recognize(ocr_image)
@@ -131,10 +139,14 @@ class InferenceService:
             plate_number=plate_number,
             detection_type=detection_type,
             direction_type="IN",
-            confidence_score=detection.confidence_score,
+            confidence_score=confidence_score,
             image_path=image_path,
-            detected_at=captured_at,
             image_url=image_url,
+            plate_crop_image_path=plate_crop_image_path,
+            plate_crop_image_url=plate_crop_image_url,
+            ocr_image_path=ocr_image_path,
+            ocr_image_url=ocr_image_url,
+            detected_at=captured_at,
         )
 
 

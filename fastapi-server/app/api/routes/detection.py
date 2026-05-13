@@ -26,6 +26,7 @@ def build_unrecognized_plate_response(result) -> DetectionResponse:
     return DetectionResponse(
         accepted=True,
         message="Detection result sent to backend as OCR_FAILED",
+        analysis_status="OCR_FAILED",
         data=result,
     )
 
@@ -34,6 +35,7 @@ def build_duplicate_detection_response(result) -> DetectionResponse:
     return DetectionResponse(
         accepted=True,
         message="Duplicate detection sent to backend as DUPLICATE_SKIPPED",
+        analysis_status="DUPLICATE_SKIPPED",
         data=result,
     )
 
@@ -79,6 +81,7 @@ async def create_mock_detection(
     return DetectionResponse(
         accepted=True,
         message="Mock detection result created",
+        analysis_status="ANALYSIS_ONLY",
         data=result,
     )
 
@@ -116,6 +119,7 @@ async def create_detection_from_image(
     return DetectionResponse(
         accepted=True,
         message="Detection result created from image",
+        analysis_status="ANALYSIS_ONLY",
         data=result,
     )
 
@@ -159,6 +163,7 @@ async def create_and_send_mock_detection(
     return DetectionResponse(
         accepted=True,
         message="Mock detection result sent to backend",
+        analysis_status="SENT_TO_BACKEND",
         data=result,
     )
 
@@ -211,5 +216,6 @@ async def create_and_send_detection_from_image(
     return DetectionResponse(
         accepted=True,
         message="Detection result sent to backend",
+        analysis_status="SENT_TO_BACKEND",
         data=result,
     )
