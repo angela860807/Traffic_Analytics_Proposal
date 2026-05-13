@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: traffic
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/traffic
+    username: postgres
+    password: 1004
+  sql:
+    init:
+      mode: always
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    defer-datasource-initialization: true
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+# JWT 설정은 spring 외부(Root)로 빼는 것이 관례이며 관리가 편합니다
+jwt:
+  secret: c2lsdmVybmluZS10ZWNoLXNwcmluZy1ib290LWp3dC10dXRvcmlhbC1zZWNyZXQtc2lsdmVybmluZS10ZWNoLXNwcmluZy1ib290LWp3dC10dXRvcmlhbC1zZWNyZXQK
+  access-token-expiration: 3600000       # 1시간 (ms)
+  refresh-token-expiration: 1209600000  # 14일 (ms)
+
+logging:
+  level:
+    com.example.traffic: debug
+    org.springframework.security: info # 들여쓰기 정렬
+
+app:
+  api:
+    # 환경변수 INTERNAL_API_KEY가 있으면 사용하고, 없으면 우측의 기본값 사용
+    internal-key: ${INTERNAL_API_KEY:traffic-ai-internal-key-2026}

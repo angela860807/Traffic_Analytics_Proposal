@@ -175,7 +175,7 @@ const handleLogin = async () => {
   loading.value = true;
   await new Promise((r) => setTimeout(r, 600));
   try {
-    login(email.value, password.value);
+    await login(email.value, password.value);
     router.push(isAdmin.value ? '/dashboard' : '/');
   } catch (e) {
     error.value = e.message;
