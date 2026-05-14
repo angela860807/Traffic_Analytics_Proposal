@@ -432,13 +432,12 @@
 
 <script setup>
 import { ref, computed } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { RouterLink } from "vue-router";
 import { useTheme } from "@/composables/useTheme";
 import { useAuth } from "@/composables/useAuth";
 
 const { isDark } = useTheme();
 const { signup } = useAuth();
-const router = useRouter();
 
 const step = ref(1);
 const name = ref("");
@@ -533,7 +532,7 @@ const handleSubmit = async () => {
   await new Promise((r) => setTimeout(r, 700));
   try {
     await signup(name.value, email.value, phone.value, password.value);
-    router.push("/");
+    // useAuth.signup()이 내부적으로 홈으로 이동시킴
   } catch (e) {
     error.value = e.message;
   } finally {

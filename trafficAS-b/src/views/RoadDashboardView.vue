@@ -699,6 +699,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch, defineAsyncComp
 import { useRouter } from "vue-router";
 import { useAuth } from "@/composables/useAuth";
 import { useDashboardData } from "@/composables/useDashboardData";
+import { useVideoOptimize } from "@/composables/useVideoOptimize";
 import * as echarts from "echarts";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -750,6 +751,9 @@ const activeTab = ref("overview");
 /* 한 번이라도 클릭된 탭만 마운트 — 첫 진입 시 overview 외 탭 컴포넌트는 다운로드/렌더 안 됨 */
 const visitedTabs = ref(new Set(["overview"]));
 watch(activeTab, (v) => { visitedTabs.value.add(v); });
+
+/* 비디오 최적화 — overview 탭일 때만 6분할 영상 재생, 탭 비활성/뷰포트 밖 자동 정지 */
+useVideoOptimize({ active: () => activeTab.value === "overview", selector: ".v2-cam-video" });
 
 /* ── 헤더 ── */
 const showNotif = ref(false);

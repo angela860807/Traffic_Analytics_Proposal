@@ -14,7 +14,7 @@ CCTV 기반 번호판 자동 인식(ANPR), 구역별 혼잡도 히트맵, 차량
 
 - **Frontend:** Vue 3 (`<script setup>` Composition API) + Vue Router 4
 - **백엔드 API:** FastAPI (`VITE_FASTAPI_BASE_URL`) — 도로 혼잡도, 최근 OCR 인식 결과 등
-- **AI 채팅:** Groq API (LLaMA 3.3-70B) 기반 교통 관제 어시스턴트
+- **실시간 채팅:** 키워드 매칭 + 대시보드 실시간 상태 조회 기반 어시스턴트 (외부 API 의존 없음)
 - **시각화:** ECharts (혼잡도/도넛/통계 차트), Leaflet (지도/히트맵)
 - **도로 geometry:** OpenStreetMap Overpass API + 24시간 localStorage 캐시
 - **배포:** Vite 정적 빌드 → 웹 서버 배포
@@ -31,8 +31,8 @@ CCTV 기반 번호판 자동 인식(ANPR), 구역별 혼잡도 히트맵, 차량
     ├── Overpass API → overpass-api.de (다중 미러 + 캐시)
     │                  └── 강남/서초/송파 주요 도로 geometry
     │
-    └── Groq API ───→ LLaMA 3.3-70B
-                       └── AI 교통 관제 어시스턴트
+    └── 실시간 채팅 (로컬)
+                       └── 키워드 매칭 + 대시보드 상태 실시간 조회
 ```
 
 ---
@@ -77,7 +77,6 @@ CCTV 기반 번호판 자동 인식(ANPR), 구역별 혼잡도 히트맵, 차량
 - FastAPI REST 호출 (`/api/v1/road-congestion`, `/api/v1/plates/recent`)
 - Spring Boot (Java 백엔드 — 도메인 엔티티 / DB)
 - YOLO + OCR 엔진 (차량/번호판 감지)
-- Groq API — LLaMA 3.3-70B-Versatile (교통 관제 어시스턴트)
 - HTMLVideoElement (실시간 CCTV 영상 6분할)
 
 ### 6-3 인증 / 상태 관리
@@ -114,8 +113,8 @@ Vue 3 SPA (Vite)
     ├── Overpass API → 다중 미러 (overpass-api.de / kumi.systems / private.coffee / lz4)
     │                     └── 강남/서초/송파 motorway~secondary 도로
     │
-    └── Groq API ─────→ LLaMA 3.3-70B
-                          └── AI 교통 관제 어시스턴트 (한국어 전용)
+    └── 실시간 채팅 (로컬 키워드 매칭)
+                          └── 대시보드 상태 실시간 조회 + 자동 이벤트 푸시
 ```
 
 ---
@@ -150,8 +149,8 @@ npm install
 ### 9-3 환경 변수 설정 (`.env`)
 
 ```env
+VITE_API_BASE_URL=http://localhost:8080       # Spring Boot 서버 주소
 VITE_FASTAPI_BASE_URL=http://localhost:8000   # FastAPI 서버 주소 (비어있으면 데모 모드)
-VITE_GROQ_API_KEY=gsk_...                     # Groq API 키 (선택)
 ```
 
 > `VITE_FASTAPI_BASE_URL`이 비어있으면 모든 API 호출이 우회되고 데모 데이터(랜덤)로 동작합니다.
@@ -206,7 +205,7 @@ trafficAS-b/
 │   │   ├── AppFab.vue                # 플로팅 버튼 (채팅/테마/상단이동)
 │   │   ├── AppFooter.vue             # 공통 푸터 (4컬럼, 마케팅 페이지용)
 │   │   ├── AuthModal.vue             # 로그인/회원가입 모달
-│   │   ├── ChatTab.vue               # AI 채팅 (Groq API)
+│   │   ├── ChatTab.vue               # 실시간 채팅 (키워드 매칭 + 대시보드 상태 조회)
 │   │   ├── BoardTab.vue              # 커뮤니티 게시판
 │   │   ├── QnaTab.vue                # Q&A
 │   │   ├── HeroStats.vue             # 메인 히어로 통계 카운터
@@ -324,10 +323,13 @@ trafficAS-b/
 - 알림 패널: 12건 표시 + 편집 모드 (개별 X 삭제 / 전체 삭제)
 - 외부 클릭 시 자동 닫힘
 
-### 11-9 AI 교통 어시스턴트
+### 11-9 실시간 관제 어시스턴트 (채팅)
 
-- Groq API (LLaMA 3.3-70B) 기반 한국어 전용 챗봇
-- 교통 관제 특화 시스템 프롬프트
+- **키워드 매칭** + 대시보드 실시간 상태(`useDashboardData`) 직접 조회로 즉답 — 외부 API 의존 없음
+- 빠른 명령 칩 5개 (시스템 상태 / 카메라 현황 / 혼잡 TOP3 / 통행량 / 알림)
+- 새 알림 발생 시 채팅창에 자동 푸시 (LIVE/OFF 토글)
+- 헤더에 실시간 카메라 가동 수 표시 (5초 갱신)
+- DEMO 모드 — 백엔드 미연동 시 8~15초마다 샘플 이벤트 시뮬레이션 (운영 환경에선 자동 OFF)
 
 ### 11-10 동적 날짜 처리
 
@@ -350,7 +352,7 @@ trafficAS-b/
 - 채널별 아이콘 + 활성 시 글로우 효과 + LIVE 펄스 도트
 - 게시판: 검색·페이지네이션·댓글 CRUD·검색어 하이라이트
 - Q&A: 질문·답변·관리자 권한·상태 배지(답변 대기/답변 완료)
-- 채팅: Groq API 기반 AI 어시스턴트 (LLaMA 3.3-70B)
+- 채팅: 키워드 매칭 + 대시보드 실시간 상태 조회 어시스턴트 (외부 API 의존 없음, 자동 이벤트 푸시)
 
 ---
 
