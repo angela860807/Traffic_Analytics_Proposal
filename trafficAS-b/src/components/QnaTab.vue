@@ -2,7 +2,34 @@
   <div class="qna">
     <div class="top-row">
       <p class="info">궁금한 점을 질문하고 전문가 답변을 받으세요.</p>
-      <button class="wbtn">질문하기</button>
+      <button class="wbtn" @click="openQuestionForm">질문하기</button>
+    </div>
+
+    <div v-if="message" class="notice" :class="messageType">{{ message }}</div>
+
+    <div class="question-form-wrap" v-if="showQuestionForm">
+      <input
+        v-model="questionTitle"
+        class="q-input"
+        type="text"
+        placeholder="질문 제목을 입력하세요"
+      />
+      <textarea
+        v-model="questionContent"
+        class="cta"
+        rows="4"
+        placeholder="질문 내용을 입력하세요"
+      />
+      <div class="cbtns">
+        <button class="cbtn-cancel" @click="closeQuestionForm">취소</button>
+        <button
+          class="cbtn-save"
+          :disabled="savingQuestion || !questionTitle.trim() || !questionContent.trim()"
+          @click="createQuestion"
+        >
+          질문 등록
+        </button>
+      </div>
     </div>
 
     <div class="search-bar">
@@ -130,31 +157,9 @@
                 </svg>
                 관리자 답변
                 <span class="answer-time">{{ getAnswer(q.id).time }}</span>
-                <button class="cact" v-if="isAdmin" @click="startAnswerEdit(q.id)">
-                  수정
-                </button>
               </div>
-              <div v-if="editingAnswerId !== q.id" class="answer-text">
+              <div class="answer-text">
                 {{ getAnswer(q.id).text }}
-              </div>
-              <!-- 관리자 수정 폼 -->
-              <div class="answer-form" v-else>
-                <textarea
-                  class="cta"
-                  v-model="answerDraft"
-                  rows="4"
-                  placeholder="답변을 입력하세요..."
-                />
-                <div class="cbtns">
-                  <button
-                    class="cbtn-save"
-                    @click="saveAnswer(q.id)"
-                    :disabled="!answerDraft.trim()"
-                  >
-                    저장
-                  </button>
-                  <button class="cbtn-cancel" @click="cancelAnswerEdit">취소</button>
-                </div>
               </div>
             </div>
 
@@ -188,7 +193,7 @@
                   <button
                     class="cbtn-save"
                     @click="saveAnswer(q.id)"
-                    :disabled="!answerDraft.trim()"
+                    :disabled="savingAnswer || !answerDraft.trim()"
                   >
                     답변 등록
                   </button>
@@ -232,7 +237,7 @@
           <circle cx="11" cy="11" r="8" />
           <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
-        <span>검색 결과가 없습니다.</span>
+        <span>{{ loading ? "Q&A 목록을 불러오는 중입니다." : "검색 결과가 없습니다." }}</span>
       </div>
     </div>
 
@@ -251,26 +256,38 @@
       >
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
       </svg>
-      관리자 모드 활성화 — 답변 작성/수정 가능
+      관리자 모드 활성화 — 답변 작성 가능
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { apiClient, apiGet } from "@/api/client";
 import { useAuth } from "../composables/useAuth";
 
-const { isAdmin } = useAuth();
+const { isAdmin, isLoggedIn, openLogin } = useAuth();
 
 const query = ref("");
 const expandedId = ref(null);
 const answerDraft = ref("");
-const editingAnswerId = ref(null);
+const loading = ref(false);
+const savingQuestion = ref(false);
+const savingAnswer = ref(false);
+const showQuestionForm = ref(false);
+const questionTitle = ref("");
+const questionContent = ref("");
+const message = ref("");
+const messageType = ref("info");
+const items = ref([]);
+const answersStore = ref({});
 
-const answersStore = ref(JSON.parse(localStorage.getItem("tas_qna_answers") || "{}"));
-
-function persist() {
-  localStorage.setItem("tas_qna_answers", JSON.stringify(answersStore.value));
+function showMessage(text, type = "info") {
+  message.value = text;
+  messageType.value = type;
+  window.setTimeout(() => {
+    if (message.value === text) message.value = "";
+  }, 3000);
 }
 
 function getAnswer(itemId) {
@@ -278,104 +295,137 @@ function getAnswer(itemId) {
 }
 
 function getStatus(item) {
-  return answersStore.value[item.id] ? "답변완료" : item.status;
+  return answersStore.value[item.id] || item.rawStatus === "ANSWERED" ? "답변완료" : "대기중";
 }
 
 function getStatusCls(item) {
-  return answersStore.value[item.id] ? "done" : item.cls;
+  return answersStore.value[item.id] || item.rawStatus === "ANSWERED" ? "done" : "wait";
 }
 
-function toggle(itemId) {
+async function toggle(itemId) {
   if (expandedId.value === itemId) {
     expandedId.value = null;
   } else {
     expandedId.value = itemId;
     cancelAnswerEdit();
     if (!getAnswer(itemId)) answerDraft.value = "";
+    await loadQuestionDetail(itemId);
   }
 }
 
-function startAnswerEdit(itemId) {
-  editingAnswerId.value = itemId;
-  answerDraft.value = getAnswer(itemId)?.text || "";
-}
-
 function cancelAnswerEdit() {
-  editingAnswerId.value = null;
   answerDraft.value = "";
 }
 
-function saveAnswer(itemId) {
-  const text = answerDraft.value.trim();
-  if (!text || !isAdmin.value) return;
-  const now = new Date();
-  const time = `${String(now.getMonth() + 1).padStart(2, "0")}.${String(
-    now.getDate()
-  ).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(
-    now.getMinutes()
-  ).padStart(2, "0")}`;
-  answersStore.value[itemId] = { text, time };
-  persist();
-  cancelAnswerEdit();
+function openQuestionForm() {
+  if (!isLoggedIn.value) {
+    openLogin();
+    showMessage("로그인 후 질문을 등록할 수 있습니다.", "warn");
+    return;
+  }
+  showQuestionForm.value = true;
 }
 
-const items = [
-  {
-    id: 1,
-    title: "영상 업로드 후 재생이 안 되는 문제",
-    body:
-      "동영상을 업로드했는데 카드에서 재생이 되지 않습니다. 지원 포맷과 용량 제한이 어떻게 되는지 알고 싶습니다.",
-    author: "user06",
-    status: "답변완료",
-    cls: "done",
+function closeQuestionForm() {
+  showQuestionForm.value = false;
+  questionTitle.value = "";
+  questionContent.value = "";
+}
+
+function normalizeQuestion(q) {
+  return {
+    id: q.questionId,
+    title: q.title,
+    body: q.content,
+    author: q.authorName || "-",
+    rawStatus: q.status,
+    status: q.status === "ANSWERED" ? "답변완료" : "대기중",
+    cls: q.status === "ANSWERED" ? "done" : "wait",
     isNew: false,
-  },
-  {
-    id: 2,
-    title: "카메라 RTSP 주소 형식이 어떻게 되나요?",
-    body:
-      "NVR에 연결된 카메라의 RTSP 스트림 주소를 TrafficAS에 등록하려고 하는데, 정확한 주소 형식이 궁금합니다.",
-    author: "user07",
-    status: "답변완료",
-    cls: "done",
-    isNew: false,
-  },
-  {
-    id: 3,
-    title: "번호판 인식률이 70%대에 머물러요",
-    body:
-      "야간에 번호판 인식률이 70~75% 수준입니다. 카메라 해상도는 1080p이고 조명 조건은 가로등 수준입니다. 개선 방법이 있을까요?",
-    author: "user08",
-    status: "답변중",
-    cls: "ing",
-    isNew: true,
-  },
-  {
-    id: 4,
-    title: "Docker 환경에서 GPU 설정 방법",
-    body:
-      "Docker Compose로 배포 시 NVIDIA GPU를 AI 서버에서 사용하려면 어떤 설정이 필요한지 알려주세요.",
-    author: "user09",
-    status: "대기중",
-    cls: "wait",
-    isNew: true,
-  },
-  {
-    id: 5,
-    title: "Spring Boot 토큰 만료 시간 설정",
-    body:
-      "JWT 토큰 만료 시간을 변경하고 싶습니다. application.yml에서 수정하면 되는지, 다른 곳도 변경해야 하는지 알고 싶습니다.",
-    author: "user10",
-    status: "답변완료",
-    cls: "done",
-    isNew: false,
-  },
-];
+  };
+}
+
+function normalizeAnswer(answer) {
+  if (!answer) return null;
+  const createdAt = answer.createdAt ? new Date(answer.createdAt) : null;
+  const time = createdAt && !Number.isNaN(createdAt.getTime())
+    ? `${String(createdAt.getMonth() + 1).padStart(2, "0")}.${String(createdAt.getDate()).padStart(2, "0")} ${String(createdAt.getHours()).padStart(2, "0")}:${String(createdAt.getMinutes()).padStart(2, "0")}`
+    : "";
+  return {
+    id: answer.answerId,
+    text: answer.content,
+    author: answer.authorName || "관리자",
+    time,
+  };
+}
+
+async function loadQuestions() {
+  loading.value = true;
+  try {
+    const body = await apiGet("/api/qna/questions");
+    items.value = Array.isArray(body.data) ? body.data.map(normalizeQuestion) : [];
+  } catch (error) {
+    console.warn("Failed to load QNA questions", error);
+    showMessage("Q&A 목록을 불러오지 못했습니다.", "error");
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function loadQuestionDetail(itemId) {
+  try {
+    const body = await apiGet(`/api/qna/questions/${itemId}`);
+    const answer = normalizeAnswer(body.data?.answer);
+    if (answer) {
+      answersStore.value = { ...answersStore.value, [itemId]: answer };
+    }
+  } catch (error) {
+    console.warn("Failed to load QNA detail", error);
+    showMessage("질문 상세 정보를 불러오지 못했습니다.", "error");
+  }
+}
+
+async function createQuestion() {
+  if (!questionTitle.value.trim() || !questionContent.value.trim()) return;
+  savingQuestion.value = true;
+  try {
+    await apiClient.post("/api/qna/questions", {
+      title: questionTitle.value.trim(),
+      content: questionContent.value.trim(),
+    });
+    closeQuestionForm();
+    await loadQuestions();
+    showMessage("질문이 등록되었습니다.", "success");
+  } catch (error) {
+    console.warn("Failed to create QNA question", error);
+    showMessage("질문 등록에 실패했습니다.", "error");
+  } finally {
+    savingQuestion.value = false;
+  }
+}
+
+async function saveAnswer(itemId) {
+  const text = answerDraft.value.trim();
+  if (!text || !isAdmin.value) return;
+  savingAnswer.value = true;
+  try {
+    await apiClient.post(`/api/qna/questions/${itemId}/answers`, { content: text });
+    answerDraft.value = "";
+    await loadQuestionDetail(itemId);
+    await loadQuestions();
+    showMessage("답변이 등록되었습니다.", "success");
+  } catch (error) {
+    console.warn("Failed to save QNA answer", error);
+    showMessage("답변 등록에 실패했습니다.", "error");
+  } finally {
+    savingAnswer.value = false;
+  }
+}
 
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase();
-  if (!q) return items;
-  return items.filter(
+  if (!q) return items.value;
+  return items.value.filter(
     (i) => i.title.toLowerCase().includes(q) || i.author.toLowerCase().includes(q)
   );
 });
@@ -386,6 +436,8 @@ const highlight = (text) => {
   const re = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
   return text.replace(re, "<mark>$1</mark>");
 };
+
+onMounted(loadQuestions);
 </script>
 
 <style scoped>
@@ -417,6 +469,60 @@ const highlight = (text) => {
 }
 .wbtn:hover {
   opacity: 0.87;
+}
+
+.notice {
+  margin-bottom: 10px;
+  padding: 9px 12px;
+  border-radius: 5px;
+  border: 1px solid var(--b);
+  font-size: 12px;
+  color: var(--t2);
+  background: var(--bg2);
+}
+.notice.success {
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.25);
+  background: rgba(52, 211, 153, 0.06);
+}
+.notice.warn {
+  color: #fb923c;
+  border-color: rgba(251, 146, 60, 0.25);
+  background: rgba(251, 146, 60, 0.06);
+}
+.notice.error {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.25);
+  background: rgba(248, 113, 113, 0.06);
+}
+
+.question-form-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 12px;
+  background: var(--bg2);
+  border: 1px solid var(--b);
+  border-radius: 7px;
+}
+.q-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: 1px solid var(--b);
+  border-radius: 5px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--t);
+  font-family: "Noto Sans KR", sans-serif;
+  outline: none;
+}
+.q-input:focus {
+  border-color: var(--ba);
+}
+.q-input::placeholder {
+  color: var(--t3);
 }
 
 /* ── 검색바 ── */

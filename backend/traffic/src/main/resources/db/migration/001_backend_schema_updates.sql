@@ -1,30 +1,47 @@
--- Development migration notes for backend schema changes.
--- Apply manually when the local PostgreSQL schema is behind the Spring entities.
+-- Manual PostgreSQL migration for the 3rd-merge detection pipeline.
+-- Apply this to shared/demo databases even though ddl-auto=update remains enabled.
+-- This project does not enable an automatic migration runner yet; apply with psql.
 
--- 1. detection_logs.status legacy column
--- Kept for existing shared DBs during stabilization. New code writes status to
--- detection_analysis_results instead of updating detection_logs.
+-- 1. detection_logs legacy columns kept for existing shared DB compatibility.
 ALTER TABLE detection_logs
 ADD COLUMN IF NOT EXISTS status VARCHAR(30) NOT NULL DEFAULT 'RECEIVED';
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'detection_logs'
+          AND column_name = 'plate_number'
+    ) THEN
+        ALTER TABLE detection_logs ALTER COLUMN plate_number DROP NOT NULL;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'detection_logs'
+          AND column_name = 'detection_type'
+    ) THEN
+        ALTER TABLE detection_logs ALTER COLUMN detection_type DROP NOT NULL;
+    END IF;
+END $$;
+
+ALTER TABLE detection_logs DROP CONSTRAINT IF EXISTS detection_logs_status_check;
+ALTER TABLE detection_logs
+ADD CONSTRAINT detection_logs_status_check
+CHECK (status IN ('RECEIVED', 'OCR_FAILED', 'FLOW_EVENT_CREATED', 'DUPLICATE_SKIPPED'));
 
 CREATE INDEX IF NOT EXISTS idx_status
 ON detection_logs(status);
 
--- Append-only detection_logs no longer writes result columns. Keep legacy
--- columns nullable until they are removed after stabilization.
-ALTER TABLE detection_logs
-ALTER COLUMN plate_number DROP NOT NULL;
-
-ALTER TABLE detection_logs
-ALTER COLUMN detection_type DROP NOT NULL;
-
--- 2. traffic_analysis_index.zone_id
+-- 2. traffic_analysis_index.zone_id.
 ALTER TABLE traffic_analysis_index
 ADD COLUMN IF NOT EXISTS zone_id BIGINT;
 
 -- Run only after confirming traffic_analysis_index has no rows with zone_id IS NULL.
-ALTER TABLE traffic_analysis_index
-ALTER COLUMN zone_id SET NOT NULL;
+-- ALTER TABLE traffic_analysis_index
+-- ALTER COLUMN zone_id SET NOT NULL;
 
 DO $$
 BEGIN
@@ -43,14 +60,14 @@ END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS uk_traffic_analysis_index_zone
 ON traffic_analysis_index(zone_id);
 
--- 3. vehicle_flow_events analysis columns
+-- 3. vehicle_flow_events analysis columns.
 ALTER TABLE vehicle_flow_events
 ADD COLUMN IF NOT EXISTS speed NUMERIC(5, 2) DEFAULT 0.00;
 
 ALTER TABLE vehicle_flow_events
 ADD COLUMN IF NOT EXISTS stay_time BIGINT DEFAULT 0;
 
--- 4. hourly_traffic_stats extended analysis columns
+-- 4. hourly_traffic_stats extended analysis columns.
 ALTER TABLE hourly_traffic_stats
 ADD COLUMN IF NOT EXISTS average_speed NUMERIC(5, 2) NOT NULL DEFAULT 0.00;
 
@@ -66,7 +83,7 @@ ADD COLUMN IF NOT EXISTS duplicate_vehicle_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE hourly_traffic_stats
 ADD COLUMN IF NOT EXISTS last_log_id BIGINT NOT NULL DEFAULT 0;
 
--- 5. detection_analysis_results append-only processing result table
+-- 5. detection_analysis_results append-only processing result table.
 CREATE TABLE IF NOT EXISTS detection_analysis_results (
     analysis_result_id BIGSERIAL PRIMARY KEY,
     detection_log_id BIGINT NOT NULL REFERENCES detection_logs(detection_log_id),
