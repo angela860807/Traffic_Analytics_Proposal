@@ -151,13 +151,12 @@
 
 <script setup>
 import { ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { RouterLink } from "vue-router";
 import { useTheme } from "@/composables/useTheme";
 import { useAuth } from "@/composables/useAuth";
 
 const { isDark } = useTheme();
-const { login, isAdmin } = useAuth();
-const router = useRouter();
+const { login } = useAuth();
 
 const email = ref("");
 const password = ref("");
@@ -176,7 +175,7 @@ const handleLogin = async () => {
   await new Promise((r) => setTimeout(r, 600));
   try {
     await login(email.value, password.value);
-    router.push(isAdmin.value ? '/dashboard' : '/');
+    // useAuth.login()이 내부적으로 홈으로 이동시킴
   } catch (e) {
     error.value = e.message;
   } finally {

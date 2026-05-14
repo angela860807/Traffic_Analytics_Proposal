@@ -2,7 +2,10 @@
   <div class="board">
     <div class="top-row">
       <p class="info">사용 후기, 활용 사례, 공지사항을 공유하세요.</p>
-      <button class="wbtn">글쓰기</button>
+      <button class="wbtn" :disabled="!isLoggedIn" @click="onWrite"
+              :title="isLoggedIn ? '새 글 작성' : '로그인이 필요합니다'">
+        <i class="bi bi-pencil-square"></i> 글쓰기
+      </button>
     </div>
 
     <div class="search-bar">
@@ -102,6 +105,11 @@ import { ref, computed } from "vue";
 import { useAuth } from "../composables/useAuth";
 
 const { isLoggedIn, currentUser, openLogin } = useAuth();
+
+function onWrite() {
+  if (!isLoggedIn.value) { openLogin(); return; }
+  alert('게시판 글쓰기 기능은 곧 추가됩니다.');
+}
 
 const query = ref("");
 const expandedId = ref(null);
@@ -218,7 +226,9 @@ const highlight = (text) => {
   font-weight: 700; letter-spacing: 0.08em; border-radius: 4px;
   cursor: pointer; border: none;
 }
-.wbtn:hover { opacity: 0.87; }
+.wbtn:hover:not(:disabled) { opacity: 0.87; }
+.wbtn:disabled { opacity: 0.45; cursor: not-allowed; }
+.wbtn i { margin-right: 4px; }
 
 /* ── 검색바 ── */
 .search-bar {

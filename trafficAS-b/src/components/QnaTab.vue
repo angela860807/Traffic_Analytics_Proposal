@@ -2,7 +2,10 @@
   <div class="qna">
     <div class="top-row">
       <p class="info">궁금한 점을 질문하고 전문가 답변을 받으세요.</p>
-      <button class="wbtn">질문하기</button>
+      <button class="wbtn" :disabled="!isLoggedIn" @click="onWrite"
+              :title="isLoggedIn ? '새 질문 작성' : '로그인이 필요합니다'">
+        <i class="bi bi-question-circle"></i> 질문하기
+      </button>
     </div>
 
     <div class="search-bar">
@@ -260,7 +263,12 @@
 import { ref, computed } from "vue";
 import { useAuth } from "../composables/useAuth";
 
-const { isAdmin } = useAuth();
+const { isAdmin, isLoggedIn, openLogin } = useAuth();
+
+function onWrite() {
+  if (!isLoggedIn.value) { openLogin(); return; }
+  alert('질문 작성 기능은 곧 추가됩니다.');
+}
 
 const query = ref("");
 const expandedId = ref(null);
@@ -415,9 +423,9 @@ const highlight = (text) => {
   cursor: pointer;
   border: none;
 }
-.wbtn:hover {
-  opacity: 0.87;
-}
+.wbtn:hover:not(:disabled) { opacity: 0.87; }
+.wbtn:disabled { opacity: 0.45; cursor: not-allowed; }
+.wbtn i { margin-right: 4px; }
 
 /* ── 검색바 ── */
 .search-bar {

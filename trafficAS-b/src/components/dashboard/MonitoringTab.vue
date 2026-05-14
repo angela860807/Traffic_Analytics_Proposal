@@ -133,16 +133,21 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, toRefs } from 'vue'
 import { useDashboardData } from '@/composables/useDashboardData'
+import { useVideoOptimize } from '@/composables/useVideoOptimize'
 
-defineProps({ active: { type: Boolean, default: false } })
+const props = defineProps({ active: { type: Boolean, default: false } })
+const { active } = toRefs(props)
 const {
   cameraFeeds, stats, dupRemoved, settings,
   tickCamHeartbeat, camHealth,
   mutedCameras, toggleCameraMute,
   pushNotification,
 } = useDashboardData()
+
+/* 비디오 최적화 — 이 탭 active일 때만 영상 재생, 탭 비활성/뷰포트 밖 자동 정지 */
+useVideoOptimize({ active: () => active.value, selector: '.v2-mon-video' })
 
 /* 카메라별 마지막 알람 시각 — 같은 카메라가 동일 사유로 1분 안에 중복 알림 가지 않게 디바운스 */
 const lastAlertAt = new Map()  // key: `${name}|${reason}` → ts
