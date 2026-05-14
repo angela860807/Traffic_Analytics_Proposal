@@ -1,4 +1,4 @@
-# Raspberry Pi Client
+# 라즈베리파이 클라이언트
 
 Raspberry Pi는 카메라 프레임을 수집해서 Windows PC의 FastAPI 서버로 전송한다.
 추론과 DB 저장은 PC 쪽 FastAPI/Spring Boot/PostgreSQL이 담당한다.
@@ -98,12 +98,12 @@ http://<PC_LAN_IP>:8000/api/camera/live
 
 ## 5. DB 저장 상태 확인
 
-업로드 스크립트는 FastAPI 응답 메시지를 기준으로 예상 저장 상태를 출력한다.
+업로드 스크립트는 FastAPI 응답의 `analysisStatus`를 기준으로 최종 저장 상태를 출력한다.
 
 ```text
-analysisStatus=SENT_TO_BACKEND      정상 인식, Spring에서 분석 결과/flow event 생성 대상
-analysisStatus=OCR_FAILED           번호판 미인식, detection_analysis_results에 결과 저장
-analysisStatus=DUPLICATE_SKIPPED    FastAPI 중복 판정, detection_analysis_results에 결과 저장
+analysisStatus=FLOW_EVENT_CREATED   정상 인식, detection_logs/analysis_results/flow_events 저장
+analysisStatus=OCR_FAILED           번호판 미인식, detection_logs/analysis_results 저장
+analysisStatus=DUPLICATE_SKIPPED    중복 판정, detection_logs/analysis_results 저장
 analysisStatus=ANALYSIS_ONLY        /api/detections/image 분석 전용 응답
 ```
 

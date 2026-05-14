@@ -37,6 +37,9 @@ def summarize_detection_response(result: dict[str, Any]) -> str:
 
 
 def _infer_analysis_status(message: str) -> str:
+    if "FLOW_EVENT_CREATED" in message:
+        return "FLOW_EVENT_CREATED"
+
     if "OCR_FAILED" in message:
         return "OCR_FAILED"
 
@@ -44,7 +47,7 @@ def _infer_analysis_status(message: str) -> str:
         return "DUPLICATE_SKIPPED"
 
     if "sent to backend" in message:
-        return "SENT_TO_BACKEND"
+        return "FLOW_EVENT_CREATED"
 
     return "ANALYSIS_ONLY"
 
