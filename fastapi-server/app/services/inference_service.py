@@ -14,6 +14,7 @@ from app.services.image_preprocessor import (
     preprocess_plate_for_ocr,
 )
 from app.services.plate_detector import PlateDetector
+from app.services.plate_detector import PlateDetection
 from app.services.plate_recognizer import PlateRecognizer
 
 
@@ -67,6 +68,10 @@ class InferenceService:
             existing_image_path=image_path,
         )
 
+    def detect_plate_bbox_from_image(self, image) -> PlateDetection:
+        detection_image = preprocess_frame_for_detection(image)
+        return self.plate_detector.detect(detection_image)
+
     def _detect(
         self,
         *,
@@ -91,8 +96,7 @@ class InferenceService:
         ocr_image_path = None
         ocr_image_url = None
 
-        detection_image = preprocess_frame_for_detection(image)
-        detection = self.plate_detector.detect(detection_image)
+        detection = self.detect_plate_bbox_from_image(image)
         confidence_score = detection.confidence_score
 
         if detection.bbox is None:

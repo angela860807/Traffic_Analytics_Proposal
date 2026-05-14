@@ -59,3 +59,10 @@ SAVE_PLATE_CROP = os.getenv("SAVE_PLATE_CROP", "true").lower() == "true"
 SAVE_OCR_PREPROCESSED_IMAGE = (
     os.getenv("SAVE_OCR_PREPROCESSED_IMAGE", "true").lower() == "true"
 )
+
+STREAM_FPS = int(os.getenv("STREAM_FPS", "5"))
+PRE_BUFFER_SECONDS = float(os.getenv("PRE_BUFFER_SECONDS", "2"))
+POST_MISS_FRAMES = int(os.getenv("POST_MISS_FRAMES", "5"))
+MAX_EVENT_SECONDS = float(os.getenv("MAX_EVENT_SECONDS", "4"))
+TOP_N_OCR_FRAMES = int(os.getenv("TOP_N_OCR_FRAMES", "1"))
+SAVE_EVENT_DEBUG = os.getenv("SAVE_EVENT_DEBUG", "false").lower() == "true"
