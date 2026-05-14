@@ -41,6 +41,12 @@ services:
       DETECTION_PREPROCESS_MODE: none
       SAVE_PLATE_CROP: "true"
       SAVE_OCR_PREPROCESSED_IMAGE: "true"
+      STREAM_FPS: 5
+      PRE_BUFFER_SECONDS: 2
+      POST_MISS_FRAMES: 5
+      MAX_EVENT_SECONDS: 4
+      TOP_N_OCR_FRAMES: 1
+      SAVE_EVENT_DEBUG: "false"
     ports:
       - "8000:8000"
     volumes:

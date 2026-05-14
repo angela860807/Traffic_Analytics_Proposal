@@ -1,6 +1,6 @@
 import asyncio
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from pathlib import Path
 
@@ -17,6 +17,14 @@ from app.services.backend_client import BackendClient
 from app.services.inference_service import InferenceService
 from app.services.plate_detector import PlateDetection
 from app.services.plate_recognizer import PlateRecognition, PlateRecognizer
+from app.services.frame_buffer import FrameBuffer
+from app.services.stream_event_service import (
+    STREAM_STATUS_FINALIZED,
+    STREAM_STATUS_IDLE,
+    STREAM_STATUS_TRACKING,
+    StreamEventService,
+    StreamProcessingResult,
+)
 
 
 client = TestClient(app)
@@ -434,6 +442,174 @@ def test_create_detection_from_invalid_image_bytes() -> None:
 
     assert response.status_code == 400
     assert response.json()["detail"] == "image must be a valid jpg or png"
+
+
+def test_stream_event_service_finalizes_after_bbox_misses(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr("app.services.stream_event_service.SAVE_EVENT_DEBUG", True)
+    monkeypatch.setattr(
+        "app.services.stream_event_service.IMAGE_STORAGE_DIR",
+        str(tmp_path / "detections"),
+    )
+
+    image_bytes = make_test_image_bytes()
+    detections = [
+        PlateDetection("VEHICLE", 0.0, None),
+        PlateDetection("PLATE", 0.93, (20, 20, 120, 50)),
+        PlateDetection("VEHICLE", 0.0, None),
+        PlateDetection("VEHICLE", 0.0, None),
+        PlateDetection("VEHICLE", 0.0, None),
+        PlateDetection("VEHICLE", 0.0, None),
+        PlateDetection("VEHICLE", 0.0, None),
+    ]
+
+    class FakeInferenceService:
+        def detect_plate_bbox_from_image(self, image):
+            return detections.pop(0)
+
+        async def detect_from_image_bytes(self, *, camera_code, captured_at, image_bytes):
+            return make_recognized_detection(detected_at=captured_at)
+
+    service = StreamEventService(
+        buffer=FrameBuffer(max_frames_per_camera=3),
+        inference_service=FakeInferenceService(),
+    )
+    captured_at = datetime(2026, 5, 14, 14, 30, 0)
+
+    idle_result = asyncio.run(
+        service.process_frame(
+            camera_code="CAM_001",
+            captured_at=captured_at,
+            content_type="image/jpeg",
+            image_bytes=image_bytes,
+        )
+    )
+    assert idle_result.stream_status == STREAM_STATUS_IDLE
+
+    tracking_result = asyncio.run(
+        service.process_frame(
+            camera_code="CAM_001",
+            captured_at=captured_at + timedelta(milliseconds=200),
+            content_type="image/jpeg",
+            image_bytes=image_bytes,
+        )
+    )
+    assert tracking_result.stream_status == STREAM_STATUS_TRACKING
+    assert tracking_result.event_id is not None
+
+    finalized_result = None
+    for index in range(5):
+        finalized_result = asyncio.run(
+            service.process_frame(
+                camera_code="CAM_001",
+                captured_at=captured_at + timedelta(milliseconds=400 + (index * 200)),
+                content_type="image/jpeg",
+                image_bytes=image_bytes,
+            )
+        )
+
+    assert finalized_result is not None
+    assert finalized_result.stream_status == STREAM_STATUS_FINALIZED
+    assert finalized_result.result is not None
+    assert finalized_result.result.plate_number == "123A4567"
+    assert finalized_result.event_age_seconds >= 0
+    assert len(list((tmp_path / "detections" / "debug").rglob("*.jpg"))) == 1
+
+
+def test_stream_frame_endpoint_returns_tracking(monkeypatch) -> None:
+    class FakeStreamService:
+        async def process_frame(self, *, camera_code, captured_at, content_type, image_bytes):
+            return StreamProcessingResult(
+                stream_status=STREAM_STATUS_TRACKING,
+                camera_code=camera_code,
+                event_id="CAM_001-20260514143000-test",
+                frame_count=2,
+                bbox=(10, 20, 80, 50),
+                bboxes=[(10, 20, 80, 50), (90, 20, 150, 50)],
+                bbox_confidence_score=0.93,
+                event_age_seconds=1.5,
+            )
+
+    monkeypatch.setattr(
+        detection_route,
+        "stream_detection_service",
+        FakeStreamService(),
+    )
+
+    response = client.post(
+        "/api/detections/stream-frame",
+        data={
+            "cameraCode": "CAM_001",
+            "capturedAt": "2026-05-14T14:30:00",
+        },
+        files={
+            "image": ("frame.jpg", make_test_image_bytes(), "image/jpeg"),
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["streamStatus"] == "TRACKING"
+    assert body["eventId"] == "CAM_001-20260514143000-test"
+    assert body["frameCount"] == 2
+    assert body["bbox"] == [10, 20, 80, 50]
+    assert body["bboxes"] == [[10, 20, 80, 50], [90, 20, 150, 50]]
+    assert body["bboxConfidenceScore"] == 0.93
+    assert body["eventAgeSeconds"] == 1.5
+    assert body["analysisStatus"] is None
+    assert body["data"] is None
+
+
+def test_stream_frame_endpoint_sends_finalized_detection_to_backend(monkeypatch) -> None:
+    detection_route.duplicate_detection_guard.clear()
+    sent_statuses = []
+
+    class FakeStreamService:
+        async def process_frame(self, *, camera_code, captured_at, content_type, image_bytes):
+            return StreamProcessingResult(
+                stream_status=STREAM_STATUS_FINALIZED,
+                camera_code=camera_code,
+                event_id="CAM_001-20260514143000-test",
+                frame_count=6,
+                result=make_recognized_detection(detected_at=captured_at),
+            )
+
+    async def record_backend_send(result, detection_status=None):
+        sent_statuses.append(detection_status)
+        return {"data": {"status": "FLOW_EVENT_CREATED"}}
+
+    monkeypatch.setattr(
+        detection_route,
+        "stream_detection_service",
+        FakeStreamService(),
+    )
+    monkeypatch.setattr(
+        detection_route.backend_client,
+        "send_detection",
+        record_backend_send,
+    )
+
+    response = client.post(
+        "/api/detections/stream-frame",
+        data={
+            "cameraCode": "CAM_001",
+            "capturedAt": "2026-05-14T14:30:00",
+        },
+        files={
+            "image": ("frame.jpg", make_test_image_bytes(), "image/jpeg"),
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["streamStatus"] == "FINALIZED"
+    assert body["analysisStatus"] == "FLOW_EVENT_CREATED"
+    assert body["data"]["plateNumber"] == "123A4567"
+    assert sent_statuses == [None]
+
+    detection_route.duplicate_detection_guard.clear()
 
 
 def test_backend_client_payload_includes_crop_and_ocr_image_fields(monkeypatch) -> None:

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -11,10 +11,17 @@ from app.core.config import (
 
 
 @dataclass
+class PlateDetectionBox:
+    bbox: tuple[int, int, int, int]
+    confidence_score: float
+
+
+@dataclass
 class PlateDetection:
     detection_type: str
     confidence_score: float
     bbox: tuple[int, int, int, int] | None = None
+    boxes: list[PlateDetectionBox] = field(default_factory=list)
 
 
 class PlateDetector:
@@ -38,7 +45,7 @@ class PlateDetector:
             max_det=YOLO_MAX_DET,
         )
 
-        best_detection: PlateDetection | None = None
+        detections: list[PlateDetectionBox] = []
 
         for result in results:
             boxes = sorted(
@@ -50,22 +57,27 @@ class PlateDetector:
             for box in boxes:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 confidence_score = float(box.conf[0])
-
-                best_detection = PlateDetection(
-                    detection_type="PLATE",
-                    confidence_score=confidence_score,
-                    bbox=(x1, y1, x2, y2),
+                detections.append(
+                    PlateDetectionBox(
+                        bbox=(x1, y1, x2, y2),
+                        confidence_score=confidence_score,
+                    )
                 )
-                break
 
-        if best_detection is None:
+        if not detections:
             return PlateDetection(
                 detection_type="VEHICLE",
                 confidence_score=0.0,
                 bbox=None,
             )
 
-        return best_detection
+        best_detection = detections[0]
+        return PlateDetection(
+            detection_type="PLATE",
+            confidence_score=best_detection.confidence_score,
+            bbox=best_detection.bbox,
+            boxes=detections,
+        )
 
     def _load_model(self):
         if self._model is None:

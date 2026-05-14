@@ -1,128 +1,113 @@
-# 🚦 교통 관리 시스템
+﻿# 교통 관리 시스템 (Traffic Management System)
 
-AI 기반 실시간 교통 탐지 로그를 수집하고, 이를 시각별로 통계화하여 교통 흐름을 분석하는 지능형 교통 관리 백엔드 시스템입니다.
+AI 기반 실시간 차량 감지 결과를 수집하고, 차량 흐름 이벤트와 시간대별 교통 통계를 관리하는 Spring Boot 백엔드 서버입니다.
+
+외부 AI 분석 서버가 전달한 감지 로그를 저장하고, OCR 분석 결과, 중복 감지 상태, 차량 이동 흐름, 구역별 통계 데이터를 관리합니다. 또한 회원 인증, 공지사항, 게시글, 댓글, QnA 기능을 위한 REST API를 제공합니다.
 
 ---
 
-# 🛠 기술 스택
+# 기술 스택
 
 - **Language**: Java 21
 - **Framework**: Spring Boot 3.5.14
 - **Database**: PostgreSQL
 - **ORM**: Spring Data JPA
 - **Security**: Spring Security & JWT (JJWT 0.12.6)
-- **API 문서**: Swagger (SpringDoc OpenAPI 2.8.5)
+- **API 문서**: Swagger (Springdoc OpenAPI 2.8.5)
 - **Build Tool**: Gradle
+- **Container**: Docker
 
 ---
 
-# 🏛 시스템 아키텍처
+# 시스템 아키텍처
 
-본 시스템은 대량의 데이터 처리를 위한 성능 최적화와 시스템 간 보안을 고려하여 설계되었습니다.
+본 백엔드는 외부 분석 서버, PostgreSQL, 프론트엔드 클라이언트 사이에서 교통 데이터의 저장과 조회를 담당합니다.
 
 1. **Ingestion Layer**
-   - AI 서버가 탐지한 차량 데이터를 전용 API(`X-Internal-Api-Key`)를 통해 수신
+   - 외부 AI 분석 서버가 차량 감지 결과를 전송합니다.
+   - `POST /api/v1/detection-logs` 엔드포인트에서 감지 로그를 수신합니다.
+   - 서버 간 호출은 `X-Internal-Api-Key` 헤더로 검증합니다.
 
 2. **Processing Layer**
-   - `ObjectProvider` 자기 참조 기반 트랜잭션 분리
-   - 데이터 검증 후 비동기 흐름 분석 수행
+   - 감지 요청의 필수값, 카메라 코드, 신뢰도 범위 등을 검증합니다.
+   - OCR 성공, OCR 실패, 중복 감지 상태를 구분합니다.
+   - 정상 감지 결과는 차량 정보와 차량 흐름 이벤트로 연결합니다.
 
 3. **Storage Layer**
-   - PostgreSQL 기반 로그 및 통계 데이터 저장
-   - Spring Data JPA를 통한 영속성 관리
+   - PostgreSQL에 원본 감지 로그, 분석 결과, 차량, 카메라, 구역, 통계 데이터를 저장합니다.
+   - Spring Data JPA Repository를 통해 영속성 계층을 관리합니다.
 
-4. **Analysis Layer**
-   - Spring Scheduler 기반 시간 단위 통계 자동 집계
+4. **Statistics Layer**
+   - `VehicleFlowEvent` 데이터를 기준으로 시간대별 교통 통계를 집계합니다.
+   - Spring Scheduler를 통해 주기적인 통계 집계가 가능하도록 구성했습니다.
 
 ---
 
-# 📂 프로젝트 구조
+# 프로젝트 구조
 
 ```text
-└─com.example.traffic
-    │  TrafficApplication.java
-    │
-    ├─common.enums
-    │      DetectionType.java
-    │      Direction.java
-    │      QnaStatus.java
-    │      UserRole.java
-    │      UserStatus.java
-    │      VehicleStatus.java
-    │      ZoneType.java
-    │
-    ├─config
-    │      SchedulingConfig.java
-    │      SecurityConfig.java
-    │      SwaggerConfig.java
-    │
-    ├─controller
-    │      CameraController.java
-    │      CommentController.java
-    │      DetectionLogController.java
-    │      HourlyTrafficStatController.java
-    │      MemberController.java
-    │      NoticeController.java
-    │      PostController.java
-    │      QnaController.java
-    │      VehicleController.java
-    │      VehicleFlowEventController.java
-    │      ZoneController.java
-    │
-    ├─domain
-    │      Camera.java
-    │      Comment.java
-    │      DetectionLog.java
-    │      HourlyTrafficStat.java
-    │      Member.java
-    │      Notice.java
-    │      Post.java
-    │      QnaAnswer.java
-    │      QnaQuestion.java
-    │      Vehicle.java
-    │      VehicleFlowEvent.java
-    │      Zone.java
-    │
-    ├─dto
-    │  ├─request
-    │  │      CameraSaveRequest.java
-    │  │      DetectionRequest.java
-    │  │      LoginRequest.java
-    │  │      ...
-    │  │
-    │  └─response
-    │          CommonResponse.java
-    │          DetectionResponse.java
-    │          TokenResponse.java
-    │          ...
-    │
-    ├─etc
-    │      BusinessException.java
-    │      GlobalExceptionHandler.java
-    │      TrafficStatScheduler.java
-    │
-    ├─repository
-    │      DetectionLogRepository.java
-    │      ZoneRepository.java
-    │      ...
-    │
-    ├─security
-    │      CustomUserDetailsService.java
-    │      JwtAuthenticationFilter.java
-    │      JwtTokenProvider.java
-    │
-    └─service
-           DetectionLogService.java
-           HourlyTrafficStatService.java
-           VehicleFlowEventService.java
-           ...
+traffic
+ ┣ src
+ ┃ ┣ main
+ ┃ ┃ ┣ java/com/example/traffic
+ ┃ ┃ ┃ ┣ TrafficApplication.java
+ ┃ ┃ ┃ ┣ common/enums
+ ┃ ┃ ┃ ┃ ┣ DetectionLogStatus.java
+ ┃ ┃ ┃ ┃ ┣ DetectionType.java
+ ┃ ┃ ┃ ┃ ┣ Direction.java
+ ┃ ┃ ┃ ┃ ┣ QnaStatus.java
+ ┃ ┃ ┃ ┃ ┣ UserRole.java
+ ┃ ┃ ┃ ┃ ┣ UserStatus.java
+ ┃ ┃ ┃ ┃ ┣ VehicleStatus.java
+ ┃ ┃ ┃ ┃ ┗ ZoneType.java
+ ┃ ┃ ┃ ┣ config
+ ┃ ┃ ┃ ┃ ┣ SchedulingConfig.java
+ ┃ ┃ ┃ ┃ ┣ SecurityConfig.java
+ ┃ ┃ ┃ ┃ ┗ SwaggerConfig.java
+ ┃ ┃ ┃ ┣ controller
+ ┃ ┃ ┃ ┃ ┣ CameraController.java
+ ┃ ┃ ┃ ┃ ┣ DetectionLogController.java
+ ┃ ┃ ┃ ┃ ┣ HourlyTrafficStatController.java
+ ┃ ┃ ┃ ┃ ┣ MemberController.java
+ ┃ ┃ ┃ ┃ ┣ VehicleFlowEventController.java
+ ┃ ┃ ┃ ┃ ┗ ...
+ ┃ ┃ ┃ ┣ domain
+ ┃ ┃ ┃ ┃ ┣ DetectionLog.java
+ ┃ ┃ ┃ ┃ ┣ DetectionAnalysisResult.java
+ ┃ ┃ ┃ ┃ ┣ Vehicle.java
+ ┃ ┃ ┃ ┃ ┣ VehicleFlowEvent.java
+ ┃ ┃ ┃ ┃ ┣ HourlyTrafficStat.java
+ ┃ ┃ ┃ ┃ ┗ ...
+ ┃ ┃ ┃ ┣ dto
+ ┃ ┃ ┃ ┃ ┣ request
+ ┃ ┃ ┃ ┃ ┗ response
+ ┃ ┃ ┃ ┣ etc
+ ┃ ┃ ┃ ┃ ┣ BusinessException.java
+ ┃ ┃ ┃ ┃ ┣ GlobalExceptionHandler.java
+ ┃ ┃ ┃ ┃ ┗ TrafficStatScheduler.java
+ ┃ ┃ ┃ ┣ repository
+ ┃ ┃ ┃ ┣ security
+ ┃ ┃ ┃ ┃ ┣ CustomUserDetailsService.java
+ ┃ ┃ ┃ ┃ ┣ JwtAuthenticationFilter.java
+ ┃ ┃ ┃ ┃ ┗ JwtTokenProvider.java
+ ┃ ┃ ┃ ┗ service
+ ┃ ┃ ┗ resources
+ ┃ ┃   ┣ application.yml
+ ┃ ┃   ┣ data.sql
+ ┃ ┃   ┗ db/migration
+ ┃ ┗ test
+ ┣ build.gradle
+ ┣ Dockerfile
+ ┗ settings.gradle
 ```
 
 ---
 
-# 🚀 실행 및 빌드 가이드
+# 실행 및 빌드 가이드
 
 ## 1. PostgreSQL 설정
+
+기본 로컬 DB 설정은 `traffic/src/main/resources/application.yml`에 정의되어 있습니다.
 
 ```properties
 spring.datasource.url=jdbc:postgresql://localhost:5432/traffic
@@ -130,26 +115,42 @@ spring.datasource.username=postgres
 spring.datasource.password=1004
 ```
 
-## 2. 프로젝트 빌드
+운영 또는 공유 환경에서는 DB 비밀번호, JWT secret, 내부 API Key를 환경 변수로 분리하는 것을 권장합니다.
+
+## 2. 프로젝트 이동
+
+Windows PowerShell 기준:
+
+```powershell
+cd C:\ksm\Traffic_Analytics_Proposal\backend\traffic
+```
+
+## 3. 프로젝트 빌드
 
 ### 전체 빌드
 
-```bash
-./gradlew build
+```powershell
+.\gradlew.bat build
 ```
 
 ### 테스트 제외 빌드
 
-```bash
-./gradlew build -x test
+```powershell
+.\gradlew.bat build -x test
 ```
 
 ---
 
-# ▶️ 서버 실행
+# 서버 실행
 
-```bash
-./gradlew bootRun
+```powershell
+.\gradlew.bat bootRun
+```
+
+서버는 기본적으로 다음 주소에서 실행됩니다.
+
+```text
+http://localhost:8080
 ```
 
 ## 정상 실행 로그 예시
@@ -161,15 +162,25 @@ Started TrafficApplication in 8.421 seconds
 
 ---
 
-# 📘 API 문서
+# API 문서
 
 ## Swagger UI
 
+서버 실행 후 Swagger UI에서 전체 API 명세를 확인할 수 있습니다.
+
 ```text
-http://localhost:8080/swagger-ui.html
+http://localhost:8080/swagger-ui/index.html
+```
+
+OpenAPI JSON 문서는 다음 주소에서 확인할 수 있습니다.
+
+```text
+http://localhost:8080/v3/api-docs
 ```
 
 ## AI 서버 인증 헤더
+
+외부 AI 분석 서버가 감지 로그를 전송할 때 사용하는 내부 인증 헤더입니다.
 
 ```http
 X-Internal-Api-Key: traffic-ai-internal-key-2026
@@ -177,75 +188,170 @@ X-Internal-Api-Key: traffic-ai-internal-key-2026
 
 ---
 
-# ⚠️ 예외 처리 규약
+# 주요 API
 
-- `BusinessException` 기반 사용자 정의 예외 처리
-- `GlobalExceptionHandler`를 통한 전역 예외 응답 관리
-- AI 데이터 오류 및 외부 요청 실패에 대해 일관된 HTTP 응답 반환
+README에는 핵심 엔드포인트만 요약했습니다. 전체 요청/응답 스키마와 세부 파라미터는 Swagger UI에서 확인할 수 있습니다.
 
-### 예시 응답
+| 기능 | Method | Endpoint |
+| --- | --- | --- |
+| 회원가입 | POST | `/api/auth/signup` |
+| 로그인 | POST | `/api/auth/login` |
+| 로그아웃 | POST | `/api/auth/logout` |
+| 회원 정보 조회 | GET | `/api/auth/me/{id}` |
+| 감지 로그 수신 | POST | `/api/v1/detection-logs` |
+| 최근 감지 로그 조회 | GET | `/api/v1/detection-logs` |
+| 감지 로그 검색 | GET | `/api/v1/detection-logs/search` |
+| 시간대별 통계 조회 | GET | `/api/stats/hourly` |
+| 시간대별 통계 집계 | POST | `/api/stats/hourly/aggregate` |
+| 카메라 등록 | POST | `/api/cameras` |
+| 카메라 목록 조회 | GET | `/api/cameras` |
+| 카메라 상세 조회 | GET | `/api/cameras/{cameraId}` |
+| 카메라 수정 | PUT | `/api/cameras/{cameraId}` |
+| 구역 등록 | POST | `/api/zones` |
+| 구역 목록 조회 | GET | `/api/zones` |
+| 구역 수정 | PUT | `/api/zones/{zoneId}` |
+| 차량 상세 조회 | GET | `/api/vehicles/{vehicleId}` |
+| 차량 상태 변경 | PATCH | `/api/vehicles/{vehicleId}/status` |
+| 차량 흐름 통계 조회 | GET | `/api/flow-events/stats/count` |
+| 차량별 흐름 이벤트 조회 | GET | `/api/flow-events/vehicle/{vehicleId}` |
+| 공지사항 등록 | POST | `/api/notices` |
+| 공지사항 목록 조회 | GET | `/api/notices` |
+| 공지사항 상세 조회 | GET | `/api/notices/{id}` |
+| 게시글 등록 | POST | `/api/posts` |
+| 게시글 목록 조회 | GET | `/api/posts` |
+| 게시글 상세 조회 | GET | `/api/posts/{id}` |
+| 댓글 등록 | POST | `/api/comments/post/{postId}` |
+| 댓글 목록 조회 | GET | `/api/comments/post/{postId}` |
+| QnA 질문 등록 | POST | `/api/qna/questions` |
+| QnA 질문 목록 조회 | GET | `/api/qna/questions` |
+| QnA 질문 상세 조회 | GET | `/api/qna/questions/{id}` |
+| QnA 답변 등록 | POST | `/api/qna/questions/{id}/answers` |
+
+---
+
+# 예외 처리 규약
+
+- `BusinessException` 기반으로 비즈니스 예외를 처리합니다.
+- `GlobalExceptionHandler`에서 Validation, JSON 파싱, 인증 실패, 서버 예외를 공통 처리합니다.
+- 성공 응답은 `CommonResponse` 형식을 사용합니다.
+- 실패 응답은 `ErrorResponse` 형식을 사용합니다.
+
+### 성공 응답 예시
 
 ```json
 {
-  "success": false,
-  "message": "Invalid detection data",
-  "status": 400
+  "success": true,
+  "data": {},
+  "message": "요청이 성공적으로 처리되었습니다."
+}
+```
+
+### 실패 응답 예시
+
+```json
+{
+  "code": "BUSINESS_ERROR",
+  "message": "Invalid detection data"
 }
 ```
 
 ---
 
-# 📈 주요 기능
+# 주요 기능
 
-- AI 차량 탐지 로그 실시간 수집
-- 차량 이동 흐름 분석
+- AI 차량 감지 로그 실시간 수신
+- 감지 로그와 OCR 분석 결과 분리 저장
+- `OCR_FAILED`, `FLOW_EVENT_CREATED`, `DUPLICATE_SKIPPED` 상태 관리
+- 차량 이동 흐름 이벤트 생성
 - 시간대별 교통 통계 자동 집계
-- JWT 기반 인증/인가 처리
+- 카메라 및 구역 관리
+- JWT 기반 회원가입 / 로그인 / 인증 처리
+- 공지사항, 게시글, 댓글, QnA API 제공
 - Swagger 기반 REST API 문서 제공
-- Scheduler 기반 배치 통계 처리
 
 ---
 
-# 🔐 보안 구조
+# 보안 구조
 
-- Spring Security 기반 인증 처리
+- Spring Security 기반 인증/인가 처리
 - JWT Access Token 기반 사용자 인증
-- 내부 AI 서버 전용 API Key 인증 분리
-- 권한(Role) 기반 API 접근 제어
+- 역할(Role) 기반 API 접근 제어
+- 내부 AI 분석 서버 전용 API Key 인증 분리
+- CORS 허용 Origin 및 Header 제한
 
 ---
 
-# 🧩 핵심 서비스
+# 핵심 서비스
 
 | Service | Description |
-|---|---|
-| `DetectionLogService` | AI 탐지 로그 저장 및 검증 |
-| `VehicleFlowEventService` | 차량 흐름 이벤트 분석 |
-| `HourlyTrafficStatService` | 시간 단위 통계 집계 |
+| --- | --- |
+| `DetectionLogService` | AI 감지 로그 검증, 저장, 분석 결과 상태 분기 |
+| `DetectionAnalysisResultService` | OCR 분석 결과 및 재처리 결과 저장 |
+| `VehicleService` | 차량 조회 및 신규 차량 생성 |
+| `VehicleFlowEventService` | 차량 흐름 이벤트 생성 및 중복 감지 판단 |
+| `HourlyTrafficStatService` | 시간대별 교통 통계 집계 |
 | `JwtTokenProvider` | JWT 생성 및 검증 |
-| `TrafficStatScheduler` | 스케줄 기반 통계 자동 처리 |
+| `TrafficStatScheduler` | 스케줄 기반 통계 집계 호출 |
 
 ---
 
-# 🗄 Database
+# Database
 
 ## 주요 테이블
 
-- `detection_log`
-- `vehicle`
-- `vehicle_flow_event`
-- `hourly_traffic_stat`
-- `zone`
-- `camera`
-- `member`
+- `detection_logs`
+- `detection_analysis_results`
+- `vehicles`
+- `vehicle_flow_events`
+- `hourly_traffic_stats`
+- `traffic_analysis_index`
+- `zones`
+- `cameras`
+- `members`
+- `posts`
+- `comments`
+- `notices`
+- `qna_questions`
+- `qna_answers`
+
+## 마이그레이션 참고
+
+스키마 변경 참고 SQL은 아래 경로에 정리되어 있습니다.
+
+```text
+traffic/src/main/resources/db/migration/001_backend_schema_updates.sql
+```
 
 ---
 
-# 📌 개발 환경
+# 개발 환경
 
 | 항목 | 버전 |
-|---|---|
+| --- | --- |
 | Java | 21 |
 | Spring Boot | 3.5.14 |
 | PostgreSQL | 16+ |
-| Gradle | 8+ |
+| Gradle | Wrapper 사용 |
+
+---
+
+# 테스트
+
+전체 테스트 실행:
+
+```powershell
+.\gradlew.bat test
+```
+
+감지 로그 통합 테스트만 실행:
+
+```powershell
+.\gradlew.bat test --tests "com.example.traffic.controller.DetectionLogControllerIntegrationTest"
+```
+
+---
+
+# 관련 문서
+
+- [Backend Troubleshooting](./TROUBLESHOOTING.md)
+- [Development Migration Notes](./traffic/docs/dev-migration-notes.md)

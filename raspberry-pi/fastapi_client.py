@@ -9,6 +9,7 @@ from config import (
     DETECTION_IMAGE_SEND_URL,
     LIVE_FRAME_URL,
     REQUEST_TIMEOUT_SECONDS,
+    STREAM_FRAME_URL,
 )
 
 class FastApiClientError(RuntimeError):
@@ -33,6 +34,24 @@ def summarize_detection_response(result: dict[str, Any]) -> str:
         f"plateCropImageUrl={data.get('plateCropImageUrl') or '-'}, "
         f"ocrImageUrl={data.get('ocrImageUrl') or '-'}, "
         f"message={message}"
+    )
+
+
+def summarize_stream_response(result: dict[str, Any]) -> str:
+    data = result.get("data") or {}
+
+    return (
+        "stream result: "
+        f"accepted={result.get('accepted')}, "
+        f"streamStatus={result.get('streamStatus')}, "
+        f"eventId={result.get('eventId') or '-'}, "
+        f"frameCount={result.get('frameCount')}, "
+        f"analysisStatus={result.get('analysisStatus') or '-'}, "
+        f"plateNumber={data.get('plateNumber') or '-'}, "
+        f"detectionType={data.get('detectionType') or '-'}, "
+        f"confidenceScore={data.get('confidenceScore') or '-'}, "
+        f"imageUrl={data.get('imageUrl') or '-'}, "
+        f"message={result.get('message', '')}"
     )
 
 
@@ -121,6 +140,20 @@ def upload_live_frame(
         captured_at=captured_at or datetime.now(),
         filename=filename,
     )
+
+
+def upload_stream_frame(
+    image_bytes: bytes,
+    captured_at: Optional[datetime] = None,
+    filename: str = "stream-frame.jpg",
+) -> dict[str, Any]:
+    response = _post_image(
+        url=STREAM_FRAME_URL,
+        image_bytes=image_bytes,
+        captured_at=captured_at or datetime.now(),
+        filename=filename,
+    )
+    return response.json()
 
 
 def upload_detection_image_file(
