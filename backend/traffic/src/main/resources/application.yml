@@ -12,6 +12,8 @@ spring:
 
   jpa:
     hibernate:
+      # Kept for local/team development. Shared schema changes are still tracked
+      # explicitly in src/main/resources/db/migration/*.sql.
       ddl-auto: update
     defer-datasource-initialization: true
     show-sql: true

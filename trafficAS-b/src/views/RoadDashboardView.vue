@@ -359,7 +359,13 @@
                 </div>
                 <div class="v2-ocr-body">
                   <div class="v2-ocr-photo">
-                    <img v-if="latestPlate.id && plateImg(latestPlate)" :src="plateImg(latestPlate)" class="v2-ocr-photo-img" :alt="latestPlate.num" />
+                    <img
+                      v-if="latestPlate.id && plateDisplayImage(latestPlate)"
+                      :src="plateDisplayImage(latestPlate)"
+                      class="v2-ocr-photo-img"
+                      :alt="latestPlate.num"
+                      @error="markPlateImageFailed(plateDisplayImage(latestPlate))"
+                    />
                     <div v-else-if="latestPlate.id" class="v2-ocr-photo-empty">
                       <i class="bi bi-image"></i>
                       <span>이미지 없음</span>
@@ -394,7 +400,13 @@
                     :class="{ active: p.id === latestPlate.id }"
                     @click="selectPlate(p)"
                   >
-                    <img v-if="plateImg(p)" :src="plateImg(p)" class="v2-ocr-thumb-img" :alt="p.num" />
+                    <img
+                      v-if="plateDisplayImage(p)"
+                      :src="plateDisplayImage(p)"
+                      class="v2-ocr-thumb-img"
+                      :alt="p.num"
+                      @error="markPlateImageFailed(plateDisplayImage(p))"
+                    />
                     <div v-else class="v2-ocr-thumb-empty"><i class="bi bi-image"></i></div>
                     <div class="v2-ocr-thumb-time mono">{{ p.time }}</div>
                     <div class="v2-ocr-thumb-plate mono">{{ p.num }}</div>
@@ -903,6 +915,20 @@ const latestPlate = computed(() => {
 })
 const recentPlates = computed(() => plates.value.slice(0, 5))
 const logPlates = computed(() => plates.value.slice(0, 8))
+const failedPlateImageUrls = ref(new Set())
+
+function plateDisplayImage(plate) {
+  const url = plateImg(plate)
+  return url && !failedPlateImageUrls.value.has(url) ? url : ''
+}
+
+function markPlateImageFailed(url) {
+  if (!url) return
+  const next = new Set(failedPlateImageUrls.value)
+  next.add(url)
+  failedPlateImageUrls.value = next
+}
+
 /* 이미지 우선순위: plateCropImageUrl → cropUrl → imageUrl → placeholder */
 /* 백엔드 응답 → 프론트 데이터 정규화 (설계서 필드명 호환) */
 function normalizePlate(p) {

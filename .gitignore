@@ -41,6 +41,10 @@ fastapi-server/examples/*.jpeg
 fastapi-server/examples/*.png
 
 # Local test media and generated captures
+/local-test-media/
+/test-media/*
+!/test-media/
+!/test-media/README.md
 /no_plate.jpg
 /capture*.jpg
 /test_*.jpg

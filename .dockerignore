@@ -22,6 +22,8 @@ backend/traffic/out
 **/build
 
 # Runtime data and large local artifacts
+local-test-media
+test-media
 fastapi-server/storage
 fastapi-server/models
 fastapi-server/sample.jpg

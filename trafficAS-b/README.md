@@ -178,8 +178,8 @@ http://localhost:5173
 ### 9-7 관리자 계정
 
 ```
-이메일 : admin@trafficAS.com
-비밀번호 : admin1234
+이메일 : admin@email.com
+비밀번호 : 1234
 ```
 
 > 관리자 계정으로 로그인해야 대시보드(`/dashboard`) 접근이 가능합니다.
