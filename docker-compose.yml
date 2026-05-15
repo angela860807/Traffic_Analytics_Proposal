@@ -37,8 +37,8 @@ services:
       SPRING_DETECTION_PATH: /api/v1/detection-logs
       BACKEND_INTERNAL_API_KEY: traffic-ai-internal-key-2026
       IMAGE_STORAGE_DIR: storage/detections
-      MODEL_PATH: /app/models/best.pt
-      PLATE_MODEL_PATH: /app/models/best.pt
+      MODEL_PATH: /app/models/best3.pt
+      PLATE_MODEL_PATH: /app/models/best3.pt
       VEHICLE_MODEL_NAME: yolo26s.pt
       VEHICLE_YOLO_CONF_THRESHOLD: 0.35
       VEHICLE_YOLO_IOU_THRESHOLD: 0.45
