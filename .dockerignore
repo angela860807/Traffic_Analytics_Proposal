@@ -1,0 +1,47 @@
+.git
+.gitignore
+.dockerignore
+
+# Dependencies and caches
+**/node_modules
+**/.vite
+**/.gradle
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.venv
+**/venv
+**/env
+
+# Build outputs
+trafficAS-b/dist
+backend/traffic/build
+backend/traffic/out
+**/dist
+**/build
+
+# Runtime data and large local artifacts
+local-test-media
+test-media
+fastapi-server/storage
+fastapi-server/models
+fastapi-server/sample.jpg
+fastapi-server/capture.jpg
+fastapi-server/capture*.jpg
+no_plate.jpg
+plate.jpg
+*.docx
+*.zip
+*.log
+
+# Environment and local tool files
+**/.env
+**/.env.local
+**/.env.*.local
+.vscode
+.idea
+.claude
+Thumbs.db
+desktop.ini
+.DS_Store

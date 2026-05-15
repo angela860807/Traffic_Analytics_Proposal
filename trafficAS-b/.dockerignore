@@ -1,7 +1,0 @@
-node_modules
-dist
-.env
-.claude
-__pycache__
-npm-debug.log*
-Dockerfile

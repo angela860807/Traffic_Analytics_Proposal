@@ -7,7 +7,8 @@ import org.springframework.http.HttpStatus;
 @Getter
 public enum DetectionType {
     VEHICLE("차량"),
-    PLATE("번호판");
+    PLATE("번호판"),
+    UNKNOWN("미확인");
 
     private final String description;
 
@@ -16,7 +17,7 @@ public enum DetectionType {
     }
 
     public static DetectionType of(String value) {
-        if (value == null || value.isBlank()) return VEHICLE;
+        if (value == null || value.isBlank()) return UNKNOWN;
         try {
             return DetectionType.valueOf(value.toUpperCase());
         } catch (IllegalArgumentException e) {

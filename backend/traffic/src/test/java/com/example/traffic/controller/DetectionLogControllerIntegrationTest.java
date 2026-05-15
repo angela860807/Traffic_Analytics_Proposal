@@ -1,10 +1,12 @@
 package com.example.traffic.controller;
 
 import com.example.traffic.common.enums.DetectionLogStatus;
+import com.example.traffic.common.enums.DetectionType;
 import com.example.traffic.domain.DetectionAnalysisResult;
 import com.example.traffic.domain.DetectionLog;
 import com.example.traffic.repository.DetectionAnalysisResultRepository;
 import com.example.traffic.repository.DetectionLogRepository;
+import com.example.traffic.repository.TrafficAnalysisIndexRepository;
 import com.example.traffic.repository.VehicleFlowEventRepository;
 import com.example.traffic.repository.VehicleRepository;
 import org.junit.jupiter.api.Test;
@@ -12,7 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,13 +25,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-@Sql(
-        statements = {
-                "ALTER TABLE detection_logs ALTER COLUMN plate_number DROP NOT NULL",
-                "ALTER TABLE detection_logs ALTER COLUMN detection_type DROP NOT NULL"
-        },
-        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
-)
 class DetectionLogControllerIntegrationTest {
 
     private static final String INTERNAL_API_KEY = "traffic-ai-internal-key-2026";
@@ -49,6 +43,9 @@ class DetectionLogControllerIntegrationTest {
 
     @Autowired
     private VehicleFlowEventRepository vehicleFlowEventRepository;
+
+    @Autowired
+    private TrafficAnalysisIndexRepository trafficAnalysisIndexRepository;
 
     @Test
     void processDetectionSavesLogAnalysisResultVehicleAndFlowEvent() throws Exception {
@@ -84,7 +81,9 @@ class DetectionLogControllerIntegrationTest {
                                 ocrImagePath, ocrImageUrl)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data").isNumber());
+                .andExpect(jsonPath("$.data.logId").isNumber())
+                .andExpect(jsonPath("$.data.status").value("FLOW_EVENT_CREATED"))
+                .andExpect(jsonPath("$.data.plateNumber").value(plateNumber));
 
         assertThat(detectionLogRepository.count()).isEqualTo(logCountBefore + 1);
         assertThat(detectionAnalysisResultRepository.count()).isEqualTo(resultCountBefore + 1);
@@ -102,6 +101,13 @@ class DetectionLogControllerIntegrationTest {
         assertThat(savedResult.getPlateCropImageUrl()).isEqualTo(plateCropImageUrl);
         assertThat(savedResult.getOcrImagePath()).isEqualTo(ocrImagePath);
         assertThat(savedResult.getOcrImageUrl()).isEqualTo(ocrImageUrl);
+        assertThat(trafficAnalysisIndexRepository.findByZoneZoneId(savedLog.getCamera().getZone().getZoneId()))
+                .isPresent()
+                .get()
+                .satisfies(index -> {
+                    assertThat(index.getLastLogId()).isEqualTo(savedLog.getLogId());
+                    assertThat(index.getLastLogTime()).isEqualTo(savedLog.getDetectedAt());
+                });
     }
 
     @Test
@@ -141,12 +147,13 @@ class DetectionLogControllerIntegrationTest {
                                   "imagePath": "storage/detections/2026/05/12/CAM_001_103500_frame.jpg",
                                   "imageUrl": "%s",
                                   "detectedAt": "2026-05-12T10:35:00",
-                                  "detectionType": "VEHICLE",
+                                  "detectionType": "UNKNOWN",
                                   "status": "OCR_FAILED"
                                 }
-                                """.formatted(imageUrl)))
+                """.formatted(imageUrl)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("OCR_FAILED"));
 
         DetectionLog savedLog = detectionLogRepository.findTop100ByOrderByDetectedAtDesc().stream()
                 .filter(log -> imageUrl.equals(log.getImageUrl()))
@@ -161,6 +168,7 @@ class DetectionLogControllerIntegrationTest {
         assertThat(vehicleRepository.count()).isEqualTo(vehicleCountBefore);
         assertThat(vehicleFlowEventRepository.count()).isEqualTo(flowEventCountBefore);
         assertThat(savedResult.getStatus()).isEqualTo(DetectionLogStatus.OCR_FAILED);
+        assertThat(savedResult.getDetectionType()).isEqualTo(DetectionType.UNKNOWN);
     }
 
     @Test
@@ -184,9 +192,10 @@ class DetectionLogControllerIntegrationTest {
                                   "detectionType": "PLATE",
                                   "status": "DUPLICATE_SKIPPED"
                                 }
-                                """.formatted(plateNumber)))
+                """.formatted(plateNumber)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("DUPLICATE_SKIPPED"));
 
         DetectionAnalysisResult savedResult = detectionAnalysisResultRepository
                 .findByPlateNumberOrderByCreatedAtDesc(plateNumber)
