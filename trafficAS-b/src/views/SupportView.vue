@@ -14,18 +14,6 @@
               최신 업데이트와 중요한 소식을 확인하세요.<br />
               운영 시간 안내와 함께 빠르고 정확한 정보를 제공합니다.
             </p>
-            <div class="hero-channels">
-              <div class="hch">
-                <div class="hch-icon"><i class="bi bi-megaphone-fill"></i></div>
-                <div class="hch-name">공지사항</div>
-                <div class="hch-desc">최신 업데이트와{{ '\n' }}중요한 소식을 확인하세요.</div>
-              </div>
-              <div class="hch">
-                <div class="hch-icon"><i class="bi bi-clock-fill"></i></div>
-                <div class="hch-name">운영 시간</div>
-                <div class="hch-desc">평일 09:00 - 18:00 (KST){{ '\n' }}주말 및 공휴일 휴무</div>
-              </div>
-            </div>
           </div>
           <div class="hero-right">
             <img src="/sub3.png" alt="공지사항" class="hero-img" />
@@ -84,69 +72,47 @@ const values = [
 </script>
 
 <style scoped>
-.content { padding-top: 68px; background: var(--bg); }
+.content { padding-top: 69px; background: var(--bg); }  /* 헤더 68px + border 1px */
 
-/* ───── HERO ───── */
-.hero { background: var(--bg2); border-bottom: 1px solid var(--b); }
+/* ───── HERO (IntroView와 동일) ───── */
+.hero { background: var(--bg); border-bottom: 1px solid var(--b); overflow: hidden; }
 .hero-in {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 24px 60px;
+  max-width: 1440px; margin: 0 auto;
+  padding: 32px 60px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  grid-template-columns: minmax(0, 0.55fr) minmax(0, 2.4fr);
   gap: 0;
-  align-items: center;
-  height: 340px;
-  max-height: 340px;
+  align-items: stretch;
+  height: 360px;                  /* 서브페이지 — 조금 더 컴팩트 */
   overflow: hidden;
 }
 .hero-left { align-self: center; min-width: 0; }
 .hero-tag {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 13px; font-weight: 600;
-  letter-spacing: 0.14em;
-  color: var(--a);
-  margin-bottom: 10px;
+  font-size: 14px; font-weight: 700; letter-spacing: 0.16em;
+  color: var(--a); margin-bottom: 14px;
 }
 .hero h1 {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: clamp(28px, 2.8vw, 38px);
-  font-weight: 800; letter-spacing: -1.1px; line-height: 1.2;
-  color: var(--t); margin: 0 0 12px;
+  font-size: clamp(28px, 3vw, 40px);
+  font-weight: 800; letter-spacing: -1.2px; line-height: 1.15;
+  color: var(--t); margin: 0 0 14px;
 }
 .hero h1 em { color: var(--a); font-style: normal; }
 .hero-sub {
-  font-size: 13.5px; font-weight: 500;
+  font-size: 14px; font-weight: 500;
   color: var(--t); opacity: 0.78;
-  line-height: 1.65; margin: 0 0 18px;
+  line-height: 1.65; margin: 0;
   word-break: keep-all;
 }
-.hero-channels {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;
-  max-width: 520px;
-}
-.hch { text-align: left; }
-.hch-icon {
-  width: 38px; height: 38px; border-radius: 10px;
-  background: rgba(96, 165, 250, 0.12);
-  display: inline-flex; align-items: center; justify-content: center;
-  color: var(--a); font-size: 16px;
-  margin-bottom: 8px;
-}
-.theme-navy.light .hch-icon { background: rgba(37, 99, 235, 0.1); }
-.hch-name {
-  font-size: 13.5px; font-weight: 700; color: var(--t);
-  margin-bottom: 4px;
-}
-.hch-desc {
-  font-size: 11.5px; color: var(--t); opacity: 0.62;
-  line-height: 1.5; white-space: pre-line;
-}
 
-/* 우측 이미지 — 헤더 끝선부터 히어로 박스 끝선까지 세로 가득 */
+/* 우측 이미지 — 헤더 바로 아래선 ~ 박스 끝선까지 풀스트레치 + 화면 우측 끝까지 */
 .hero-right {
   position: relative;
-  margin: -24px calc(60px - (50vw - 50%)) -24px 0;  /* 히어로 상하 패딩(24px) 무효화 */
+  margin-top: -33px;          /* hero-in 상단 padding(32) + 1px 보정 */
+  margin-bottom: -33px;
+  margin-left: 0;
+  margin-right: min(-60px, calc(660px - 50vw));
   align-self: stretch;
   display: flex;
   align-items: center;
@@ -157,22 +123,23 @@ const values = [
 .hero-img {
   width: 100%;
   height: 100%;
-  max-height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center center;
   display: block;
   --hero-mask: linear-gradient(to right,
     transparent 0%,
-    rgba(0,0,0,0.5) 4%,
-    rgba(0,0,0,0.9) 8%,
-    #000 12%,
+    rgba(0,0,0,0.08) 5%,
+    rgba(0,0,0,0.25) 12%,
+    rgba(0,0,0,0.55) 18%,
+    rgba(0,0,0,0.82) 24%,
+    #000 30%,
     #000 100%);
   -webkit-mask-image: var(--hero-mask);
   mask-image: var(--hero-mask);
 }
 
 /* ───── 공통 SECTION ───── */
-.sec { padding: 60px 60px; }
+.sec { padding: 80px 60px; }
 .sw { max-width: 1440px; margin: 0 auto; }
 
 /* ───── 게시판 패널 ───── */

@@ -1251,3 +1251,111 @@ React용은 `lucide-react`, Vue 3용은 `lucide-vue-next`, Vue 2용은 `lucide-v
 ### 교훈
 "이미지 위치 조정"은 패딩보다 grid `align-self` 가 자연스럽다.
 
+
+## 32. 대시보드 양옆에 흰 공백 라인이 보이는 문제
+
+### 증상
+관리자 대시보드(`/dashboard`)를 열면 좌·우 끝에 가는 흰색 띠가 보임. 다른 페이지에선 안 보이는데 대시보드에서만 두드러짐.
+
+### 원인
+`html { scrollbar-gutter: stable }`이 우측에 스크롤바 공간(약 17px)을 예약. 대시보드는 `height: 100vh; overflow: hidden`이라 자체 스크롤바가 없으니 그 예약 공간이 body 기본 흰 배경으로 노출.
+
+### 해결
+`base.css`에서 `scrollbar-gutter: stable` 제거하고 html/body에 명시적 배경 지정:
+```css
+html { overflow-x: hidden; background: #f1f5fb; }
+body { background: #f1f5fb; }
+```
+
+### 교훈
+`scrollbar-gutter: stable`은 페이지 간 스크롤바 유무 차이로 발생하는 레이아웃 시프트를 막아주지만, **`overflow: hidden`을 쓰는 풀스크린 페이지에서는 빈 공백을 만든다**. 양쪽이 공존하는 프로젝트면 페이지별 전략을 분리하거나 단일 정책으로 통일해야 한다.
+
+---
+
+## 33. Vite proxy http error — `/api/v1/...`
+
+### 증상
+개발 서버 콘솔에 `[vite] http proxy error: /api/v1/detection-logs` 같은 빨간 로그가 반복.
+
+### 원인
+`vite.config.js`의 proxy 설정이 `/api` 요청을 `http://127.0.0.1:8080`(Spring Boot)으로 포워드하려는데 백엔드 서버가 안 떠 있어서 연결 실패.
+
+### 해결 3가지
+1. **백엔드 켜기**: `cd ../backend/traffic && ./gradlew bootRun`
+2. **무시**: 프론트는 fetch 실패 시 데모 데이터로 폴백되도록 이미 설계됨. 콘솔 로그만 보이고 UI는 정상
+3. **로그만 끄기**:
+   ```js
+   proxy: {
+     '/api': {
+       target: 'http://127.0.0.1:8080',
+       configure: (proxy) => { proxy.on('error', () => {}); }
+     }
+   }
+   ```
+
+### 교훈
+프록시 에러는 "연결 실패"일 뿐 프론트 자체 동작에는 영향 없다. 데모 모드/폴백이 잘 구현돼 있으면 안전하게 무시 가능.
+
+---
+
+## 34. `object-fit: cover`로 이미지가 잘리는 문제 (히어로 박스 vs 이미지 비율 불일치)
+
+### 증상
+시스템 소개 페이지에서 일러스트(1672×941 = 16:9)는 히어로 박스에 자연스럽게 들어가는데, 공지사항에서 다른 일러스트(`sub3.png`)를 같은 박스에 cover로 넣으니 주체(확성기 등)가 잘려 보임.
+
+### 원인
+박스 비율과 이미지 비율의 불일치:
+- 히어로 박스: 약 1200×320px = **3.75:1**
+- 이미지: 1672×941 = **1.78:1 (16:9)**
+- `cover` 시 가로(1200)에 맞춰 이미지를 1200×675로 확대 → 박스 세로(320)보다 큰 355px만큼 상하 잘림
+
+### 해결
+1. **박스를 16:9에 가깝게**: `height: 320 → 540px`로 늘리면 cover 잘림 거의 없음
+2. **`object-fit: contain` + `object-position: right`**: 이미지 자연 비율 유지, 좌측 빈 공간은 그라데이션이 자연스럽게 덮음
+3. **이미지 자체를 와이드한 비율로 교체**
+
+### 교훈
+`cover`는 만능이 아니다. **박스 비율과 이미지 비율의 차이가 1.5배 이상**이면 잘림이 눈에 띄게 발생한다. 디자인 시안과 자산 비율을 먼저 정렬한 뒤 CSS로 들어가야 한다.
+
+---
+
+## 35. main 머지 시 QnaTab 충돌 — 양쪽 변경 모두 살리는 패턴
+
+### 증상
+yoon → main PR에서 `src/components/QnaTab.vue` 머지 충돌.
+- yoon: 비회원 차단(`:disabled="!isLoggedIn"`, `onWrite()` 핸들러)
+- main: 질문 등록 폼 + API 연동(`openQuestionForm`, `createQuestion`)
+
+### 해결
+두 변경 모두 살리는 통합:
+- 버튼은 yoon의 비회원 차단 패턴 유지(`:disabled` + `@click="onWrite"`)
+- `onWrite()`에서 로그인 체크 후 main의 `openQuestionForm()` 호출
+```js
+function onWrite() {
+  if (!isLoggedIn.value) { openLogin(); return; }
+  openQuestionForm();
+}
+```
+- main의 폼 UI/저장 로직은 그대로 보존
+
+### 교훈
+"한쪽 ours / 다른 쪽 theirs"로 끝내지 말고, **두 변경의 의도가 다른 영역(UI 차단 vs 백엔드 연동)이면 합쳐 살리는 게 정답**. `onWrite()` 같은 게이트 함수 한 줄로 우아하게 결합 가능.
+
+---
+
+## 36. 다크 모드 제거 후에도 `.theme-navy.light` 분기 유지하는 이유
+
+### 증상
+다크 모드 토글을 없애고 라이트 모드로 통일했는데, 굳이 `:class="{ light: !isDark }"` 같은 조건문이 남아있음.
+
+### 결정
+**컴포넌트별 클래스 분기 코드는 그대로 유지**. 대신 `useTheme.js`에서 `isDark = ref(false)` 고정 + `toggle()` no-op 처리.
+
+### 이유
+1. 모든 페이지의 템플릿/스타일을 `.theme-navy.light` 기반으로 작성해놨음
+2. 분기 자체를 지우면 CSS 룰의 `:root` 변수 적용이 깨질 수 있음
+3. 나중에 다크 모드 다시 켜야 할 때 `toggle()` 한 곳만 살리면 전부 복구
+
+### 교훈
+**기능 제거 ≠ 코드 삭제**. 토글 UI/액션만 비활성화하고 내부 분기 메커니즘은 보존하면, 미래 복원 비용이 0에 가까워진다.
+

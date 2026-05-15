@@ -528,3 +528,65 @@ npm run dev -- --host
 출력의 `Network: http://192.168.x.x:5173/`를 같은 WiFi 팀원에게 공유. 외부망은 `npx cloudflared tunnel --url http://localhost:5173`.
 
 ---
+
+## 17. 사용법 제거 · 공지사항 단순화 · 시스템 소개 전면 개편 · 다크모드 제거 (2026-05-15 후속)
+
+### 17-1 라우트/네비게이션 변경
+- **사용법 페이지(`/sub/usage`) 통째 삭제** — UsageView.vue 파일 + 라우터 import + AppNav/AppFooter 링크 + light.css 전용 룰까지 정리
+- **고객 지원 → 공지사항** 명칭 변경 (URL `/sub/support` 유지). 페이지 내부도 Q&A·실시간 채팅 탭 제거하고 **BoardTab 단일 렌더**로 단순화
+
+### 17-2 시스템 소개(IntroView) 전면 재작성
+시안 기반으로 6개 섹션 구조:
+1. **HERO** — `SYSTEM INTRODUCTION` 라벨 / `시스템 소개` h1 / 2줄 카피 / 우측 일러스트 (그라데이션 풀블리드)
+2. **시스템 아키텍처** — 4개 카드(Camera·Edge AI → AI Detection → Data Platform → Dashboard/API), 카드 내부 `[01] | English/Korean` 헤더 + `[아이콘 좌 / 불릿 우]` 본문, 카드 사이 `<ChevronRight />` 연결
+3. **데이터 라이프사이클** — 5단계 원형 아이콘 + dashed 점선, 카드별 80~84px 원 안에 Lucide 아이콘
+4. **핵심 모듈** — 4개 카드 (가운데 정렬), 번호·제목·그래픽·설명·태그칩 3개
+5. **연동 및 배포** — 좌측 박스(Integration 4개: REST/WebSocket/SDK/Export) + ChevronRight + 우측 박스(Deployment 3개: Cloud/On-premise/Hybrid)
+6. **비즈니스 임팩트** (다크 네이비 배너) — 6개 KPI(97%+/50ms/90%/40%+/99.9%/무제한), 배경에 옅은 48×48 그리드 + radial mask 패턴, 카드 hover 시 lift + 값 색상 시안 블루로 변경
+
+### 17-3 SVG 일러스트 폴백 메커니즘
+`public/illustrations/` 폴더에 `hero.svg`/`arch-camera.svg`/`arch-ai.svg`/`arch-database.svg`/`arch-dashboard.svg`를 떨어뜨리면 자동으로 SVG 사용, 없으면 Lucide 아이콘으로 폴백:
+```vue
+<img v-if="a.svg && !a.svgBroken" :src="a.svg" @error="a.svgBroken = true" />
+<component v-else :is="a.lucide" :size="64" />
+```
+
+### 17-4 다크 모드 제거 / 라이트 모드 단일화
+- **`useTheme.js`**: `isDark = ref(false)` 고정, `toggle()`은 no-op 처리 (호환성 유지)
+- **`AppFab.vue`**: 채팅/테마 토글 버튼 제거 → **↑ 맨 위로** 버튼만
+- **`base.css`**: `scrollbar-gutter: stable` 제거(대시보드 양쪽 흰 공백 원인), html/body 라이트 톤(`#f1f5fb`) 직접 적용
+
+### 17-5 톤 통일 및 디테일 정리
+- 모든 페이지 `hero-tag` 폰트 → **14px / weight 700 / letter-spacing 0.16em**로 통일
+- 모든 `.sec` 패딩 → **80px 60px**로 통일 (페이지별 60/80/100 혼재 해결)
+- 푸터: `기술` 컬럼 제거(4→3 columns), 패딩 36/32 → **24/22**로 슬림화, `서비스`/`팀·산출물` 컬럼 **가운데 정렬**
+- 헤더 메뉴/사용자명/버튼: opacity 24% → 100%, weight 600으로 또렷하게
+- 푸터 링크: opacity 0.62로 보조 톤, 호버 시 `var(--a)` + opacity 1
+
+### 17-6 BoardTab 폰트 전반 상향
+공지사항 게시판 가독성 개선:
+- info 14.5/300 → 16/500, 글쓰기 버튼 12.5/9·18 → 14/11·22
+- 테이블 행 14 → 15.5px, 헤더 11 → 12.5px
+- 댓글 본문 14/`--t2` → 15/`--t` 85%, 페이지네이션 12.5/34px → 14/36px
+
+### 17-7 솔루션 개요 강화 (변주)
+4분할 카드 단조로움 해소를 위해 솔루션 개요만 다른 비례로:
+- 그리드 `1.25fr / 1fr` → **`1.5fr / 1fr`**로 대시보드 이미지 영역 확대
+- 이미지 그림자 강화(`24px 60px → 32px 80px`) + 호버 시 미세 lift
+
+### 17-8 메인 히어로 그라데이션·톤 다듬기
+- 마스크 그라데이션: 6-stop → **11-stop ease-in 페이드** (0~42% 점진적)
+- 이미지에 `filter: saturate(0.78) brightness(0.85)` 추가 → 톤다운
+
+### 17-9 Lucide 아이콘 도입 확대
+신규 사용: `Cctv`(데이터 수집/실시간 영상 분석), `BrainCircuit`(AI 엔진), `Database`(데이터 플랫폼), `LayoutDashboard`(대시보드), `Car`(차량 감지), `ArrowLeftRight`(IN/OUT), `BellRing`(이벤트 알림), `Plug`/`Radio`/`Code2`/`FileDown`(연동), `Cloud`/`Server`/`Network`(배포), `Crosshair`/`Zap`/`Bot`/`TrendingUp`/`ShieldCheck`/`Infinity`(KPI), `ChevronRight`(연결 화살표)
+
+### 17-10 코드 클린업
+- `src/components/HeroStats.vue` 삭제 — 사용처 0
+- `light.css`의 `.step-vline`, `.stats-band.cyan` 등 죽은 룰 제거
+- 모든 페이지의 dead import / 미사용 ref 점검 완료
+
+### 17-11 한글 표기 수정
+- "AI **검지** 엔진" → "AI **감지** 엔진" 일괄 수정 (4건)
+
+---
