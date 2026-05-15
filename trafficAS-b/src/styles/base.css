@@ -23,7 +23,7 @@ nav.appnav {
 /* ── NAVY THEME (Dark) ── */
 .theme-navy {
   --bg:   #020b18; --bg2:  #03101f; --bg3:  #041528;
-  --card: rgba(255,255,255,.03);
+  --card: rgba(2, 11, 24, .92);
   --b:    rgba(255,255,255,.07);  --ba: rgba(96,165,250,.42);
   --t:    #e4eeff;
   --t2:   rgba(228,238,255,.48);

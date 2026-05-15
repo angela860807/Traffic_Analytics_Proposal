@@ -78,14 +78,15 @@ const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
   display: flex;
   align-items: center;
   padding: 0 16px;
-  font-size: 14px;
-  letter-spacing: 0.02em;
-  color: var(--t3);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--t);
   transition: color 0.2s;
   white-space: nowrap;
 }
 .links a:hover {
-  color: var(--t);
+  color: var(--a);
 }
 .links a.router-link-active {
   color: var(--a);
@@ -97,9 +98,10 @@ const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
   gap: 8px;
 }
 .uname {
-  font-size: 13.5px;
-  color: var(--t2);
-  letter-spacing: 0.02em;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t);
+  letter-spacing: 0.01em;
   white-space: nowrap;
 }
 .btn-login {
@@ -109,8 +111,9 @@ const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
   background: none;
   border: 1px solid var(--b);
   border-radius: 6px;
-  color: var(--t2);
-  font-size: 13.5px;
+  color: var(--t);
+  font-size: 14px;
+  font-weight: 600;
   transition: all 0.2s;
   white-space: nowrap;
   text-decoration: none;
@@ -158,8 +161,9 @@ const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
   background: none;
   border: 1px solid var(--b);
   border-radius: 6px;
-  color: var(--t3);
-  font-size: 13.5px;
+  color: var(--t);
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
