@@ -46,6 +46,7 @@ class InferenceService:
         camera_code: str,
         captured_at: datetime,
         image_bytes: bytes,
+        vehicle_detection: VehicleDetection | None = None,
     ) -> DetectionResult:
         image = self.image_decoder.decode_image_bytes(image_bytes)
 
@@ -53,6 +54,7 @@ class InferenceService:
             image=image,
             camera_code=camera_code,
             captured_at=captured_at,
+            vehicle_detection=vehicle_detection,
         )
 
     async def detect_from_saved_image(
@@ -61,6 +63,7 @@ class InferenceService:
         camera_code: str,
         captured_at: datetime,
         image_path: str,
+        vehicle_detection: VehicleDetection | None = None,
     ) -> DetectionResult:
         image = self.image_decoder.decode_image_file(image_path)
 
@@ -69,6 +72,7 @@ class InferenceService:
             camera_code=camera_code,
             captured_at=captured_at,
             existing_image_path=image_path,
+            vehicle_detection=vehicle_detection,
         )
 
     def detect_plate_bbox_from_image(self, image) -> PlateDetection:
@@ -86,6 +90,7 @@ class InferenceService:
         camera_code: str,
         captured_at: datetime,
         existing_image_path: str | None = None,
+        vehicle_detection: VehicleDetection | None = None,
     ) -> DetectionResult:
         if existing_image_path is None:
             image_path = self.image_storage_service.save_detection_image(
@@ -103,7 +108,8 @@ class InferenceService:
         ocr_image_path = None
         ocr_image_url = None
 
-        vehicle_detection = self.detect_vehicle_bbox_from_image(image)
+        if vehicle_detection is None:
+            vehicle_detection = self.detect_vehicle_bbox_from_image(image)
 
         if vehicle_detection.bbox is None:
             plate_number = None
