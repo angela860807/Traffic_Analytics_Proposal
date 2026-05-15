@@ -101,7 +101,7 @@ CCTV 기반 번호판 자동 인식(ANPR), 구역별 혼잡도 히트맵, 차량
     ▼
 Vue 3 SPA (Vite)
     │
-    ├── Vue Router ──→ / (메인) /sub/intro /sub/usage /sub/support /login /signup /dashboard
+    ├── Vue Router ──→ / (메인) /sub/intro /sub/support /login /signup /dashboard
     │
     ├── useAuth.js ───────→ LocalStorage (사용자 세션)
     ├── useDashboardData ─→ 공유 상태 (KPI / OCR / 카메라 / 카메라 혼잡도 / 설정)
@@ -194,7 +194,6 @@ trafficAS-b/
 │   ├── views/
 │   │   ├── MainView.vue              # 메인 랜딩 페이지 (Hero / 시스템 소개 / Features / CTA)
 │   │   ├── IntroView.vue             # 서비스 소개
-│   │   ├── UsageView.vue             # 이용 방법
 │   │   ├── LoginView.vue             # 로그인
 │   │   ├── SignupView.vue            # 회원가입
 │   │   ├── SupportView.vue           # 고객지원
@@ -436,8 +435,8 @@ onUnmounted(() => {
 
 ### 14-1 공통 컴포넌트 — `AppFooter.vue`
 - 4컬럼 구조 (브랜드 / 서비스 / 기술 / 팀·산출물)
-- `MainView`, `IntroView`, `UsageView`에서 import해 일관된 푸터 유지
-- 한 번 수정하면 3개 페이지 동시 반영
+- `MainView`, `IntroView`, `SupportView`에서 import해 일관된 푸터 유지
+- 한 번 수정하면 페이지 동시 반영
 
 ### 14-2 폰트 시스템
 - **한글 본문**: Pretendard Variable (가독성)
@@ -454,9 +453,8 @@ onUnmounted(() => {
 ### 14-4 페이지별 푸터 정책
 | 페이지 유형 | 푸터 |
 |---|---|
-| 랜딩 / 소개 / 사용법 | `<AppFooter />` 마케팅 푸터 |
+| 랜딩 / 소개 / 고객 지원 | `<AppFooter />` 마케팅 푸터 |
 | 로그인 / 회원가입 | 풀스크린 폼 — 푸터 없음 |
-| 고객 지원 | 풀스크린 사이드바 레이아웃 (사이드바에 © 내장) |
 | 관리자 대시보드 | 한 줄짜리 © (관제 UI 전용) |
 
 ---

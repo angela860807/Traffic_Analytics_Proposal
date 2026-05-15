@@ -15,21 +15,8 @@
         <div class="ft-h">서비스</div>
         <ul>
           <li><RouterLink to="/sub/intro">시스템 소개</RouterLink></li>
-          <li><RouterLink to="/sub/usage">이용 방법</RouterLink></li>
-          <li><RouterLink to="/sub/support">고객 지원</RouterLink></li>
+          <li><RouterLink to="/sub/support">공지사항</RouterLink></li>
           <li><RouterLink to="/dashboard">관리자 대시보드</RouterLink></li>
-        </ul>
-      </div>
-
-      <!-- 기술 컬럼 -->
-      <div class="ft-col">
-        <div class="ft-h">기술</div>
-        <ul>
-          <li><a href="https://vuejs.org" target="_blank" rel="noopener">Vue.js 3</a></li>
-          <li><a href="https://spring.io/projects/spring-boot" target="_blank" rel="noopener">Spring Boot</a></li>
-          <li><a href="https://fastapi.tiangolo.com" target="_blank" rel="noopener">FastAPI</a></li>
-          <li><a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a></li>
-          <li><a href="https://echarts.apache.org" target="_blank" rel="noopener">ECharts</a></li>
         </ul>
       </div>
 
@@ -54,18 +41,18 @@ import { RouterLink } from "vue-router";
 .ftw {
   border-top: 1px solid var(--b);
   background: var(--bg2);
-  padding: 36px 60px 32px;
+  padding: 24px 60px 22px;
 }
 .ft-top {
   max-width: 1440px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1.2fr;
+  grid-template-columns: 1.6fr 1fr 1.2fr;
   gap: 48px;
 }
 .ft-brand .ft-logo {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
   line-height: 1.3;
   letter-spacing: -0.5px;
@@ -73,7 +60,7 @@ import { RouterLink } from "vue-router";
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .ft-logo em { color: var(--a); font-style: normal; }
 .ft-logo-dot {
@@ -84,22 +71,22 @@ import { RouterLink } from "vue-router";
   animation: livePulse 2s ease-in-out infinite;
 }
 .ft-tag {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 400;
-  line-height: 1.7;
+  line-height: 1.55;
   color: var(--t);
   opacity: 0.62;
   max-width: 320px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .ft-col .ft-h {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 15.5px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.2px;
   color: var(--t);
   opacity: 0.88;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .ft-col ul {
   list-style: none;
@@ -107,7 +94,7 @@ import { RouterLink } from "vue-router";
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 7px;
 }
 .ft-col a {
   font-size: 13.5px;

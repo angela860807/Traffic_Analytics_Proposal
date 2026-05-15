@@ -7,9 +7,8 @@
         Traffic<em>AS</em>
       </RouterLink>
       <div class="links">
-        <RouterLink to="/sub/usage">사용법</RouterLink>
         <RouterLink to="/sub/intro">시스템 소개</RouterLink>
-        <RouterLink to="/sub/support">고객 지원</RouterLink>
+        <RouterLink to="/sub/support">공지사항</RouterLink>
       </div>
       <div class="right">
         <template v-if="isLoggedIn">
