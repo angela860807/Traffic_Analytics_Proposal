@@ -79,6 +79,9 @@ import { RouterLink } from "vue-router";
   max-width: 320px;
   margin-bottom: 8px;
 }
+.ft-col {
+  text-align: center;          /* 컬럼 전체 가운데 정렬 */
+}
 .ft-col .ft-h {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 15px;
@@ -94,6 +97,7 @@ import { RouterLink } from "vue-router";
   margin: 0;
   display: flex;
   flex-direction: column;
+  align-items: center;         /* 리스트 아이템 가운데 */
   gap: 7px;
 }
 .ft-col a {
@@ -104,6 +108,7 @@ import { RouterLink } from "vue-router";
   text-decoration: none;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
   transition: opacity 0.18s, color 0.18s;
 }

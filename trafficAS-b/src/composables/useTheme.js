@@ -1,6 +1,7 @@
 import { ref } from 'vue'
-const isDark = ref(true)
+/* 라이트 모드 고정 — 다크 모드 제거 */
+const isDark = ref(false)
 export function useTheme() {
-  const toggle = () => { isDark.value = !isDark.value }
+  const toggle = () => { /* noop — 라이트 모드 고정 */ }
   return { isDark, toggle }
 }

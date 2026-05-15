@@ -243,10 +243,11 @@ const coreFeatures = [
 .hero-tag {
   display: inline-block;
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   color: var(--a);
-  margin-bottom: 22px;
+  margin-bottom: 18px;
 }
 .hero h1 {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
@@ -295,14 +296,20 @@ const coreFeatures = [
   max-height: 720px;
   display: block;
   object-fit: cover;
-  /* 좌측 30%까지 부드러운 가로 그라데이션 — 7:3 비율 텍스트 영역과 자연스럽게 어우러짐 */
+  /* 톤다운: 채도/밝기 더 낮춰 차분하게 */
+  filter: saturate(0.78) brightness(0.85);
+  /* 부드러운 ease-in 페이드 — 좌측 38%까지 점진적으로 진해짐 */
   --hero-mask: linear-gradient(to right,
     transparent 0%,
-    rgba(0,0,0,0.08) 5%,
-    rgba(0,0,0,0.25) 12%,
-    rgba(0,0,0,0.55) 18%,
-    rgba(0,0,0,0.82) 24%,
-    #000 30%,
+    rgba(0,0,0,0.02) 4%,
+    rgba(0,0,0,0.08) 8%,
+    rgba(0,0,0,0.18) 13%,
+    rgba(0,0,0,0.32) 18%,
+    rgba(0,0,0,0.5) 23%,
+    rgba(0,0,0,0.68) 28%,
+    rgba(0,0,0,0.84) 33%,
+    rgba(0,0,0,0.95) 38%,
+    #000 42%,
     #000 100%);
   -webkit-mask-image: var(--hero-mask);
   mask-image: var(--hero-mask);
@@ -430,7 +437,7 @@ const coreFeatures = [
 /* ───── SOLUTION ───── */
 .solution-row {
   display: grid;
-  grid-template-columns: 1.25fr 1fr;  /* 이미지 더 크게, 텍스트는 작게 */
+  grid-template-columns: 1.5fr 1fr;  /* 대시보드 이미지를 더 시원하게 강조 */
   gap: 80px;
   align-items: center;
 }
@@ -438,9 +445,14 @@ const coreFeatures = [
 .solution-img {
   width: 100%;
   height: auto;
-  border-radius: 12px;
+  border-radius: 14px;
   display: block;
-  box-shadow: 0 14px 40px rgba(15, 40, 90, 0.12);
+  box-shadow: 0 24px 60px rgba(15, 40, 90, 0.18), 0 4px 14px rgba(15, 40, 90, 0.06);
+  transition: transform 0.4s, box-shadow 0.4s;
+}
+.solution-img:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 32px 80px rgba(37, 99, 235, 0.2), 0 8px 20px rgba(15, 40, 90, 0.08);
 }
 .solution-right h2 {
   font-family: "Pretendard Variable", Pretendard, sans-serif;

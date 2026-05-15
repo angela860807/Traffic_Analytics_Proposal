@@ -218,11 +218,11 @@ const highlight = (text) => {
   align-items: center;
   margin-bottom: 12px;
 }
-.info { font-size: 14.5px; color: var(--t2); font-weight: 300; }
+.info { font-size: 16px; color: var(--t); opacity: 0.72; font-weight: 500; }
 .wbtn {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 9px 18px; background: var(--a); color: var(--bg);
-  font-family: "JetBrains Mono", monospace; font-size: 12.5px;
+  padding: 11px 22px; background: var(--a); color: var(--bg);
+  font-family: "JetBrains Mono", monospace; font-size: 14px;
   font-weight: 700; letter-spacing: 0.08em; border-radius: 4px;
   cursor: pointer; border: none;
 }
@@ -243,8 +243,8 @@ const highlight = (text) => {
 }
 .s-ico { padding: 0 10px; display: flex; align-items: center; color: var(--t3); flex-shrink: 0; }
 .s-input {
-  flex: 1; padding: 11px 0; background: none; border: none;
-  font-size: 14px; color: var(--t); outline: none;
+  flex: 1; padding: 12px 0; background: none; border: none;
+  font-size: 15px; color: var(--t); outline: none;
   font-family: "Noto Sans KR", sans-serif;
 }
 .s-input::placeholder { color: var(--t3); }
@@ -255,7 +255,7 @@ const highlight = (text) => {
 }
 .s-clear:hover { color: var(--t); }
 .s-count {
-  font-family: "JetBrains Mono", monospace; font-size: 11px;
+  font-family: "JetBrains Mono", monospace; font-size: 12.5px;
   color: var(--a); padding: 0 10px 0 0; white-space: nowrap; flex-shrink: 0;
 }
 
@@ -265,14 +265,14 @@ const highlight = (text) => {
   border-radius: 7px; overflow: hidden; margin-bottom: 14px;
 }
 .th {
-  padding: 12px 18px; border-bottom: 1px solid var(--b);
+  padding: 14px 20px; border-bottom: 1px solid var(--b);
   background: rgba(255, 255, 255, 0.025);
   font-family: "JetBrains Mono", monospace;
-  font-size: 11px; letter-spacing: 0.1em; color: var(--t3);
+  font-size: 12.5px; letter-spacing: 0.1em; color: var(--t2);
 }
 .tr {
-  padding: 13px 18px; border-bottom: 1px solid var(--b);
-  font-size: 14px; align-items: center;
+  padding: 15px 20px; border-bottom: 1px solid var(--b);
+  font-size: 15.5px; align-items: center;
   transition: background 0.15s; cursor: pointer;
 }
 .tr:hover { background: rgba(255, 255, 255, 0.03); }
@@ -285,15 +285,15 @@ const highlight = (text) => {
 .ttl-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--t); }
 .chv { flex-shrink: 0; color: var(--t3); transition: transform 0.2s; }
 .chv.open { transform: rotate(90deg); color: var(--a); }
-.sub { font-size: 13px; color: var(--t3); }
-.mono { font-family: "JetBrains Mono", monospace; font-size: 12px; }
+.sub { font-size: 14px; color: var(--t2); }
+.mono { font-family: "JetBrains Mono", monospace; font-size: 13.5px; }
 .nb {
-  font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+  font-family: "JetBrains Mono", monospace; font-size: 11.5px;
   background: rgba(255, 255, 255, 0.1); color: var(--a);
-  padding: 2px 7px; border-radius: 100px; flex-shrink: 0;
+  padding: 3px 8px; border-radius: 100px; flex-shrink: 0;
 }
 .cc {
-  font-family: "JetBrains Mono", monospace; font-size: 11px;
+  font-family: "JetBrains Mono", monospace; font-size: 12.5px;
   color: var(--t3); flex-shrink: 0;
 }
 
@@ -305,9 +305,9 @@ const highlight = (text) => {
 }
 .cphead {
   display: flex; align-items: center; gap: 6px;
-  padding: 12px 18px;
-  font-family: "JetBrains Mono", monospace; font-size: 12px;
-  color: var(--t3); border-bottom: 1px solid var(--b);
+  padding: 14px 20px;
+  font-family: "JetBrains Mono", monospace; font-size: 13.5px;
+  color: var(--t2); border-bottom: 1px solid var(--b);
 }
 .cphead strong { color: var(--a); }
 
@@ -322,11 +322,11 @@ const highlight = (text) => {
   margin-bottom: 5px;
 }
 .caut {
-  font-family: "JetBrains Mono", monospace; font-size: 12px;
-  color: var(--a); font-weight: 500;
+  font-family: "JetBrains Mono", monospace; font-size: 13.5px;
+  color: var(--a); font-weight: 600;
 }
 .ctm {
-  font-family: "JetBrains Mono", monospace; font-size: 11px;
+  font-family: "JetBrains Mono", monospace; font-size: 12.5px;
   color: var(--t3); flex: 1;
 }
 .cacts { display: flex; gap: 4px; }
@@ -338,7 +338,7 @@ const highlight = (text) => {
 }
 .cact:hover { border-color: var(--ba); color: var(--a); }
 .cact.del:hover { border-color: rgba(248, 113, 113, 0.4); color: #f87171; }
-.ctxt { font-size: 14px; color: var(--t2); line-height: 1.7; white-space: pre-wrap; }
+.ctxt { font-size: 15px; color: var(--t); opacity: 0.85; line-height: 1.7; white-space: pre-wrap; }
 
 .cempty {
   padding: 22px 18px; font-size: 13px; color: var(--t3); text-align: center;
@@ -399,12 +399,12 @@ const highlight = (text) => {
 .clogin {
   padding: 16px 18px;
   border-top: 1px solid var(--b);
-  font-size: 13.5px; color: var(--t3);
+  font-size: 14.5px; color: var(--t2);
   display: flex; align-items: center; gap: 5px;
 }
 .clink {
   background: none; border: none; color: var(--a);
-  font-size: 13.5px; cursor: pointer; text-decoration: underline;
+  font-size: 14.5px; cursor: pointer; text-decoration: underline;
   font-family: "Noto Sans KR", sans-serif; padding: 0;
 }
 
@@ -416,16 +416,16 @@ const highlight = (text) => {
 
 .empty {
   padding: 32px 18px; display: flex; align-items: center;
-  justify-content: center; gap: 8px; font-size: 13.5px; color: var(--t3);
+  justify-content: center; gap: 8px; font-size: 14.5px; color: var(--t2);
 }
 
 /* ── 페이지네이션 ── */
 .pagi { display: flex; gap: 5px; justify-content: center; }
 .pg {
-  width: 34px; height: 34px; border-radius: 4px;
+  width: 36px; height: 36px; border-radius: 4px;
   border: 1px solid var(--b); background: transparent;
-  color: var(--t3); font-family: "JetBrains Mono", monospace;
-  font-size: 12.5px; cursor: pointer; transition: all 0.2s;
+  color: var(--t2); font-family: "JetBrains Mono", monospace;
+  font-size: 14px; cursor: pointer; transition: all 0.2s;
 }
 .pg:hover, .pg.on {
   border-color: var(--ba); color: var(--a);
