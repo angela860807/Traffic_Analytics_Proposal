@@ -24,6 +24,7 @@ public class HourlyTrafficStatService {
 
     private final HourlyTrafficStatRepository hourlyTrafficStatRepository;
     private final VehicleFlowEventRepository vehicleFlowEventRepository;
+    private final TrafficAnalysisIndexService trafficAnalysisIndexService;
 
     public List<TrafficStatResponse> getHourlyStats(TrafficStatSearchRequest request) {
         List<HourlyTrafficStat> stats;
@@ -62,13 +63,17 @@ public class HourlyTrafficStatService {
                 .filter(event -> event.getFlowDirection() == Direction.OUT)
                 .count();
 
+        boolean hasSpeedSamples = eventsForAnalysis.stream()
+                .anyMatch(event -> event.getSpeed() != null);
         double avgSpeed = eventsForAnalysis.stream()
-                .mapToDouble(event -> event.getSpeed() != null ? event.getSpeed().doubleValue() : 0.0)
+                .filter(event -> event.getSpeed() != null)
+                .mapToDouble(event -> event.getSpeed().doubleValue())
                 .average()
                 .orElse(0.0);
 
         double avgStayTime = eventsForAnalysis.stream()
-                .mapToDouble(event -> event.getStayTime() != null ? event.getStayTime() : 0.0)
+                .filter(event -> event.getStayTime() != null)
+                .mapToDouble(VehicleFlowEvent::getStayTime)
                 .average()
                 .orElse(0.0);
 
@@ -76,7 +81,11 @@ public class HourlyTrafficStatService {
         int duplicateCount = (int) ((currentInCount + currentOutCount) - totalUniqueVehicles);
         duplicateCount = Math.max(0, duplicateCount);
 
-        double congestionScore = calculateCongestionScore((int) (currentInCount + currentOutCount), avgSpeed);
+        double congestionScore = hasSpeedSamples
+                ? calculateCongestionScore((int) (currentInCount + currentOutCount), avgSpeed)
+                : 0.0;
+        VehicleFlowEvent lastEvent = eventsForAnalysis.get(eventsForAnalysis.size() - 1);
+        Long lastLogId = lastEvent.getSourceDetectionLog().getLogId();
 
         HourlyTrafficStat stat = hourlyTrafficStatRepository.findByZoneZoneIdAndStatDateAndStatHour(
                         zone.getZoneId(), statDate, statHour)
@@ -93,10 +102,16 @@ public class HourlyTrafficStatService {
                 BigDecimal.valueOf(congestionScore),
                 BigDecimal.valueOf(avgStayTime),
                 duplicateCount,
-                0L
+                lastLogId
         );
 
         hourlyTrafficStatRepository.save(stat);
+        trafficAnalysisIndexService.updateCheckpoint(
+                zone,
+                lastEvent.getFlowEventId(),
+                lastLogId,
+                lastEvent.getEventAt()
+        );
     }
 
     private double calculateCongestionScore(int totalCount, double avgSpeed) {

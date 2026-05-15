@@ -69,8 +69,8 @@ public class VehicleFlowEvent {
         this.eventAt = (eventAt != null) ? eventAt : LocalDateTime.now();
         this.sourceDetectionLog = sourceDetectionLog;
         this.sourceAnalysisResult = sourceAnalysisResult; // 할당 추가
-        this.speed = (speed != null) ? speed : BigDecimal.ZERO;
-        this.stayTime = (stayTime != null) ? stayTime : 0L;
+        this.speed = speed;
+        this.stayTime = stayTime;
         this.createdAt = LocalDateTime.now();
     }
 }
