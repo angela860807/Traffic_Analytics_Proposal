@@ -76,7 +76,7 @@ class StreamEventService:
     ) -> StreamProcessingResult:
         received_monotonic = time.monotonic()
         image = self.image_decoder.decode_image_bytes(image_bytes)
-        detection = self.inference_service.detect_plate_bbox_from_image(image)
+        detection = self.inference_service.detect_vehicle_bbox_from_image(image)
         bboxes = [box.bbox for box in detection.boxes]
 
         frame = self._build_buffered_frame(
@@ -123,7 +123,7 @@ class StreamEventService:
             result = await self._finalize_event(event)
             del self._events_by_camera[camera_code]
             logger.info(
-                "bbox event finalized: eventId=%s cameraCode=%s frames=%s ageSeconds=%.2f resultPlate=%s resultType=%s",
+                "vehicle event finalized: eventId=%s cameraCode=%s frames=%s ageSeconds=%.2f resultPlate=%s resultType=%s",
                 event.event_id,
                 camera_code,
                 len(event.frames),
@@ -172,7 +172,7 @@ class StreamEventService:
         )
         self._events_by_camera[camera_code] = event
         logger.info(
-            "bbox event started: eventId=%s cameraCode=%s preBufferFrames=%s",
+            "vehicle event started: eventId=%s cameraCode=%s preBufferFrames=%s",
             event.event_id,
             camera_code,
             len(event.frames),
@@ -209,7 +209,7 @@ class StreamEventService:
 
         if not candidates:
             logger.info(
-                "bbox event has no OCR candidates: eventId=%s cameraCode=%s frames=%s",
+                "vehicle event has no OCR candidates: eventId=%s cameraCode=%s frames=%s",
                 event.event_id,
                 event.camera_code,
                 len(event.frames),
@@ -225,7 +225,7 @@ class StreamEventService:
         best_candidate = top_candidates[0]
 
         logger.info(
-            "bbox event OCR candidates selected: eventId=%s cameraCode=%s candidates=%s bestScore=%.4f bestConfidence=%.4f bestBlur=%.2f",
+            "vehicle event OCR candidates selected: eventId=%s cameraCode=%s candidates=%s bestScore=%.4f bestConfidence=%.4f bestBlur=%.2f",
             event.event_id,
             event.camera_code,
             len(candidates),

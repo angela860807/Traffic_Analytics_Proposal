@@ -1,10 +1,12 @@
 package com.example.traffic.controller;
 
 import com.example.traffic.common.enums.DetectionLogStatus;
+import com.example.traffic.common.enums.DetectionType;
 import com.example.traffic.domain.DetectionAnalysisResult;
 import com.example.traffic.domain.DetectionLog;
 import com.example.traffic.repository.DetectionAnalysisResultRepository;
 import com.example.traffic.repository.DetectionLogRepository;
+import com.example.traffic.repository.TrafficAnalysisIndexRepository;
 import com.example.traffic.repository.VehicleFlowEventRepository;
 import com.example.traffic.repository.VehicleRepository;
 import org.junit.jupiter.api.Test;
@@ -41,6 +43,9 @@ class DetectionLogControllerIntegrationTest {
 
     @Autowired
     private VehicleFlowEventRepository vehicleFlowEventRepository;
+
+    @Autowired
+    private TrafficAnalysisIndexRepository trafficAnalysisIndexRepository;
 
     @Test
     void processDetectionSavesLogAnalysisResultVehicleAndFlowEvent() throws Exception {
@@ -96,6 +101,13 @@ class DetectionLogControllerIntegrationTest {
         assertThat(savedResult.getPlateCropImageUrl()).isEqualTo(plateCropImageUrl);
         assertThat(savedResult.getOcrImagePath()).isEqualTo(ocrImagePath);
         assertThat(savedResult.getOcrImageUrl()).isEqualTo(ocrImageUrl);
+        assertThat(trafficAnalysisIndexRepository.findByZoneZoneId(savedLog.getCamera().getZone().getZoneId()))
+                .isPresent()
+                .get()
+                .satisfies(index -> {
+                    assertThat(index.getLastLogId()).isEqualTo(savedLog.getLogId());
+                    assertThat(index.getLastLogTime()).isEqualTo(savedLog.getDetectedAt());
+                });
     }
 
     @Test
@@ -135,7 +147,7 @@ class DetectionLogControllerIntegrationTest {
                                   "imagePath": "storage/detections/2026/05/12/CAM_001_103500_frame.jpg",
                                   "imageUrl": "%s",
                                   "detectedAt": "2026-05-12T10:35:00",
-                                  "detectionType": "VEHICLE",
+                                  "detectionType": "UNKNOWN",
                                   "status": "OCR_FAILED"
                                 }
                 """.formatted(imageUrl)))
@@ -156,6 +168,7 @@ class DetectionLogControllerIntegrationTest {
         assertThat(vehicleRepository.count()).isEqualTo(vehicleCountBefore);
         assertThat(vehicleFlowEventRepository.count()).isEqualTo(flowEventCountBefore);
         assertThat(savedResult.getStatus()).isEqualTo(DetectionLogStatus.OCR_FAILED);
+        assertThat(savedResult.getDetectionType()).isEqualTo(DetectionType.UNKNOWN);
     }
 
     @Test
