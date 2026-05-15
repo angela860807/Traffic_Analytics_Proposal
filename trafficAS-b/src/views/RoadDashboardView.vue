@@ -359,7 +359,13 @@
                 </div>
                 <div class="v2-ocr-body">
                   <div class="v2-ocr-photo">
-                    <img v-if="latestPlate.id && plateImg(latestPlate)" :src="plateImg(latestPlate)" class="v2-ocr-photo-img" :alt="latestPlate.num" />
+                    <img
+                      v-if="latestPlate.id && plateDisplayImage(latestPlate)"
+                      :src="plateDisplayImage(latestPlate)"
+                      class="v2-ocr-photo-img"
+                      :alt="latestPlate.num"
+                      @error="markPlateImageFailed(plateDisplayImage(latestPlate))"
+                    />
                     <div v-else-if="latestPlate.id" class="v2-ocr-photo-empty">
                       <i class="bi bi-image"></i>
                       <span>이미지 없음</span>
@@ -394,7 +400,13 @@
                     :class="{ active: p.id === latestPlate.id }"
                     @click="selectPlate(p)"
                   >
-                    <img v-if="plateImg(p)" :src="plateImg(p)" class="v2-ocr-thumb-img" :alt="p.num" />
+                    <img
+                      v-if="plateDisplayImage(p)"
+                      :src="plateDisplayImage(p)"
+                      class="v2-ocr-thumb-img"
+                      :alt="p.num"
+                      @error="markPlateImageFailed(plateDisplayImage(p))"
+                    />
                     <div v-else class="v2-ocr-thumb-empty"><i class="bi bi-image"></i></div>
                     <div class="v2-ocr-thumb-time mono">{{ p.time }}</div>
                     <div class="v2-ocr-thumb-plate mono">{{ p.num }}</div>
@@ -704,6 +716,7 @@ import * as echarts from "echarts";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DISTRICT_LIST, INITIAL_DISTRICTS_WEATHER } from "@/data/weather";
+import { apiGet } from "@/api/client";
 
 /* 대시보드 탭은 클릭 시점에 로드 — 첫 진입 시 overview만 빠르게 표시 */
 const EventsTab     = defineAsyncComponent(() => import("@/components/dashboard/EventsTab.vue"));
@@ -888,26 +901,39 @@ const latestPlate = computed(() => {
 })
 const recentPlates = computed(() => plates.value.slice(0, 5))
 const logPlates = computed(() => plates.value.slice(0, 8))
+const failedPlateImageUrls = ref(new Set())
+
+function plateDisplayImage(plate) {
+  const url = plateImg(plate)
+  return url && !failedPlateImageUrls.value.has(url) ? url : ''
+}
+
+function markPlateImageFailed(url) {
+  if (!url) return
+  const next = new Set(failedPlateImageUrls.value)
+  next.add(url)
+  failedPlateImageUrls.value = next
+}
+
 /* 이미지 우선순위: plateCropImageUrl → cropUrl → imageUrl → placeholder */
 /* 백엔드 응답 → 프론트 데이터 정규화 (설계서 필드명 호환) */
 function normalizePlate(p) {
-  /* detectedAt이 UTC ISO든 로컬이든 Date 객체로 한 번 거쳐서 로컬 yyyy-MM-dd / HH:mm:ss 추출 */
   let d = '', t = ''
   if (p.detectedAt) {
     const dt = new Date(p.detectedAt)
     if (!isNaN(dt)) {
-      d = dt.toLocaleDateString('sv-SE')              // 'sv-SE' → yyyy-MM-dd
-      t = dt.toLocaleTimeString('en-GB', { hour12: false })  // HH:mm:ss
+      d = dt.toLocaleDateString('sv-SE')
+      t = dt.toLocaleTimeString('en-GB', { hour12: false })
     }
   }
   return {
-    id:       p.id ?? p.detectionLogId,
+    id:       p.logId ?? p.id ?? p.detectionLogId,
     num:      p.plateNumber ?? p.num ?? '미인식',
     cam:      p.cameraName ?? p.cameraCode ?? p.cam ?? '-',
     date:     p.date ?? d ?? todayStr,
     time:     p.time ?? t,
     conf:     p.conf ?? Math.round((p.confidenceScore ?? 0) * 100),
-    dir:      p.dir ?? 'in',
+    dir:      (p.dir ?? p.directionType ?? 'IN').toLowerCase(),
     cropUrl:  p.cropUrl ?? p.plateCropImageUrl,
     imageUrl: p.imageUrl,
     ocrUrl:   p.ocrUrl ?? p.ocrImageUrl,
@@ -1192,17 +1218,21 @@ async function fetchRoadCongestion() {
     return null;
   }
 }
-/* FastAPI 연동: 최근 OCR 인식 번호판 가져오기. 응답: [{id,num,cam,time,conf,dir,cropUrl}] */
+/* Spring 연동: 최근 detection log를 OCR 패널/로그 테이블 계약으로 사용 */
 async function fetchRecentPlates(limit = 20) {
-  if (!FASTAPI_BASE) return null;
   try {
-    const r = await fetch(`${FASTAPI_BASE}/api/v1/plates/recent?limit=${limit}`, {
-      signal: AbortSignal.timeout(2000),
-    });
-    if (!r.ok) return null;
-    return await r.json();
-  } catch {
-    return null;
+    const body = await apiGet('/api/v1/detection-logs')
+    return (body.data || []).slice(0, limit)
+  } catch (error) {
+    console.warn('Failed to load detection logs', error)
+    return null
+  }
+}
+
+async function refreshRecentPlates() {
+  const apiPlates = await fetchRecentPlates(20);
+  if (Array.isArray(apiPlates)) {
+    plates.value = apiPlates.map(normalizePlate);
   }
 }
 
@@ -1494,6 +1524,8 @@ onMounted(async () => {
     currentDistrictIdx.value = (currentDistrictIdx.value + 1) % DISTRICT_LIST.length
   }, 5000)
 
+  refreshRecentPlates()
+
   // 드래그로 카드 순서 바뀌면 차트 컨테이너가 재마운트되므로 재초기화
   watch([congEl, sparkEl, heatmapEl], async () => {
     await nextTick()
@@ -1530,31 +1562,7 @@ onMounted(async () => {
       applyRoadCongestion(demo);
     }
 
-    // 백엔드에서 최근 인식 plates 받기 (없으면 로컬 데모 생성)
-    const apiPlates = await fetchRecentPlates(20);
-    if (apiPlates && Array.isArray(apiPlates) && apiPlates.length) {
-      plates.value = apiPlates.map(normalizePlate);
-    } else {
-      const now = new Date();
-      const ts = [now.getHours(), now.getMinutes(), now.getSeconds()]
-        .map((v) => String(v).padStart(2, "0")).join(":");
-      const cams = cameraFeeds.map((c) => c.name);
-      plates.value = [{
-        id: Date.now(),
-        num: `${Math.floor(10 + Math.random() * 89)}${
-          "가나다라마바사아자차"[Math.floor(Math.random() * 10)]
-        } ${Math.floor(1000 + Math.random() * 9000)}`,
-        cam: cams[Math.floor(Math.random() * cams.length)],
-        date: todayStr,
-        time: ts,
-        conf: 88 + Math.round(Math.random() * 10),
-        dir: Math.random() > 0.5 ? "in" : "out",
-        status: (() => {
-          const r = Math.random()
-          return r > 0.9 ? 'OCR_FAILED' : r > 0.78 ? 'DUPLICATE_SKIPPED' : 'FLOW_EVENT_CREATED'
-        })(),
-      }, ...plates.value].slice(0, 20);
-    }
+    await refreshRecentPlates()
 
     if (charts.donut) charts.donut.setOption(donutOpt());
   }, 3000);

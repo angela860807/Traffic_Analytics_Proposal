@@ -24,6 +24,7 @@ public class VehicleFlowEventService {
 
     private final VehicleFlowEventRepository flowEventRepository;
     private final ZoneRepository zoneRepository;
+    private final TrafficAnalysisIndexService trafficAnalysisIndexService;
 
     public List<FlowEventResponse> getVehicleHistory(Long vehicleId) {
         return flowEventRepository.findByVehicleIdWithDetails(vehicleId).stream()
@@ -61,6 +62,13 @@ public class VehicleFlowEventService {
                 .build();
 
         VehicleFlowEvent savedEvent = flowEventRepository.save(flowEvent);
+        trafficAnalysisIndexService.updateCheckpoint(
+                savedEvent.getZone(),
+                savedEvent.getFlowEventId(),
+                savedEvent.getSourceDetectionLog().getLogId(),
+                savedEvent.getEventAt()
+        );
+
         return FlowEventResponse.from(savedEvent);
     }
 

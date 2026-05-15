@@ -47,8 +47,8 @@ Vue Router 네비게이션 가드에서 비관리자 계정 접근을 차단.
 관리자 계정으로 로그인해야 합니다.
 
 ```
-이메일 : admin@trafficAS.com
-비밀번호 : admin1234
+이메일 : admin@email.com
+비밀번호 : 1234
 ```
 
 ### 관련 코드
@@ -69,7 +69,7 @@ router.beforeEach((to) => {
 ## 2. 관리자 계정 로그인 실패
 
 ### 증상
-`admin@trafficAS.com` / `admin1234` 로 로그인 시 "계정 정보가 맞지 않습니다" 오류 발생.
+`admin@email.com` / `1234` 로 로그인 시 "계정 정보가 맞지 않습니다" 오류 발생.
 
 ### 원인
 `useAuth.js`의 관리자 계정 초기화 IIFE가 기존 데이터를 덮어쓰지 않고 조건부로만 추가하여, localStorage에 잘못된 패스워드로 저장된 관리자 데이터가 남아있으면 갱신되지 않음.

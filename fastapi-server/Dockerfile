@@ -2,13 +2,20 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+ENV FLAGS_use_onednn=0 \
+    FLAGS_use_mkldnn=0 \
+    PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True \
+    YOLO_CONFIG_DIR=/tmp/Ultralytics
 
-COPY requirements.txt .
+RUN apt-get update \
+    && apt-get install -y libgl1 libglib2.0-0 libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY fastapi-server/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app ./app
-COPY samples ./samples
+COPY fastapi-server/app ./app
+COPY fastapi-server/samples ./samples
 
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
