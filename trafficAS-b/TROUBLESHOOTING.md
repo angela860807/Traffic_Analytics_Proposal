@@ -25,6 +25,12 @@
 17. [UTC 응답이 자정 근처 날짜 어긋남](#17-utc-응답-날짜-어긋남)
 18. [프로덕션에서 가짜 차량 사진이 보이는 문제](#18-프로덕션-가짜-차량-사진)
 19. [백엔드 응답에 이미지 URL이 없을 때 ＜img＞ 깨짐](#19-이미지-없을-때-img-깨짐)
+20. [PR "Can't automatically merge" 충돌 해결 패턴](#20-pr-충돌-해결-패턴)
+21. [머지 후 index.html / .env 등 핵심 파일이 통째로 사라진 사고](#21-머지-사고-파일-삭제)
+22. ["vite is not recognized" — node_modules 깨짐](#22-vite-명령-인식-실패)
+23. [Failed to resolve import — 비디오 파일 누락](#23-비디오-파일-누락)
+24. [관리자 로그인됐는데 대시보드 버튼이 안 보임 (JWT role)](#24-jwt-role-누락)
+25. [Vite 캐시 꼬임 — normalizeUrl 오류](#25-vite-캐시-꼬임)
 
 ---
 
@@ -816,6 +822,255 @@ function plateImg(p) {
 
 ---
 
+## 20. PR 충돌 해결 패턴
+
+### 증상
+GitHub PR 페이지에 빨간색 `This branch has conflicts that must be resolved`. 머지 버튼 비활성화. 충돌 파일 10~20개.
+
+### 원인
+- 같은 파일을 양쪽 브랜치(yoon ↔ main)에서 다르게 수정
+- node_modules가 git tracked 상태이면 모든 npm install 결과가 충돌로 잡힘 (#21 참조)
+- 머지 commit 직전 / 직후 폴더 구조 리팩토링 시 add/add 충돌 발생
+
+### 해결 패턴 — 영역별 채택 전략
+
+**A. 안전 백업 + 머지 시도**
+```bash
+git branch yoon-backup-$(date +%Y%m%d)  # 백업
+git stash --include-untracked            # 미추적 파일 일시 보관
+git fetch origin
+git merge origin/main                    # 충돌 발견
+```
+
+**B. 영역별 채택 결정**
+
+| 영역 | 채택 | 이유 |
+|---|---|---|
+| 백엔드 연동 (`useAuth.js`, `LoginView`, `SignupView`, `AuthModal`) | **theirs (main)** | 메모리 룰: 백엔드 코드 수정 금지 |
+| 인프라 설정 (`vite.config.js`) | **theirs** | 백엔드 프록시 등 정합성 |
+| 의존성 (`package.json`) | 더 완전한 쪽 | echarts/leaflet 등 누락 없는 버전 |
+| 문서 (`README`, `TROUBLESHOOTING`) | **ours** | 최신 갱신본 보존 |
+| 프론트 컴포넌트 (대시보드/뷰) | **ours** | 디자인 시스템 일관성 |
+| `package-lock.json` | **ours** | 어차피 `npm install`로 재생성됨 |
+
+```bash
+# 채택 명령
+git checkout --ours <파일>      # yoon 버전 유지
+git checkout --theirs <파일>    # main 버전 채택
+git add <파일>
+```
+
+**C. 머지 마무리**
+```bash
+git commit
+git stash pop                            # 백업 복원
+npm install                              # 의존성 재생성
+npm run build                            # 깨짐 검증
+git push origin yoon
+```
+
+### 핵심 원칙
+- 영역(인증·인프라·UI·문서)별로 일관된 정책 유지
+- 충돌 해결 후 반드시 `npm run build` 통과 확인
+- 머지 시 `git status`에 예상치 못한 deletion 있으면 `git diff --diff-filter=D --name-only HEAD~1` 로 점검
+
+---
+
+## 21. 머지 사고 — 파일 삭제
+
+### 증상
+머지 직후 `npm run dev` 실행 시 Vite 오류:
+```
+Could not auto-determine entry point from rollupOptions or html files
+```
+`README.md`, `TROUBLESHOOTING.md`, `index.html`, `.env` 등이 working tree에서 사라짐.
+
+### 원인
+머지 시 충돌 해결을 너무 광범위하게 `--theirs` 적용하거나, GitHub 웹 conflict editor에서 "delete" 옵션을 잘못 선택하면 핵심 파일이 머지 커밋에서 삭제됨. **node_modules 충돌 200건 사이에 진짜 중요한 파일이 묻혀서 같이 휩쓸리는 게 전형적**.
+
+### 해결 — 부모 커밋에서 복구
+```bash
+# 1) 어느 커밋에서 삭제됐는지 확인
+git log --diff-filter=D --name-only -- "trafficAS-b/index.html"
+
+# 2) 부모 커밋(commit^)에서 파일 내용 가져와 복원
+git show <머지커밋>^:trafficAS-b/index.html > trafficAS-b/index.html
+git show <머지커밋>^:trafficAS-b/.env > trafficAS-b/.env
+git show <머지커밋>^:trafficAS-b/README.md > trafficAS-b/README.md
+git show <머지커밋>^:trafficAS-b/TROUBLESHOOTING.md > trafficAS-b/TROUBLESHOOTING.md
+
+# 3) 복원본 commit
+git add trafficAS-b/index.html trafficAS-b/.env ...
+git commit -m "fix: 누락 파일 복구"
+```
+
+### 예방
+- 머지 전 `git status`로 변경 파일 목록 확인
+- 머지 후 `git diff <prev>..HEAD --stat | grep -v node_modules`로 비node_modules 변화 검토
+- `.gitignore`에 `node_modules/`, `dist/`, `.env` 등록 (#22 참조)
+
+---
+
+## 22. vite 명령 인식 실패
+
+### 증상
+`npm run dev` 실행 시:
+```
+'vite'은(는) 내부 또는 외부 명령, 실행할 수 있는 프로그램,
+또는 배치 파일이 아닙니다.
+```
+
+### 원인
+- `node_modules/vite/` 폴더는 있는데 `node_modules/.bin/vite` 심볼릭 링크가 없음
+- 다음 중 하나로 손상됨:
+  - 이전에 `git rm -r --cached node_modules` 같은 명령으로 일부 파일이 꼬임
+  - 디스크 정리 도구가 `.bin/` 폴더를 임시 파일로 오인하고 삭제
+  - npm install 중 중단
+
+### 해결
+```powershell
+# PowerShell에서
+Remove-Item -Recurse -Force node_modules, package-lock.json
+npm install
+```
+
+또는 bash:
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### 확인
+```bash
+ls node_modules/.bin/vite*
+# → vite, vite.cmd, vite.ps1 세 개 있어야 정상
+```
+
+---
+
+## 23. 비디오 파일 누락
+
+### 증상
+브라우저 콘솔에 빨간 에러:
+```
+[plugin:vite:vue] Failed to resolve import "/classify-video.mp4" from "src/views/MainView.vue".
+Does the file exist?
+```
+빌드 실패 또는 화면 깨짐.
+
+### 원인
+- 코드에서 `<source src="/xxx.mp4">` 참조하는 파일이 `public/` 폴더에 없음
+- 영상 교체하면서 옛 파일을 삭제·이동했는데 코드 업데이트 안 함
+- 또는 새 영상 추가하면서 파일명 오타
+
+### 해결
+
+**A. 파일 존재 여부 확인**
+```bash
+ls public/*.mp4
+```
+
+**B. 코드 vs 파일 매칭 검증**
+```bash
+grep -o 'src="/[^"]*\.mp4"' src/views/*.vue | sort -u
+ls public/*.mp4 | sed 's|public/|/|'
+# 두 출력을 비교해서 누락 파일 찾기
+```
+
+**C. 두 가지 처리 옵션**
+
+1. **파일 복원** — 백업/다운로드에서 가져와 `public/`에 배치
+2. **코드 수정** — 다른 존재하는 파일로 교체 또는 그 줄 삭제 (폴백 `<source>`가 있으면 자동 폴백됨)
+
+### 예방
+- `<source>` 태그는 항상 폴백 1개 이상 두기:
+```vue
+<video>
+  <source src="/main.mp4" type="video/mp4" />
+  <source src="/fallback.mp4" type="video/mp4" />
+</video>
+```
+- 파일 삭제 전 grep으로 참조 확인
+
+---
+
+## 24. JWT role 누락 — 대시보드 버튼 안 보임
+
+### 증상
+관리자 계정으로 로그인했는데 헤더에 **"대시보드"** 버튼이 안 나타남. `/dashboard` 직접 입력해도 메인으로 튕김.
+
+### 원인
+머지 후 새 `useAuth.js`(JWT 백엔드 연동 버전)의 `isAdmin` 판정 로직:
+```js
+const isAdmin = computed(() => _user.value?.role === 'ADMIN')
+```
+
+- 백엔드 JWT 토큰에 `auth: 'ROLE_ADMIN'`이 있어야 `role: 'ADMIN'` 부여됨
+- 백엔드 안 띄운 상태면 localStorage 옛 데이터에 `role` 필드 자체가 없음 → `isAdmin = false`
+
+### 해결
+
+**A. 빠른 임시 해결 — LocalStorage 수동 수정** (백엔드 없이 테스트)
+브라우저 콘솔(F12 → Console)에서:
+```js
+localStorage.setItem('tas_user', JSON.stringify({
+  email: 'admin@trafficAS.com',
+  role: 'ADMIN',
+  name: '관리자'
+}))
+location.reload()
+```
+
+**B. 정공법 — 백엔드 띄우고 정상 로그인**
+- Spring Boot 서버 실행 (port 8080)
+- `.env`에 `VITE_API_BASE_URL=http://localhost:8080`
+- 로그인 → JWT에 `ROLE_ADMIN` 포함 → 자동으로 `isAdmin` true
+
+### 관련 코드
+`src/composables/useAuth.js:41`, `73-82`
+
+---
+
+## 25. Vite 캐시 꼬임
+
+### 증상
+브라우저 콘솔 또는 Vite 터미널:
+```
+[plugin:vite:vue] (... 정상 코드인데 ...)
+   at normalizeUrl (.../node_modules/vite/dist/.../dep-xxx.js:...)
+```
+실제 코드는 문법적으로 정상인데도 Vite가 이상한 위치에서 에러 발생.
+
+### 원인
+Vite의 의존성 사전 번들 캐시(`node_modules/.vite/`) 가 꼬여서 발생.
+주로 다음 직후에 일어남:
+- `npm install` 중간 중단
+- 머지 후 dependencies 바뀜
+- Node 버전 변경
+
+### 해결
+```powershell
+# Vite dev 서버 중단 (Ctrl+C)
+Remove-Item -Recurse -Force node_modules\.vite
+npm run dev
+```
+
+bash:
+```bash
+rm -rf node_modules/.vite
+npm run dev
+```
+
+### 그래도 안 되면
+완전 재설치:
+```bash
+rm -rf node_modules package-lock.json
+npm install
+npm run dev
+```
+
+---
+
 ## 공통 디버깅 팁
 
 ### LocalStorage 초기화
@@ -851,3 +1106,148 @@ npm run dev
 - `[Leaflet HeatMap] 로드 실패: ...` — Leaflet 자체 초기화 실패 (드물게 발생)
 
 ---
+
+## 26. 메인 히어로 풀블리드 이미지의 좌우 한쪽만 잘리는 문제
+
+### 증상
+히어로 이미지를 `width: 100vw` + `margin-left: calc(-50vw + 50%)`로 풀블리드 처리했는데 좌측 끝에 빈 공간이 남거나 우측만 늘어남.
+
+### 원인
+`html { scrollbar-gutter: stable }`로 스크롤바 영역이 우측에 고정 예약되면서 `100vw`(뷰포트 전체) vs `100%`(body 너비) 간 비대칭이 생긴다. `left: 50%` + `transform: translateX(-50%)`처럼 양쪽으로 동일 보정되는 트릭을 안 쓰면 한쪽만 보정됨.
+
+### 해결
+```css
+.hero {
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
+  margin-right: calc(-50vw + 50%);
+}
+```
+또는 더 안전하게:
+```css
+.hero {
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+}
+```
+두 번째 방법이 스크롤바 거터 영향을 받지 않아 더 일관적이다.
+
+### 교훈
+풀블리드는 양쪽 동시 보정. 한쪽 마진만으로 처리하면 OS/브라우저별 스크롤바 정책에 영향받음.
+
+---
+
+## 27. 카드 섹션이 히어로 끝선에 자연스럽게 걸치게 하는 패턴
+
+### 증상
+시안상 4개 피처 카드가 히어로 하단 라인에 절반쯤 걸쳐 있어야 하는데, 단순히 다음 섹션에 두면 히어로와 분리돼서 어색함.
+
+### 해결
+```css
+.hero-in { padding-bottom: 110px; }       /* 카드 침범 공간 확보 */
+.hero + .sec {
+  margin-top: -50px;                       /* 히어로 끝선 위로 50px 올라옴 */
+  padding-top: 0;
+  position: relative;
+  z-index: 5;                              /* 히어로 위로 떠 보이게 */
+}
+```
+
+### 교훈
+`margin-top: 음수`로 다음 섹션을 끌어올리되, z-index로 레이어 명확화. 음수 값이 카드 높이를 넘어가면 다음 섹션의 시작점도 같이 끌려와 다른 섹션이 따라 움직이므로, 변동이 싫으면 동량의 `margin-bottom`을 더해 보정.
+
+---
+
+## 28. 한글 헤드라인이 단어 중간에서 잘리는 문제 ("만듭/니다")
+
+### 증상
+`<h1>스마트한 교통 환경을 만듭니다.</h1>`가 좁은 컨테이너에서 `만듭` / `니다`로 어절 중간이 끊김.
+
+### 원인
+CSS 기본 줄바꿈은 CJK 문자에 대해 어디서든 줄바꿈을 허용한다(`word-break: normal`).
+
+### 해결
+```css
+h1, p {
+  word-break: keep-all;       /* 어절 단위로만 줄바꿈 */
+  overflow-wrap: break-word;  /* 너무 긴 단어는 어쩔 수 없이 끊김 허용 */
+}
+```
+
+### 교훈
+한글 본문/제목 영역엔 거의 항상 `word-break: keep-all` 적용 필수. 영문 사이트 톤 그대로 가져오면 어절이 깨진다.
+
+---
+
+## 29. Vue scoped CSS에서 자식 컴포넌트 가득 채우기 실패
+
+### 증상
+SupportView의 `.panel` 박스 안에 `<BoardTab />` 같은 자식 컴포넌트를 넣었는데 `flex: 1; height: 100%`를 줘도 박스를 채우지 못함.
+
+### 원인
+Vue scoped 스타일은 `data-v-X` 속성으로 셀렉터를 한정한다. `.panel > *`는 부모(SupportView)의 hash로 매칭되지만 자식 컴포넌트의 루트는 그 컴포넌트(BoardTab)의 hash를 가지므로 매칭 안 됨.
+
+### 해결
+`:deep()` 셀렉터로 스코프를 뚫는다.
+```css
+.panel-inner :deep(> *) {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+}
+.panel-inner :deep(.tbl) { flex: 1; min-height: 0; }
+```
+또는 wrapping div를 SupportView 템플릿에 넣어서 직접 스타일링 (scope 매칭 가능).
+
+### 교훈
+scoped + 자식 컴포넌트 = `:deep()` 거의 필수. 안 쓰면 디버깅 한참 헤맴.
+
+---
+
+## 30. Lucide Vue 패키지 이름 혼동
+
+### 증상
+`import { Cctv } from '@lucide/vue'` 했더니 `Cannot find module` 에러.
+
+### 원인
+Lucide 공식 Vue 3 패키지는 **`lucide-vue-next`**다. `@lucide/vue`는 존재하지 않거나 다른 프로젝트 fork명.
+
+### 해결
+```bash
+npm install lucide-vue-next
+```
+```js
+import { Cctv, ScanText, BellRing, BarChart3, Network } from "lucide-vue-next";
+```
+
+### 교훈
+React용은 `lucide-react`, Vue 3용은 `lucide-vue-next`, Vue 2용은 `lucide-vue`. 검색 시 버전 매칭 주의.
+
+---
+
+## 31. `padding-top: 90px` 줘서 이미지 둥둥 떠 보이는 문제
+
+### 증상
+좌측 텍스트와 우측 이미지가 세로 정렬되도록 `.hero-right { padding-top: 80px }`을 주니까 이미지 위에 큰 빈 공간 생겨 "떠 있는" 느낌.
+
+### 원인
+패딩으로 이미지를 아래로 밀면 위쪽이 공백으로 보이게 됨. 이미지가 헤더 라인부터 가득 차야 자연스러움.
+
+### 해결
+- `padding-top` 제거
+- 대신 `.hero-in`의 `align-items: center` 또는 `align-items: stretch` 사용
+- 이미지에 `align-self: stretch`로 컨테이너 세로 가득
+
+```css
+.hero-in {
+  display: grid;
+  align-items: stretch;
+}
+.hero-right { align-self: stretch; }
+.hero-img { height: 100%; object-fit: cover; }
+```
+
+### 교훈
+"이미지 위치 조정"은 패딩보다 grid `align-self` 가 자연스럽다.
+

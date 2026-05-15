@@ -1,6 +1,12 @@
 import { ref, computed } from 'vue'
+import router from '@/router/index.js'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+
+/* 인증 상태 변경 후 홈으로 안전하게 이동 (라우터 미초기화 시 무시) */
+function goHome() {
+  try { router.push('/') } catch {}
+}
 
 const _user = ref(JSON.parse(localStorage.getItem('tas_user') || 'null'))
 const _showModal = ref(false)
@@ -61,6 +67,8 @@ export function useAuth() {
     const user = body.data
     localStorage.setItem('tas_user', JSON.stringify(user))
     _user.value = user
+    closeModal()
+    goHome()
     return user
   }
 
@@ -85,7 +93,8 @@ export function useAuth() {
     localStorage.setItem('tas_refresh_token', body.data?.refreshToken || '')
     localStorage.setItem('tas_user', JSON.stringify(user))
     _user.value = user
-
+    closeModal()
+    goHome()
     return user
   }
 
@@ -94,6 +103,7 @@ export function useAuth() {
     localStorage.removeItem('tas_refresh_token')
     localStorage.removeItem('tas_user')
     _user.value = null
+    goHome()
   }
 
   return { isLoggedIn, isAdmin, currentUser, showModal, modalMode, openLogin, openSignup, closeModal, signup, login, logout }

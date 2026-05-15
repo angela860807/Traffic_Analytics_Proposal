@@ -1,407 +1,272 @@
 <template>
   <div class="theme-navy" :class="{ light: !isDark }">
-    <AppNav @goChat="tab = 'chat'" />
+    <AppNav />
     <AppFab />
 
     <main class="content">
-      <!-- Header -->
-      <div class="ph">
-        <div class="ph-ey">CUSTOMER SUPPORT</div>
-        <h1>고객 <em>지원</em></h1>
-        <p class="ph-sub">게시판, Q&A, 실시간 채팅으로 도움을 드립니다.</p>
-      </div>
-
-      <div class="layout">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-          <nav class="sb-nav">
-            <button
-              class="sb-item"
-              v-for="ch in channels"
-              :key="ch.key"
-              :class="{ on: tab === ch.key }"
-              @click="tab = ch.key"
-            >
-              <div class="sb-item-top">
-                <span class="sb-tag">{{ ch.tag }}</span>
-                <span class="sb-badge" :class="{ live: ch.live }">{{ ch.badge }}</span>
+      <!-- HERO -->
+      <section class="hero">
+        <div class="hero-in">
+          <div class="hero-left">
+            <div class="hero-tag">ANNOUNCEMENTS</div>
+            <h1>공지<em>사항</em></h1>
+            <p class="hero-sub">
+              최신 업데이트와 중요한 소식을 확인하세요.<br />
+              운영 시간 안내와 함께 빠르고 정확한 정보를 제공합니다.
+            </p>
+            <div class="hero-channels">
+              <div class="hch">
+                <div class="hch-icon"><i class="bi bi-megaphone-fill"></i></div>
+                <div class="hch-name">공지사항</div>
+                <div class="hch-desc">최신 업데이트와{{ '\n' }}중요한 소식을 확인하세요.</div>
               </div>
-              <div class="sb-name">{{ ch.name }}</div>
-              <div class="sb-desc">{{ ch.desc }}</div>
-            </button>
-          </nav>
-
-          <div class="sb-footer">
-            <div class="st-row">
-              <span class="st-dot"></span>
-              <span class="st-text">6명 접속 중</span>
-              <span class="st-sep">·</span>
-              <span class="st-meta">실시간</span>
+              <div class="hch">
+                <div class="hch-icon"><i class="bi bi-clock-fill"></i></div>
+                <div class="hch-name">운영 시간</div>
+                <div class="hch-desc">평일 09:00 - 18:00 (KST){{ '\n' }}주말 및 공휴일 휴무</div>
+              </div>
             </div>
-            <div class="st-copy">© 2026 네바퀴 1조 · 스마트 모빌리티 DX Academy</div>
           </div>
-        </aside>
+          <div class="hero-right">
+            <img src="/sub3.png" alt="공지사항" class="hero-img" />
+          </div>
+        </div>
+      </section>
 
-        <!-- Content Panel -->
-        <section class="panel">
-          <div class="panel-head">
-            <div class="ph-info">
-              <span class="ph-tag">{{ active?.tag }}</span>
-              <span class="ph-name">{{ active?.name }}</span>
+      <!-- MAIN: 게시판 -->
+      <section class="sec">
+        <div class="sw">
+          <section class="panel">
+            <div class="panel-inner">
+              <BoardTab />
             </div>
-            <div class="ph-desc">{{ active?.desc }}</div>
+          </section>
+        </div>
+      </section>
+
+      <!-- VALUES -->
+      <section class="sec values-sec">
+        <div class="sw">
+          <div class="values-head">
+            <span class="values-line"></span>
+            <h2>Traffic AS가 제공하는 가치</h2>
           </div>
-          <div class="panel-body" :class="{ 'chat-mode': tab === 'chat' }">
-            <BoardTab v-if="tab === 'board'" />
-            <QnaTab v-if="tab === 'qna'" />
-            <ChatTab v-if="tab === 'chat'" />
+          <div class="values-grid">
+            <div v-for="v in values" :key="v.title" class="value-card">
+              <div class="value-icon"><i :class="v.icon"></i></div>
+              <div class="value-title">{{ v.title }}</div>
+              <p class="value-desc">{{ v.desc }}</p>
+            </div>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
+
+      <AppFooter />
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
-import { useRoute } from "vue-router";
 import AppNav from "@/components/AppNav.vue";
 import AppFab from "@/components/AppFab.vue";
+import AppFooter from "@/components/AppFooter.vue";
 import BoardTab from "@/components/BoardTab.vue";
-import QnaTab from "@/components/QnaTab.vue";
-import ChatTab from "@/components/ChatTab.vue";
 import { useTheme } from "@/composables/useTheme";
 
 const { isDark } = useTheme();
-const route = useRoute();
-const tab = ref("board");
 
-const channels = [
-  {
-    key: "board",
-    tag: "BOARD",
-    name: "게시판",
-    desc: "공지사항, 사용 후기, 활용 사례를 공유합니다.",
-    badge: "6",
-    live: false,
-  },
-  {
-    key: "qna",
-    tag: "Q&A",
-    name: "질문 & 답변",
-    desc: "기술적인 질문을 올리고 전문 답변을 받습니다.",
-    badge: "5",
-    live: false,
-  },
-  {
-    key: "chat",
-    tag: "LIVE CHAT",
-    name: "실시간 채팅",
-    desc: "운영팀과 실시간으로 즉시 소통합니다.",
-    badge: "Live",
-    live: true,
-  },
+const values = [
+  { icon: "bi bi-clock-history",         title: "빠른 응답",      desc: "실시간 모니터링으로 신속하게 확인하고 빠르게 답변합니다." },
+  { icon: "bi bi-person-badge-fill",     title: "전문 기술 지원", desc: "교통 AI & 백엔드 전문가가 정확한 기술 지원을 제공합니다." },
+  { icon: "bi bi-chat-square-dots-fill", title: "다양한 채널",    desc: "게시판, 공지사항으로 편리하게 정보를 전달합니다." },
+  { icon: "bi bi-shield-lock-fill",      title: "안전한 서비스",  desc: "보안과 개인정보 보호를 최우선으로 안심하고 이용할 수 있습니다." },
 ];
-
-const active = computed(() => channels.find((c) => c.key === tab.value));
-
-onMounted(() => {
-  if (route.query.tab) tab.value = route.query.tab;
-});
-watch(
-  () => route.query.tab,
-  (v) => {
-    if (v) tab.value = v;
-  }
-);
 </script>
 
 <style scoped>
-.content {
-  padding-top: 62px;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
+.content { padding-top: 68px; background: var(--bg); }
+
+/* ───── HERO ───── */
+.hero { background: var(--bg2); border-bottom: 1px solid var(--b); }
+.hero-in {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px 60px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: 0;
+  align-items: center;
+  height: 340px;
+  max-height: 340px;
   overflow: hidden;
 }
-
-/* ── Header (사용법/시스템소개와 동일) ── */
-.ph {
-  padding: 64px 60px 52px;
-  border-bottom: 1px solid var(--b);
-  background: var(--bg2);
-  flex-shrink: 0;
-}
-.ph-ey {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
-  letter-spacing: 0.22em;
-  color: var(--a);
-  opacity: 0.6;
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.ph-ey::before {
-  content: "";
-  width: 14px;
-  height: 1px;
-  background: var(--a);
-  opacity: 0.5;
-}
-h1 {
+.hero-left { align-self: center; min-width: 0; }
+.hero-tag {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: clamp(36px, 5vw, 68px);
-  font-weight: 800;
-  letter-spacing: -3px;
-  color: var(--t);
-  line-height: 0.95;
-  margin-bottom: 16px;
-}
-h1 em {
+  font-size: 13px; font-weight: 600;
+  letter-spacing: 0.14em;
   color: var(--a);
-  font-style: normal;
+  margin-bottom: 10px;
 }
-.ph-sub {
-  font-size: 13px;
-  color: var(--t2);
-  font-weight: 300;
-  line-height: 1.85;
-  max-width: 600px;
-  margin-bottom: 20px;
-  margin-top: 16px;
+.hero h1 {
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
+  font-size: clamp(28px, 2.8vw, 38px);
+  font-weight: 800; letter-spacing: -1.1px; line-height: 1.2;
+  color: var(--t); margin: 0 0 12px;
 }
-
-.layout {
-  flex: 1;
-  display: flex;
-  min-height: 0;
-  overflow: hidden;
+.hero h1 em { color: var(--a); font-style: normal; }
+.hero-sub {
+  font-size: 13.5px; font-weight: 500;
+  color: var(--t); opacity: 0.78;
+  line-height: 1.65; margin: 0 0 18px;
+  word-break: keep-all;
 }
-
-/* ── Sidebar ── */
-.sidebar {
-  width: 272px;
-  flex-shrink: 0;
-  border-right: 1px solid var(--b);
-  background: var(--bg2);
-  display: flex;
-  flex-direction: column;
-  padding: 24px 24px 28px;
-  overflow-y: auto;
+.hero-channels {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;
+  max-width: 520px;
 }
-
-/* Nav items */
-.sb-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
+.hch { text-align: left; }
+.hch-icon {
+  width: 38px; height: 38px; border-radius: 10px;
+  background: rgba(96, 165, 250, 0.12);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--a); font-size: 16px;
+  margin-bottom: 8px;
+}
+.theme-navy.light .hch-icon { background: rgba(37, 99, 235, 0.1); }
+.hch-name {
+  font-size: 13.5px; font-weight: 700; color: var(--t);
+  margin-bottom: 4px;
+}
+.hch-desc {
+  font-size: 11.5px; color: var(--t); opacity: 0.62;
+  line-height: 1.5; white-space: pre-line;
 }
 
-.sb-item {
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  border: 1px solid var(--b);
-  border-radius: 8px;
-  padding: 14px 16px;
-  cursor: pointer;
-  transition: all 0.2s;
+/* 우측 이미지 — 헤더 끝선부터 히어로 박스 끝선까지 세로 가득 */
+.hero-right {
   position: relative;
-  border-left: 2px solid transparent;
-}
-.sb-item:hover {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: var(--ba);
-}
-.sb-item.on {
-  background: rgba(96, 165, 250, 0.05);
-  border-color: rgba(96, 165, 250, 0.25);
-  border-left-color: var(--a);
-}
-
-.sb-item-top {
+  margin: -24px calc(60px - (50vw - 50%)) -24px 0;  /* 히어로 상하 패딩(24px) 무효화 */
+  align-self: stretch;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 5px;
-}
-.sb-tag {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  color: var(--a);
-  opacity: 0.55;
-}
-.sb-item.on .sb-tag {
-  opacity: 1;
-}
-
-.sb-badge {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
-  background: rgba(96, 165, 250, 0.1);
-  color: var(--a);
-  padding: 1px 7px;
-  border-radius: 100px;
-}
-.sb-badge.live {
-  background: rgba(52, 211, 153, 0.12);
-  color: #34d399;
-}
-
-.sb-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--t);
-  margin-bottom: 3px;
-}
-.sb-desc {
-  font-size: 11px;
-  color: var(--t3);
-  font-weight: 300;
-  line-height: 1.55;
-}
-
-/* Sidebar footer */
-.sb-footer {
-  margin-top: 28px;
-  padding-top: 20px;
-  border-top: 1px solid var(--b);
-}
-.st-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-.st-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #34d399;
-  flex-shrink: 0;
-  animation: livePulse 1.5s ease-in-out infinite;
-}
-.st-text {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
-  color: #34d399;
-}
-.st-sep {
-  font-size: 10px;
-  color: var(--t3);
-}
-.st-meta {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
-  color: var(--t3);
-}
-.st-copy {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
-  color: var(--t3);
-  opacity: 0.5;
-  line-height: 1.5;
-}
-
-/* ── Content Panel ── */
-.panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+  justify-content: center;
   overflow: hidden;
   min-width: 0;
 }
+.hero-img {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center center;
+  display: block;
+  --hero-mask: linear-gradient(to right,
+    transparent 0%,
+    rgba(0,0,0,0.5) 4%,
+    rgba(0,0,0,0.9) 8%,
+    #000 12%,
+    #000 100%);
+  -webkit-mask-image: var(--hero-mask);
+  mask-image: var(--hero-mask);
+}
 
-.panel-head {
-  padding: 20px 36px;
-  border-bottom: 1px solid var(--b);
-  background: var(--bg2);
-  flex-shrink: 0;
+/* ───── 공통 SECTION ───── */
+.sec { padding: 60px 60px; }
+.sw { max-width: 1440px; margin: 0 auto; }
+
+/* ───── 게시판 패널 ───── */
+.panel {
+  background: var(--card);
+  border: 1px solid var(--b);
+  border-radius: 16px;
+  padding: 32px 36px;
+  min-height: 720px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-}
-.ph-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.ph-tag {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  color: var(--a);
-  opacity: 0.6;
-}
-.ph-name {
-  font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  color: var(--t);
-}
-.ph-desc {
-  font-size: 11px;
-  color: var(--t3);
-  font-weight: 300;
-}
-
-.panel-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 28px 36px;
-}
-.panel-body.chat-mode {
-  padding: 0;
   overflow: hidden;
 }
-.panel-body::-webkit-scrollbar {
-  width: 3px;
+.theme-navy.light .panel { background: #fff; box-shadow: 0 4px 20px rgba(15, 40, 90, 0.04); }
+.panel-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
-.panel-body::-webkit-scrollbar-thumb {
-  background: var(--b);
-  border-radius: 2px;
+.panel-inner :deep(> *) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.panel-inner :deep(.tbl) { flex: 1; min-height: 0; }
+
+/* ───── VALUES ───── */
+.values-sec { padding-top: 20px; padding-bottom: 80px; }
+.values-head {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 28px;
+}
+.values-line {
+  width: 36px; height: 2px;
+  background: var(--a);
+  display: block;
+}
+.values-head h2 {
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
+  font-size: 22px; font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--t); margin: 0;
+}
+.values-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+}
+.value-card {
+  background: var(--card);
+  border: 1px solid var(--b);
+  border-radius: 14px;
+  padding: 28px 24px;
+  transition: all 0.2s;
+}
+.theme-navy.light .value-card { background: #fff; box-shadow: 0 2px 14px rgba(15, 40, 90, 0.04); }
+.value-card:hover {
+  border-color: var(--ba);
+  transform: translateY(-3px);
+  box-shadow: 0 14px 32px rgba(96, 165, 250, 0.12);
+}
+.value-icon {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: rgba(96, 165, 250, 0.12);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--a); font-size: 24px;
+  margin-bottom: 18px;
+}
+.theme-navy.light .value-icon { background: rgba(37, 99, 235, 0.08); }
+.value-title {
+  font-size: 17px; font-weight: 700;
+  color: var(--t); margin-bottom: 8px;
+}
+.value-desc {
+  font-size: 14px; font-weight: 500;
+  color: var(--t); opacity: 0.7;
+  line-height: 1.65;
+  margin: 0;
+  word-break: keep-all;
 }
 
+/* ───── RESPONSIVE ───── */
+@media (max-width: 1100px) {
+  .values-grid { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 768px) {
-  .content {
+  .hero-in {
+    grid-template-columns: 1fr;
     height: auto;
-    overflow: auto;
+    padding: 50px 24px;
+    gap: 30px;
   }
-  .ph {
-    padding: 40px 20px 32px;
-  }
-  .layout {
-    flex-direction: column;
-    min-height: 0;
-    overflow: auto;
-  }
-  .sidebar {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--b);
-    padding: 20px;
-  }
-  .sb-nav {
-    flex-direction: row;
-    overflow-x: auto;
-    gap: 8px;
-  }
-  .sb-item {
-    min-width: 160px;
-  }
-  .sb-footer {
-    display: none;
-  }
-  .panel-body {
-    padding: 20px;
-  }
-  .panel-body.chat-mode {
-    padding: 0;
-  }
+  .hero-right { margin-right: 0; }
+  .hero-img { margin-left: 0; mask-image: none; -webkit-mask-image: none; max-height: 260px; }
+  .sec { padding-left: 24px; padding-right: 24px; }
 }
 </style>

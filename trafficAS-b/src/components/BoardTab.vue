@@ -2,7 +2,10 @@
   <div class="board">
     <div class="top-row">
       <p class="info">사용 후기, 활용 사례, 공지사항을 공유하세요.</p>
-      <button class="wbtn">글쓰기</button>
+      <button class="wbtn" :disabled="!isLoggedIn" @click="onWrite"
+              :title="isLoggedIn ? '새 글 작성' : '로그인이 필요합니다'">
+        <i class="bi bi-pencil-square"></i> 글쓰기
+      </button>
     </div>
 
     <div class="search-bar">
@@ -102,6 +105,11 @@ import { ref, computed } from "vue";
 import { useAuth } from "../composables/useAuth";
 
 const { isLoggedIn, currentUser, openLogin } = useAuth();
+
+function onWrite() {
+  if (!isLoggedIn.value) { openLogin(); return; }
+  alert('게시판 글쓰기 기능은 곧 추가됩니다.');
+}
 
 const query = ref("");
 const expandedId = ref(null);
@@ -210,15 +218,17 @@ const highlight = (text) => {
   align-items: center;
   margin-bottom: 12px;
 }
-.info { font-size: 13px; color: var(--t2); font-weight: 300; }
+.info { font-size: 14.5px; color: var(--t2); font-weight: 300; }
 .wbtn {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 16px; background: var(--a); color: var(--bg);
-  font-family: "JetBrains Mono", monospace; font-size: 11px;
+  padding: 9px 18px; background: var(--a); color: var(--bg);
+  font-family: "JetBrains Mono", monospace; font-size: 12.5px;
   font-weight: 700; letter-spacing: 0.08em; border-radius: 4px;
   cursor: pointer; border: none;
 }
-.wbtn:hover { opacity: 0.87; }
+.wbtn:hover:not(:disabled) { opacity: 0.87; }
+.wbtn:disabled { opacity: 0.45; cursor: not-allowed; }
+.wbtn i { margin-right: 4px; }
 
 /* ── 검색바 ── */
 .search-bar {
@@ -233,8 +243,8 @@ const highlight = (text) => {
 }
 .s-ico { padding: 0 10px; display: flex; align-items: center; color: var(--t3); flex-shrink: 0; }
 .s-input {
-  flex: 1; padding: 9px 0; background: none; border: none;
-  font-size: 12px; color: var(--t); outline: none;
+  flex: 1; padding: 11px 0; background: none; border: none;
+  font-size: 14px; color: var(--t); outline: none;
   font-family: "Noto Sans KR", sans-serif;
 }
 .s-input::placeholder { color: var(--t3); }
@@ -245,7 +255,7 @@ const highlight = (text) => {
 }
 .s-clear:hover { color: var(--t); }
 .s-count {
-  font-family: "JetBrains Mono", monospace; font-size: 9px;
+  font-family: "JetBrains Mono", monospace; font-size: 11px;
   color: var(--a); padding: 0 10px 0 0; white-space: nowrap; flex-shrink: 0;
 }
 
@@ -255,14 +265,14 @@ const highlight = (text) => {
   border-radius: 7px; overflow: hidden; margin-bottom: 14px;
 }
 .th {
-  padding: 10px 16px; border-bottom: 1px solid var(--b);
+  padding: 12px 18px; border-bottom: 1px solid var(--b);
   background: rgba(255, 255, 255, 0.025);
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px; letter-spacing: 0.1em; color: var(--t3);
+  font-size: 11px; letter-spacing: 0.1em; color: var(--t3);
 }
 .tr {
-  padding: 11px 16px; border-bottom: 1px solid var(--b);
-  font-size: 12px; align-items: center;
+  padding: 13px 18px; border-bottom: 1px solid var(--b);
+  font-size: 14px; align-items: center;
   transition: background 0.15s; cursor: pointer;
 }
 .tr:hover { background: rgba(255, 255, 255, 0.03); }
@@ -275,15 +285,15 @@ const highlight = (text) => {
 .ttl-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--t); }
 .chv { flex-shrink: 0; color: var(--t3); transition: transform 0.2s; }
 .chv.open { transform: rotate(90deg); color: var(--a); }
-.sub { font-size: 11px; color: var(--t3); }
-.mono { font-family: "JetBrains Mono", monospace; font-size: 10px; }
+.sub { font-size: 13px; color: var(--t3); }
+.mono { font-family: "JetBrains Mono", monospace; font-size: 12px; }
 .nb {
-  font-family: "JetBrains Mono", monospace; font-size: 8px;
+  font-family: "JetBrains Mono", monospace; font-size: 10.5px;
   background: rgba(255, 255, 255, 0.1); color: var(--a);
-  padding: 1px 5px; border-radius: 100px; flex-shrink: 0;
+  padding: 2px 7px; border-radius: 100px; flex-shrink: 0;
 }
 .cc {
-  font-family: "JetBrains Mono", monospace; font-size: 9px;
+  font-family: "JetBrains Mono", monospace; font-size: 11px;
   color: var(--t3); flex-shrink: 0;
 }
 
@@ -295,8 +305,8 @@ const highlight = (text) => {
 }
 .cphead {
   display: flex; align-items: center; gap: 6px;
-  padding: 10px 16px;
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
+  padding: 12px 18px;
+  font-family: "JetBrains Mono", monospace; font-size: 12px;
   color: var(--t3); border-bottom: 1px solid var(--b);
 }
 .cphead strong { color: var(--a); }
@@ -312,26 +322,26 @@ const highlight = (text) => {
   margin-bottom: 5px;
 }
 .caut {
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
+  font-family: "JetBrains Mono", monospace; font-size: 12px;
   color: var(--a); font-weight: 500;
 }
 .ctm {
-  font-family: "JetBrains Mono", monospace; font-size: 9px;
+  font-family: "JetBrains Mono", monospace; font-size: 11px;
   color: var(--t3); flex: 1;
 }
 .cacts { display: flex; gap: 4px; }
 .cact {
-  font-family: "JetBrains Mono", monospace; font-size: 9px;
-  padding: 2px 8px; border-radius: 3px;
+  font-family: "JetBrains Mono", monospace; font-size: 11px;
+  padding: 3px 9px; border-radius: 3px;
   border: 1px solid var(--b); background: none;
   color: var(--t3); cursor: pointer; transition: all 0.15s;
 }
 .cact:hover { border-color: var(--ba); color: var(--a); }
 .cact.del:hover { border-color: rgba(248, 113, 113, 0.4); color: #f87171; }
-.ctxt { font-size: 12px; color: var(--t2); line-height: 1.6; white-space: pre-wrap; }
+.ctxt { font-size: 14px; color: var(--t2); line-height: 1.7; white-space: pre-wrap; }
 
 .cempty {
-  padding: 20px 16px; font-size: 11px; color: var(--t3); text-align: center;
+  padding: 22px 18px; font-size: 13px; color: var(--t3); text-align: center;
 }
 
 /* 수정 폼 */
@@ -345,10 +355,10 @@ const highlight = (text) => {
   background: rgba(255, 255, 255, 0.02);
 }
 .cav {
-  width: 28px; height: 28px; border-radius: 50%;
+  width: 32px; height: 32px; border-radius: 50%;
   background: var(--a); color: #fff;
   display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700; flex-shrink: 0;
+  font-size: 13.5px; font-weight: 700; flex-shrink: 0;
   margin-top: 2px;
 }
 .cright { flex: 1; display: flex; flex-direction: column; gap: 6px; }
@@ -356,8 +366,8 @@ const highlight = (text) => {
 .cta {
   width: 100%; box-sizing: border-box;
   background: var(--bg); border: 1px solid var(--b);
-  border-radius: 5px; padding: 8px 10px;
-  font-size: 12px; color: var(--t);
+  border-radius: 5px; padding: 10px 12px;
+  font-size: 14px; color: var(--t);
   font-family: "Noto Sans KR", sans-serif;
   outline: none; resize: none; line-height: 1.6;
   transition: border-color 0.2s;
@@ -367,34 +377,34 @@ const highlight = (text) => {
 
 .cbtns { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .chint {
-  font-family: "JetBrains Mono", monospace; font-size: 9px;
+  font-family: "JetBrains Mono", monospace; font-size: 11px;
   color: var(--t3); margin-right: auto;
 }
 .cbtn-save {
-  padding: 5px 14px; background: var(--a); color: #fff;
-  border: none; border-radius: 4px; font-size: 11px;
+  padding: 6px 16px; background: var(--a); color: #fff;
+  border: none; border-radius: 4px; font-size: 12.5px;
   font-family: "JetBrains Mono", monospace;
   cursor: pointer; transition: opacity 0.2s;
 }
 .cbtn-save:hover:not(:disabled) { opacity: 0.85; }
 .cbtn-save:disabled { opacity: 0.4; cursor: not-allowed; }
 .cbtn-cancel {
-  padding: 5px 12px; background: none;
-  border: 1px solid var(--b); border-radius: 4px; font-size: 11px;
+  padding: 6px 14px; background: none;
+  border: 1px solid var(--b); border-radius: 4px; font-size: 12.5px;
   font-family: "JetBrains Mono", monospace;
   color: var(--t3); cursor: pointer; transition: all 0.15s;
 }
 .cbtn-cancel:hover { border-color: var(--ba); color: var(--t); }
 
 .clogin {
-  padding: 14px 16px;
+  padding: 16px 18px;
   border-top: 1px solid var(--b);
-  font-size: 12px; color: var(--t3);
+  font-size: 13.5px; color: var(--t3);
   display: flex; align-items: center; gap: 5px;
 }
 .clink {
   background: none; border: none; color: var(--a);
-  font-size: 12px; cursor: pointer; text-decoration: underline;
+  font-size: 13.5px; cursor: pointer; text-decoration: underline;
   font-family: "Noto Sans KR", sans-serif; padding: 0;
 }
 
@@ -405,17 +415,17 @@ const highlight = (text) => {
 }
 
 .empty {
-  padding: 28px 16px; display: flex; align-items: center;
-  justify-content: center; gap: 8px; font-size: 12px; color: var(--t3);
+  padding: 32px 18px; display: flex; align-items: center;
+  justify-content: center; gap: 8px; font-size: 13.5px; color: var(--t3);
 }
 
 /* ── 페이지네이션 ── */
 .pagi { display: flex; gap: 5px; justify-content: center; }
 .pg {
-  width: 30px; height: 30px; border-radius: 4px;
+  width: 34px; height: 34px; border-radius: 4px;
   border: 1px solid var(--b); background: transparent;
   color: var(--t3); font-family: "JetBrains Mono", monospace;
-  font-size: 11px; cursor: pointer; transition: all 0.2s;
+  font-size: 12.5px; cursor: pointer; transition: all 0.2s;
 }
 .pg:hover, .pg.on {
   border-color: var(--ba); color: var(--a);

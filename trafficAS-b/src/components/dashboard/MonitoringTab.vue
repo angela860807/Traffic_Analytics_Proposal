@@ -16,13 +16,26 @@
 
     <!-- 카메라 상세 그리드 (3×2) -->
     <div class="v2-mon-grid">
-      <div v-for="(cam, i) in cameraFeeds" :key="cam.name" class="v2-mon-cell">
+      <div v-for="(cam, i) in cameraFeeds" :key="cam.name"
+           class="v2-mon-cell"
+           :class="{ 'v2-mon-warn': health(i).status === 'warn', 'v2-mon-offline': health(i).status === 'offline' }">
         <!-- 카메라 헤더 -->
         <div class="v2-mon-top">
-          <span class="v2-mon-dot" :class="cam.online ? 'on' : 'off'"></span>
+          <span class="v2-mon-dot" :class="health(i).status"></span>
           <span class="v2-mon-name">{{ cam.name }}</span>
           <span class="v2-mon-id mono">CAM-{{ String(i + 1).padStart(2, '0') }}</span>
-          <span class="v2-mon-badge live">LIVE</span>
+          <span class="v2-mon-hb mono" :class="health(i).status">
+            <i class="bi bi-broadcast"></i>
+            {{ health(i).sec }}s 전
+          </span>
+          <button class="v2-mon-mute" :class="{ on: isMuted(i) }"
+                  @click="toggleCameraMute(cam.name)"
+                  :title="isMuted(i) ? '알람 음소거 해제' : '알람 음소거 (점검 중)'">
+            <i :class="isMuted(i) ? 'bi bi-bell-slash-fill' : 'bi bi-bell-fill'"></i>
+          </button>
+          <span class="v2-mon-badge" :class="health(i).status">
+            {{ health(i).status === 'online' ? 'LIVE' : health(i).status === 'warn' ? '지연' : '끊김' }}
+          </span>
         </div>
 
         <!-- 영상 + 오버레이 -->
@@ -120,11 +133,45 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, toRefs } from 'vue'
 import { useDashboardData } from '@/composables/useDashboardData'
+import { useVideoOptimize } from '@/composables/useVideoOptimize'
 
-defineProps({ active: { type: Boolean, default: false } })
-const { cameraFeeds, stats, dupRemoved } = useDashboardData()
+const props = defineProps({ active: { type: Boolean, default: false } })
+const { active } = toRefs(props)
+const {
+  cameraFeeds, stats, dupRemoved, settings,
+  tickCamHeartbeat, camHealth,
+  mutedCameras, toggleCameraMute,
+  pushNotification,
+} = useDashboardData()
+
+/* 비디오 최적화 — 이 탭 active일 때만 영상 재생, 탭 비활성/뷰포트 밖 자동 정지 */
+useVideoOptimize({ active: () => active.value, selector: '.v2-mon-video' })
+
+/* 카메라별 마지막 알람 시각 — 같은 카메라가 동일 사유로 1분 안에 중복 알림 가지 않게 디바운스 */
+const lastAlertAt = new Map()  // key: `${name}|${reason}` → ts
+const DEBOUNCE_MS = 60 * 1000
+function maybeAlert(name, reason, msg, level = 'warning') {
+  if (mutedCameras.value.has(name)) return
+  const key = `${name}|${reason}`
+  const last = lastAlertAt.get(key) || 0
+  if (Date.now() - last < DEBOUNCE_MS) return
+  lastAlertAt.set(key, Date.now())
+  pushNotification(msg, level)
+}
+
+/* 매초 갱신되는 "now" — heartbeat 초 표시 + 카메라 상태가 실시간 변경되도록 */
+const nowMs = ref(Date.now())
+function camLabel(i) {
+  return cameraFeeds[i]?.name || ''
+}
+function health(i) {
+  return camHealth(camLabel(i), nowMs.value)
+}
+function isMuted(i) {
+  return mutedCameras.value.has(camLabel(i))
+}
 
 const camStats = ref(cameraFeeds.map(() => ({
   recognition: 88 + Math.round(Math.random() * 10),
@@ -140,16 +187,46 @@ const avgFps         = computed(() => Math.round(camStats.value.reduce((s, c) =>
 const totalDetected  = computed(() => camStats.value.reduce((s, c) => s + c.detected, 0))
 const uptimePct      = computed(() => Math.round((stats.value.online / cameraFeeds.length) * 100))
 
-/* 작은 범위로 흔들리는 실시간 업데이트 */
+/* 작은 범위로 흔들리는 실시간 업데이트 + 임계값 검사 + heartbeat tick */
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v))
 function tickRealtime() {
-  camStats.value = camStats.value.map(c => ({
-    recognition: clamp(c.recognition + Math.round((Math.random() - 0.5) * 3), 80, 99),
-    detected:    c.detected + Math.round(Math.random() * 5),
-    fps:         clamp(c.fps + Math.round((Math.random() - 0.5) * 2), 25, 31),
-    confidence:  clamp(c.confidence + Math.round((Math.random() - 0.5) * 4), 78, 99),
-    uptime:      c.uptime,
-  }))
+  camStats.value = camStats.value.map((c, i) => {
+    const next = {
+      recognition: clamp(c.recognition + Math.round((Math.random() - 0.5) * 3), 60, 99),
+      detected:    c.detected + Math.round(Math.random() * 5),
+      fps:         clamp(c.fps + Math.round((Math.random() - 0.5) * 2), 10, 31),
+      confidence:  clamp(c.confidence + Math.round((Math.random() - 0.5) * 4), 60, 99),
+      uptime:      c.uptime,
+    }
+    /* 임계값 검사 — 위반 시 알람 (디바운스 적용) */
+    const name = camLabel(i)
+    if (next.recognition < settings.thresholdRecognition) {
+      maybeAlert(name, 'recognition',
+        `${name} 인식률 저하 (${next.recognition}%, 임계 ${settings.thresholdRecognition}% 미만)`,
+        next.recognition < 50 ? 'critical' : 'warning')
+    }
+    if (next.fps < settings.thresholdFps) {
+      maybeAlert(name, 'fps',
+        `${name} FPS 저하 (${next.fps}, 임계 ${settings.thresholdFps} 미만)`,
+        'warning')
+    }
+    return next
+  })
+
+  /* heartbeat 한 틱 + 끊김/오프라인 검사 */
+  tickCamHeartbeat()
+  cameraFeeds.forEach((cam) => {
+    const h = camHealth(cam.name)
+    if (h.status === 'offline') {
+      maybeAlert(cam.name, 'offline',
+        `${cam.name} 연결 끊김 (${h.sec}초간 프레임 미수신)`,
+        'critical')
+    } else if (h.status === 'warn') {
+      maybeAlert(cam.name, 'warn',
+        `${cam.name} 프레임 수신 지연 (${h.sec}초)`,
+        'warning')
+    }
+  })
 }
 
 /* 새로고침 버튼 — 완전히 새 값으로 리셋 */
@@ -168,8 +245,15 @@ function onCamLoaded(e) {
 }
 
 let realtimeT = null
-onMounted(() => { realtimeT = setInterval(tickRealtime, 2000) })
-onUnmounted(() => { clearInterval(realtimeT) })
+let nowT = null
+onMounted(() => {
+  realtimeT = setInterval(tickRealtime, 2000)
+  nowT = setInterval(() => { nowMs.value = Date.now() }, 1000)
+})
+onUnmounted(() => {
+  clearInterval(realtimeT)
+  clearInterval(nowT)
+})
 </script>
 
 <style scoped>
@@ -205,15 +289,43 @@ onUnmounted(() => { clearInterval(realtimeT) })
 .v2-mon-dot {
   width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
 }
-.v2-mon-dot.on  { background: #4caf7d; box-shadow: 0 0 6px #4caf7d; animation: pulse 1.6s ease-in-out infinite; }
-.v2-mon-dot.off { background: #6b7280; }
+.v2-mon-dot.online  { background: #4caf7d; box-shadow: 0 0 6px #4caf7d; animation: pulse 1.6s ease-in-out infinite; }
+.v2-mon-dot.warn    { background: #d4845a; box-shadow: 0 0 6px #d4845a; animation: pulse 1s ease-in-out infinite; }
+.v2-mon-dot.offline { background: #e05260; box-shadow: 0 0 6px #e05260; }
 @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
 .v2-mon-name { color: #e4eeff; font-weight: 600; flex: 1; }
-.v2-mon-id { font-size: 10px; color: rgba(228,238,255,.45); }
-.v2-mon-badge.live {
-  font-size: 9px; font-weight: 800; color: #fff;
-  background: #e05260; padding: 2px 6px; border-radius: 3px; letter-spacing: .5px;
+.v2-mon-id   { font-size: 10px; color: rgba(228,238,255,.45); }
+
+.v2-mon-hb {
+  font-size: 9.5px; font-weight: 600;
+  padding: 2px 6px; border-radius: 3px;
+  display: inline-flex; align-items: center; gap: 3px;
+  background: rgba(76,175,125,.12);
+  color: #4caf7d; border: 1px solid rgba(76,175,125,.3);
 }
+.v2-mon-hb.warn    { background: rgba(212,132,90,.15); color: #d4845a; border-color: rgba(212,132,90,.35); }
+.v2-mon-hb.offline { background: rgba(224,82,96,.18); color: #e05260; border-color: rgba(224,82,96,.4); animation: pulse 1s ease-in-out infinite; }
+
+.v2-mon-mute {
+  background: transparent; border: 1px solid rgba(255,255,255,.08);
+  color: rgba(228,238,255,.5); width: 22px; height: 22px;
+  border-radius: 4px; cursor: pointer; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; transition: all .15s;
+}
+.v2-mon-mute:hover { color: #e4eeff; border-color: rgba(255,255,255,.2); }
+.v2-mon-mute.on { background: rgba(212,132,90,.18); color: #d4845a; border-color: rgba(212,132,90,.4); }
+
+.v2-mon-badge {
+  font-size: 9px; font-weight: 800; color: #fff;
+  padding: 2px 6px; border-radius: 3px; letter-spacing: .5px;
+}
+.v2-mon-badge.online  { background: #e05260; }
+.v2-mon-badge.warn    { background: #d4845a; }
+.v2-mon-badge.offline { background: #6b7280; }
+
+.v2-mon-cell.v2-mon-warn    { box-shadow: 0 0 0 1px rgba(212,132,90,.4); }
+.v2-mon-cell.v2-mon-offline { box-shadow: 0 0 0 1px rgba(224,82,96,.5); opacity: .85; }
 
 .v2-mon-video-wrap {
   position: relative;

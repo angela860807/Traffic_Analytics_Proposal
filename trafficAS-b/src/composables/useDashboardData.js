@@ -69,7 +69,35 @@ const settings = reactive({
   notifyCritical: true, notifyWarning: true, notifyInfo: false, notifyEmail: false,
   congestionThreshold: 80, ocrConfidence: 85, refreshInterval: 3,
   dedupSeconds: 10, dedupDirSplit: true, wsEnabled: true,
+  /* 관제 임계값 — MonitoringTab이 이 값으로 카메라 상태 검사 */
+  thresholdRecognition: 70,     // 인식률(%) 이하 시 경고 알림
+  thresholdFps: 15,             // FPS 이하 시 경고 알림
+  thresholdHeartbeatSec: 10,    // 마지막 프레임 N초 초과 시 끊김 경고
+  thresholdHeartbeatOfflineSec: 30, // 30초 초과 시 오프라인
 })
+
+/* ──────── 알림(헤더 종) — 모든 컴포넌트가 공유 ──────── */
+const notifications = ref([
+  { id: 1,  msg: '테헤란로 교차로 혼잡 감지 — 진입 +42%', time: '14:32', color: '#e05260' },
+  { id: 2,  msg: 'CAM-03 강남역 OCR 인식률 저하 (78%)', time: '14:28', color: '#d4845a' },
+  { id: 3,  msg: '반포IC 이탈 차량 급증', time: '14:15', color: '#d4845a' },
+  { id: 4,  msg: '올림픽대로 흐름 원활 전환', time: '13:58', color: '#4caf7d' },
+  { id: 5,  msg: 'OCR 파이프라인 정상 가동', time: '13:45', color: '#4caf7d' },
+  { id: 6,  msg: '잠실역 사거리 진입 트래픽 급증', time: '13:30', color: '#d4845a' },
+  { id: 7,  msg: '양재역 사거리 흐름 정상화', time: '13:02', color: '#4caf7d' },
+  { id: 8,  msg: '남부터미널 정체 시작 — 평균 12 km/h', time: '12:36', color: '#e05260' },
+  { id: 9,  msg: '석촌역 이탈 차량 통행 증가', time: '12:14', color: '#d4845a' },
+  { id: 10, msg: '강남구 전역 평균 정상', time: '11:55', color: '#4caf7d' },
+  { id: 11, msg: '중복 감지 178건 자동 제거 완료', time: '11:30', color: '#4caf7d' },
+  { id: 12, msg: 'WebSocket 연결 정상', time: '11:00', color: '#4caf7d' },
+])
+function pushNotification(msg, level = 'warning') {
+  const now = new Date()
+  const time = `${_p(now.getHours())}:${_p(now.getMinutes())}`
+  const color = level === 'critical' ? '#e05260' : level === 'warning' ? '#d4845a' : '#4caf7d'
+  notifications.value.unshift({ id: Date.now() + Math.random(), msg, time, color })
+  if (notifications.value.length > 50) notifications.value.length = 50
+}
 
 /* ──────── 헬퍼 ──────── */
 function dirLabel(d) { return d === 'in' ? '진입' : d === 'out' ? '이탈' : '-' }
@@ -104,13 +132,45 @@ const camCongestion = ref(
     cameraGroups.flatMap(g => g.cams).map(c => [c.name, 0.3 + Math.random() * 0.6])
   )
 )
-/* 외부에서 호출 — 카메라 혼잡도 한 틱 갱신 */
 function tickCamCongestion() {
   const next = { ...camCongestion.value }
   for (const k in next) {
     next[k] = Math.max(0.05, Math.min(0.99, next[k] + (Math.random() - 0.5) * 0.15))
   }
   camCongestion.value = next
+}
+
+/* ──────── 카메라 heartbeat — 마지막 프레임 수신 시각(ms) ──────── */
+const _allCamNames = [...new Set([...cameraFeeds.map(c => c.name), ...cameraGroups.flatMap(g => g.cams.map(c => c.name))])]
+const camHeartbeat = ref(Object.fromEntries(_allCamNames.map(n => [n, Date.now()])))
+/* 알람 음소거된 카메라 이름들 — 점검 중일 때 알람 안 옴 */
+const mutedCameras = ref(new Set())
+
+/* 외부에서 호출 — heartbeat 한 틱
+ * 대부분(95%)은 alive로 갱신, 5% 확률로 미갱신(끊김 시뮬레이션) */
+function tickCamHeartbeat() {
+  const next = { ...camHeartbeat.value }
+  const now = Date.now()
+  _allCamNames.forEach(name => {
+    if (Math.random() < 0.95) next[name] = now
+  })
+  camHeartbeat.value = next
+}
+
+/* 카메라 현재 상태 계산 — settings.threshold* 임계값 기준 */
+function camHealth(name, nowMs = Date.now()) {
+  const last = camHeartbeat.value[name]
+  if (!last) return { status: 'unknown', sec: 999 }
+  const sec = Math.floor((nowMs - last) / 1000)
+  if (sec >= settings.thresholdHeartbeatOfflineSec) return { status: 'offline', sec }
+  if (sec >= settings.thresholdHeartbeatSec)        return { status: 'warn',    sec }
+  return { status: 'online', sec }
+}
+
+function toggleCameraMute(name) {
+  const next = new Set(mutedCameras.value)
+  if (next.has(name)) next.delete(name); else next.add(name)
+  mutedCameras.value = next
 }
 
 export function useDashboardData() {
@@ -120,5 +180,9 @@ export function useDashboardData() {
     todayStr, dirLabel, levelLabel, plateImg, plateStatus,
     totalCamCount, stats,
     camCongestion, tickCamCongestion,
+    /* 알림 */
+    notifications, pushNotification,
+    /* heartbeat / 임계값 / 음소거 */
+    camHeartbeat, tickCamHeartbeat, camHealth, mutedCameras, toggleCameraMute,
   }
 }
