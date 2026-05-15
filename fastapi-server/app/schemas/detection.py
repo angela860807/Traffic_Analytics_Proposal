@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 DirectionType = Literal["IN", "OUT", "BOTH"]
-DetectionType = Literal["VEHICLE", "PLATE"]
+DetectionType = Literal["VEHICLE", "PLATE", "UNKNOWN"]
 AnalysisStatus = Literal[
     "ANALYSIS_ONLY",
     "SENT_TO_BACKEND",
@@ -14,6 +14,7 @@ AnalysisStatus = Literal[
     "FLOW_EVENT_CREATED",
     "DUPLICATE_SKIPPED",
 ]
+StreamStatus = Literal["IDLE", "TRACKING", "FINALIZED"]
 
 
 class RaspberryFrameRequest(BaseModel):
@@ -104,6 +105,59 @@ class DetectionResponse(BaseModel):
         default=None,
         alias="analysisStatus",
         examples=["OCR_FAILED"],
+    )
+    data: DetectionResult | None = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class StreamFrameResponse(BaseModel):
+    accepted: bool = Field(examples=[True])
+    message: str = Field(examples=["Stream frame accepted"])
+    stream_status: StreamStatus = Field(
+        alias="streamStatus",
+        examples=["TRACKING"],
+    )
+    event_id: str | None = Field(
+        default=None,
+        alias="eventId",
+        examples=["CAM_001-20260514143012-a1b2c3d4"],
+    )
+    camera_code: str = Field(
+        alias="cameraCode",
+        examples=["CAM_001"],
+    )
+    frame_count: int = Field(
+        default=0,
+        alias="frameCount",
+        ge=0,
+        examples=[6],
+    )
+    bbox: list[int] | None = Field(
+        default=None,
+        examples=[[120, 180, 240, 220]],
+    )
+    bboxes: list[list[int]] = Field(
+        default_factory=list,
+        examples=[[[120, 180, 240, 220], [420, 180, 540, 220]]],
+    )
+    bbox_confidence_score: float = Field(
+        default=0.0,
+        alias="bboxConfidenceScore",
+        ge=0,
+        le=1,
+        examples=[0.9321],
+    )
+    event_age_seconds: float = Field(
+        default=0.0,
+        alias="eventAgeSeconds",
+        ge=0,
+        examples=[2.4],
+    )
+    analysis_status: AnalysisStatus | None = Field(
+        default=None,
+        alias="analysisStatus",
+        examples=["FLOW_EVENT_CREATED"],
     )
     data: DetectionResult | None = None
 
