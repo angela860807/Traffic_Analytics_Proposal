@@ -619,7 +619,14 @@ def test_stream_event_service_finalizes_after_bbox_misses(
         def detect_vehicle_bbox_from_image(self, image):
             return detections.pop(0)
 
-        async def detect_from_image_bytes(self, *, camera_code, captured_at, image_bytes):
+        async def detect_from_image_bytes(
+            self,
+            *,
+            camera_code,
+            captured_at,
+            image_bytes,
+            vehicle_detection=None,
+        ):
             return make_recognized_detection(detected_at=captured_at)
 
     service = StreamEventService(
