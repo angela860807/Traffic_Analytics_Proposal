@@ -84,19 +84,21 @@ import { RouterLink } from "vue-router";
   animation: livePulse 2s ease-in-out infinite;
 }
 .ft-tag {
-  font-size: 13px;
-  font-weight: 300;
+  font-size: 14px;
+  font-weight: 400;
   line-height: 1.7;
-  color: var(--t2);
+  color: var(--t);
+  opacity: 0.62;
   max-width: 320px;
   margin-bottom: 12px;
 }
 .ft-col .ft-h {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 15px;
+  font-size: 15.5px;
   font-weight: 700;
   letter-spacing: -0.2px;
   color: var(--t);
+  opacity: 0.88;
   margin-bottom: 14px;
 }
 .ft-col ul {
@@ -105,19 +107,21 @@ import { RouterLink } from "vue-router";
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 10px;
 }
 .ft-col a {
   font-size: 13.5px;
-  color: var(--t2);
+  font-weight: 500;
+  color: var(--t);
+  opacity: 0.62;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  transition: color 0.18s;
+  transition: opacity 0.18s, color 0.18s;
 }
-.ft-col a:hover { color: var(--t); }
-.ft-col a i { font-size: 13px; opacity: 0.7; }
+.ft-col a:hover { color: var(--a); opacity: 1; }
+.ft-col a i { font-size: 13.5px; opacity: 0.85; }
 
 @media (max-width: 1100px) {
   .ft-top { grid-template-columns: 1fr 1fr; gap: 40px; }

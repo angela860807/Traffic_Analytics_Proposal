@@ -9,6 +9,7 @@
   "dependencies": {
     "echarts": "^6.0.0",
     "leaflet": "^1.9.4",
+    "lucide-vue-next": "^1.0.0",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0"
   },

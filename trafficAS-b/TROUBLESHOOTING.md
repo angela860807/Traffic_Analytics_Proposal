@@ -1106,3 +1106,148 @@ npm run dev
 - `[Leaflet HeatMap] 로드 실패: ...` — Leaflet 자체 초기화 실패 (드물게 발생)
 
 ---
+
+## 26. 메인 히어로 풀블리드 이미지의 좌우 한쪽만 잘리는 문제
+
+### 증상
+히어로 이미지를 `width: 100vw` + `margin-left: calc(-50vw + 50%)`로 풀블리드 처리했는데 좌측 끝에 빈 공간이 남거나 우측만 늘어남.
+
+### 원인
+`html { scrollbar-gutter: stable }`로 스크롤바 영역이 우측에 고정 예약되면서 `100vw`(뷰포트 전체) vs `100%`(body 너비) 간 비대칭이 생긴다. `left: 50%` + `transform: translateX(-50%)`처럼 양쪽으로 동일 보정되는 트릭을 안 쓰면 한쪽만 보정됨.
+
+### 해결
+```css
+.hero {
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
+  margin-right: calc(-50vw + 50%);
+}
+```
+또는 더 안전하게:
+```css
+.hero {
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+}
+```
+두 번째 방법이 스크롤바 거터 영향을 받지 않아 더 일관적이다.
+
+### 교훈
+풀블리드는 양쪽 동시 보정. 한쪽 마진만으로 처리하면 OS/브라우저별 스크롤바 정책에 영향받음.
+
+---
+
+## 27. 카드 섹션이 히어로 끝선에 자연스럽게 걸치게 하는 패턴
+
+### 증상
+시안상 4개 피처 카드가 히어로 하단 라인에 절반쯤 걸쳐 있어야 하는데, 단순히 다음 섹션에 두면 히어로와 분리돼서 어색함.
+
+### 해결
+```css
+.hero-in { padding-bottom: 110px; }       /* 카드 침범 공간 확보 */
+.hero + .sec {
+  margin-top: -50px;                       /* 히어로 끝선 위로 50px 올라옴 */
+  padding-top: 0;
+  position: relative;
+  z-index: 5;                              /* 히어로 위로 떠 보이게 */
+}
+```
+
+### 교훈
+`margin-top: 음수`로 다음 섹션을 끌어올리되, z-index로 레이어 명확화. 음수 값이 카드 높이를 넘어가면 다음 섹션의 시작점도 같이 끌려와 다른 섹션이 따라 움직이므로, 변동이 싫으면 동량의 `margin-bottom`을 더해 보정.
+
+---
+
+## 28. 한글 헤드라인이 단어 중간에서 잘리는 문제 ("만듭/니다")
+
+### 증상
+`<h1>스마트한 교통 환경을 만듭니다.</h1>`가 좁은 컨테이너에서 `만듭` / `니다`로 어절 중간이 끊김.
+
+### 원인
+CSS 기본 줄바꿈은 CJK 문자에 대해 어디서든 줄바꿈을 허용한다(`word-break: normal`).
+
+### 해결
+```css
+h1, p {
+  word-break: keep-all;       /* 어절 단위로만 줄바꿈 */
+  overflow-wrap: break-word;  /* 너무 긴 단어는 어쩔 수 없이 끊김 허용 */
+}
+```
+
+### 교훈
+한글 본문/제목 영역엔 거의 항상 `word-break: keep-all` 적용 필수. 영문 사이트 톤 그대로 가져오면 어절이 깨진다.
+
+---
+
+## 29. Vue scoped CSS에서 자식 컴포넌트 가득 채우기 실패
+
+### 증상
+SupportView의 `.panel` 박스 안에 `<BoardTab />` 같은 자식 컴포넌트를 넣었는데 `flex: 1; height: 100%`를 줘도 박스를 채우지 못함.
+
+### 원인
+Vue scoped 스타일은 `data-v-X` 속성으로 셀렉터를 한정한다. `.panel > *`는 부모(SupportView)의 hash로 매칭되지만 자식 컴포넌트의 루트는 그 컴포넌트(BoardTab)의 hash를 가지므로 매칭 안 됨.
+
+### 해결
+`:deep()` 셀렉터로 스코프를 뚫는다.
+```css
+.panel-inner :deep(> *) {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+}
+.panel-inner :deep(.tbl) { flex: 1; min-height: 0; }
+```
+또는 wrapping div를 SupportView 템플릿에 넣어서 직접 스타일링 (scope 매칭 가능).
+
+### 교훈
+scoped + 자식 컴포넌트 = `:deep()` 거의 필수. 안 쓰면 디버깅 한참 헤맴.
+
+---
+
+## 30. Lucide Vue 패키지 이름 혼동
+
+### 증상
+`import { Cctv } from '@lucide/vue'` 했더니 `Cannot find module` 에러.
+
+### 원인
+Lucide 공식 Vue 3 패키지는 **`lucide-vue-next`**다. `@lucide/vue`는 존재하지 않거나 다른 프로젝트 fork명.
+
+### 해결
+```bash
+npm install lucide-vue-next
+```
+```js
+import { Cctv, ScanText, BellRing, BarChart3, Network } from "lucide-vue-next";
+```
+
+### 교훈
+React용은 `lucide-react`, Vue 3용은 `lucide-vue-next`, Vue 2용은 `lucide-vue`. 검색 시 버전 매칭 주의.
+
+---
+
+## 31. `padding-top: 90px` 줘서 이미지 둥둥 떠 보이는 문제
+
+### 증상
+좌측 텍스트와 우측 이미지가 세로 정렬되도록 `.hero-right { padding-top: 80px }`을 주니까 이미지 위에 큰 빈 공간 생겨 "떠 있는" 느낌.
+
+### 원인
+패딩으로 이미지를 아래로 밀면 위쪽이 공백으로 보이게 됨. 이미지가 헤더 라인부터 가득 차야 자연스러움.
+
+### 해결
+- `padding-top` 제거
+- 대신 `.hero-in`의 `align-items: center` 또는 `align-items: stretch` 사용
+- 이미지에 `align-self: stretch`로 컨테이너 세로 가득
+
+```css
+.hero-in {
+  display: grid;
+  align-items: stretch;
+}
+.hero-right { align-self: stretch; }
+.hero-img { height: 100%; object-fit: cover; }
+```
+
+### 교훈
+"이미지 위치 조정"은 패딩보다 grid `align-self` 가 자연스럽다.
+

@@ -478,3 +478,55 @@ onUnmounted(() => {
 - SEO 메타(Open Graph, Twitter Card) + 모니터링(Sentry 등) 도입
 
 ---
+
+## 16. 인덱스 / 고객지원 페이지 리뉴얼 (2026-05-15)
+
+### 16-1 메인(MainView) 변경 요약
+- **HERO**: 좌측 텍스트 / 우측 이미지(`/main1.png`) 사이드바이사이드.
+  - 그리드 비율 3:7, 우측 이미지가 화면 끝까지 풀블리드(`margin-right: calc(60px - (50vw - 50%))`).
+  - 좌측 30%까지 mask gradient로 텍스트 영역과 자연스럽게 페이드.
+  - 우측 이미지 영역 `align-self: stretch`로 박스 위/아래 가득.
+- **4 FEATURE 카드**: 히어로 끝선에 살짝 걸치도록 `margin-top: -50px` + `z-index: 5`.
+  - 아이콘 + 제목 같은 행(flex row), 카드 우상단 화살표 링크.
+- **SOLUTION 개요**: 좌측 대시보드 스크린샷 / 우측 카피 + 체크리스트. 그리드 `1.25fr / 1fr`, gap 80px + `padding-left: 40px`.
+- **SERVICE PROCESS**: 4스텝 아이콘 원형. 번호 원이 아이콘 좌상단에 absolute 오버랩 + `box-shadow`. 옆 스텝과 dashed line으로 연결(`.process-line`).
+- **CORE FEATURES**: 5개 항목 가로 정렬, 아이콘 좌 / 텍스트 우, 세로 구분선(`border-right`).
+- **CTA**: 파란 그라데이션 카드. 데모/문의 버튼.
+- **파트너 섹션**: 삭제.
+- **Bootstrap arrow-right 아이콘**: 모든 버튼/링크에서 제거.
+- **Lucide 도입**: 데이터 수집(`Cctv`), 핵심기능 5개 (`Cctv`/`ScanText`/`BellRing`/`BarChart3`/`Network`)는 Lucide, 나머지는 Bootstrap Icons.
+
+### 16-2 고객지원(SupportView) 변경 요약
+시안 기반 풀스크린에서 일반 페이지로 재구성:
+1. **HERO**: 좌측 라벨 `CUSTOMER SUPPORT` + h1 `고객 지원` + 4채널(공지사항 / 질문답변 / 실시간채팅 / 운영시간) 그리드. 우측 `/support_headset_hero.png` 헤드셋 일러스트. 히어로 박스 사이즈 `height: 480px` 고정 + 이미지는 `height: 100%; object-fit: contain`으로 박스 안에 정확히 맞춤. 좌측 mask gradient로 텍스트 영역과 어우러짐.
+2. **MAIN 레이아웃**: 280px 사이드바 + 콘텐츠 패널(`<BoardTab>` / `<QnaTab>` / `<ChatTab>`).
+   - 사이드바: 4개 카드(공지사항 / 질문답변 / 실시간채팅[Live 펄스 뱃지] / 운영시간[disabled])
+   - 패널: 흰 카드 + 라운드 + `padding: 32px 36px` + `min-height: 720px`. `.panel-inner :deep(> *)`로 자식 컴포넌트가 박스 가득 채우게 강제.
+3. **VALUES**: 4개 카드(빠른 응답 / 전문 기술 지원 / 다양한 채널 / 안전한 서비스), 짧은 파란 선 액센트.
+4. **CTA**: 헤드셋 아이콘 + `실시간 채팅 시작` 버튼 — 클릭 시 `tab = 'chat'`.
+5. **AppFooter** 포함.
+
+### 16-3 헤더 / 푸터 톤 정리
+- **AppNav**: 메뉴 링크 색 `--t3 (24%)` → `--t 100%` + `weight: 600`, 호버 색은 `--a`(파랑)로 일관.
+- **AppFooter**: 본문/링크는 `--t opacity: 0.62`(보조 정보 톤)로 약하게, 호버 시 `--a + opacity:1`로 부각.
+
+### 16-4 폰트 / 색상 톤 통일
+- 본문 설명류는 `var(--t2)` 대신 **`var(--t) + opacity: 0.62~0.78`**로 통일 → 다크/라이트 모드 둘 다 또렷.
+- 하이라이트(`<em>`) 컬러: 라이트 `#4f9cf9`, 다크 `#60a5fa` — 평소 `--a`보다 한 톤 밝은 시안 블루.
+- 한글 본문은 `word-break: keep-all` 적용으로 어절 단위 줄바꿈.
+
+### 16-5 의존성 추가
+```json
+"dependencies": {
+  "lucide-vue-next": "^0.x"
+}
+```
+
+### 16-6 LAN/팀 공유 메모
+로컬 데모 공유:
+```bash
+npm run dev -- --host
+```
+출력의 `Network: http://192.168.x.x:5173/`를 같은 WiFi 팀원에게 공유. 외부망은 `npx cloudflared tunnel --url http://localhost:5173`.
+
+---
