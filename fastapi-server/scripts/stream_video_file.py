@@ -245,16 +245,23 @@ def make_blank_frame_bytes(width: int, height: int, jpeg_quality: int) -> bytes:
     return buffer.tobytes()
 
 
-def draw_text(frame, text: str, origin: tuple[int, int], color=(255, 255, 255)) -> None:
+def draw_text(
+    frame,
+    text: str,
+    origin: tuple[int, int],
+    color=(255, 255, 255),
+    font_scale: float = 0.45,
+) -> None:
     x, y = origin
+    shadow_thickness = max(1, round(font_scale * 3))
     cv2.putText(
         frame,
         text,
         (x + 1, y + 1),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.55,
+        font_scale,
         (0, 0, 0),
-        2,
+        shadow_thickness,
         cv2.LINE_AA,
     )
     cv2.putText(
@@ -262,7 +269,7 @@ def draw_text(frame, text: str, origin: tuple[int, int], color=(255, 255, 255)) 
         text,
         (x, y),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.55,
+        font_scale,
         color,
         1,
         cv2.LINE_AA,
@@ -292,6 +299,8 @@ def draw_preview(
         display_frame = frame.copy()
         coord_scale = 1.0
 
+    overlay_font_scale = min(0.50, max(0.30, display_frame.shape[0] / 1080 * 0.55))
+    overlay_line_height = max(18, round(overlay_font_scale * 52))
     response = response_body if isinstance(response_body, dict) else {}
     bbox = response.get("bbox")
     bboxes = response.get("bboxes") or []
@@ -317,8 +326,9 @@ def draw_preview(
         draw_text(
             display_frame,
             label,
-            (x1, max(24, y1 - 8)),
+            (x1, max(overlay_line_height, y1 - 8)),
             color,
+            overlay_font_scale,
         )
 
     if not bboxes and bbox is not None:
@@ -331,8 +341,9 @@ def draw_preview(
         draw_text(
             display_frame,
             f"PLATE {bbox_confidence:.3f}",
-            (x1, max(24, y1 - 8)),
+            (x1, max(overlay_line_height, y1 - 8)),
             color,
+            overlay_font_scale,
         )
 
     event_age_seconds = response.get("eventAgeSeconds", 0.0)
@@ -342,7 +353,7 @@ def draw_preview(
         f"bboxConf={bbox_confidence:.3f} "
         f"eventAge={event_age_seconds:.1f}s"
     )
-    draw_text(display_frame, header, (12, 28))
+    draw_text(display_frame, header, (12, overlay_line_height), font_scale=overlay_font_scale)
 
     if response:
         data = response.get("data") or {}
@@ -351,9 +362,20 @@ def draw_preview(
             f"analysis={response.get('analysisStatus') or '-'} "
             f"plate={data.get('plateNumber') or '-'}"
         )
-        draw_text(display_frame, status_text, (12, 56), (0, 255, 255))
+        draw_text(
+            display_frame,
+            status_text,
+            (12, overlay_line_height * 2),
+            (0, 255, 255),
+            overlay_font_scale,
+        )
 
-    draw_text(display_frame, "q/ESC: quit  space: pause", (12, display_frame.shape[0] - 16))
+    draw_text(
+        display_frame,
+        "q/ESC: quit  space: pause",
+        (12, display_frame.shape[0] - 12),
+        font_scale=overlay_font_scale,
+    )
 
     cv2.imshow(WINDOW_NAME, display_frame)
     return cv2.waitKey(wait_ms) & 0xFF

@@ -311,13 +311,13 @@ async def process_stream_frame(
         if stream_result.stream_status == STREAM_STATUS_IDLE:
             return build_stream_frame_response(
                 stream_result,
-                message="Stream frame accepted; no bbox event is active",
+                message="Stream frame accepted; no vehicle event is active",
             )
 
         if stream_result.stream_status == STREAM_STATUS_TRACKING:
             return build_stream_frame_response(
                 stream_result,
-                message="BBox event is tracking",
+                message="Vehicle event is tracking",
             )
 
         if stream_result.stream_status != STREAM_STATUS_FINALIZED:
@@ -331,14 +331,14 @@ async def process_stream_frame(
         if result is None:
             return build_stream_frame_response(
                 stream_result,
-                message="BBox event finalized without OCR candidate",
+                message="Vehicle event finalized without OCR candidate",
             )
 
         if not should_send_to_backend(result):
             await backend_client.send_detection(result, "OCR_FAILED")
             return build_stream_frame_response(
                 stream_result,
-                message="BBox event finalized and sent to backend as OCR_FAILED",
+                message="Vehicle event finalized and sent to backend as OCR_FAILED",
                 analysis_status="OCR_FAILED",
             )
 
@@ -346,7 +346,7 @@ async def process_stream_frame(
             await backend_client.send_detection(result, "DUPLICATE_SKIPPED")
             return build_stream_frame_response(
                 stream_result,
-                message="BBox event finalized and sent to backend as DUPLICATE_SKIPPED",
+                message="Vehicle event finalized and sent to backend as DUPLICATE_SKIPPED",
                 analysis_status="DUPLICATE_SKIPPED",
             )
 
@@ -376,6 +376,6 @@ async def process_stream_frame(
     )
     return build_stream_frame_response(
         stream_result,
-        message=f"BBox event finalized and saved as {analysis_status}",
+        message=f"Vehicle event finalized and saved as {analysis_status}",
         analysis_status=analysis_status,
     )

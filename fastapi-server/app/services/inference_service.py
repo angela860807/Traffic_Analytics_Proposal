@@ -16,12 +16,15 @@ from app.services.image_preprocessor import (
 from app.services.plate_detector import PlateDetector
 from app.services.plate_detector import PlateDetection
 from app.services.plate_recognizer import PlateRecognizer
+from app.services.vehicle_detector import VehicleDetection
+from app.services.vehicle_detector import VehicleDetector
 
 
 class InferenceService:
     def __init__(self) -> None:
         self.image_decoder = ImageDecoder()
         self.image_storage_service = ImageStorageService()
+        self.vehicle_detector = VehicleDetector()
         self.plate_detector = PlateDetector()
         self.plate_recognizer = PlateRecognizer()
 
@@ -72,6 +75,10 @@ class InferenceService:
         detection_image = preprocess_frame_for_detection(image)
         return self.plate_detector.detect(detection_image)
 
+    def detect_vehicle_bbox_from_image(self, image) -> VehicleDetection:
+        detection_image = preprocess_frame_for_detection(image)
+        return self.vehicle_detector.detect(detection_image)
+
     def _detect(
         self,
         *,
@@ -96,47 +103,58 @@ class InferenceService:
         ocr_image_path = None
         ocr_image_url = None
 
-        detection = self.detect_plate_bbox_from_image(image)
-        confidence_score = detection.confidence_score
+        vehicle_detection = self.detect_vehicle_bbox_from_image(image)
 
-        if detection.bbox is None:
+        if vehicle_detection.bbox is None:
             plate_number = None
-            detection_type = "VEHICLE"
+            detection_type = "UNKNOWN"
             confidence_score = 0.0
-        elif detection.confidence_score < DETECTION_CONFIDENCE_THRESHOLD:
-            plate_number = None
-            detection_type = "VEHICLE"
         else:
-            plate_crop = crop_plate_with_padding(image, detection.bbox)
+            plate_detection = self.detect_plate_bbox_from_image(image)
+            confidence_score = vehicle_detection.confidence_score
 
-            if SAVE_PLATE_CROP:
-                plate_crop_image_path = self.image_storage_service.save_detection_image(
-                    image=plate_crop,
-                    camera_code=camera_code,
-                    captured_at=captured_at,
-                    suffix="plate_crop",
-                )
-                plate_crop_image_url = self.image_storage_service.build_detection_image_url(
-                    plate_crop_image_path,
-                )
+            if (
+                plate_detection.bbox is None
+                or plate_detection.confidence_score < DETECTION_CONFIDENCE_THRESHOLD
+            ):
+                plate_number = None
+                detection_type = "VEHICLE"
+            else:
+                plate_crop = crop_plate_with_padding(image, plate_detection.bbox)
 
-            ocr_image = preprocess_plate_for_ocr(plate_crop)
+                if SAVE_PLATE_CROP:
+                    plate_crop_image_path = (
+                        self.image_storage_service.save_detection_image(
+                            image=plate_crop,
+                            camera_code=camera_code,
+                            captured_at=captured_at,
+                            suffix="plate_crop",
+                        )
+                    )
+                    plate_crop_image_url = (
+                        self.image_storage_service.build_detection_image_url(
+                            plate_crop_image_path,
+                        )
+                    )
 
-            if SAVE_OCR_PREPROCESSED_IMAGE:
-                ocr_image_path = self.image_storage_service.save_detection_image(
-                    image=ocr_image,
-                    camera_code=camera_code,
-                    captured_at=captured_at,
-                    suffix="ocr",
-                )
-                ocr_image_url = self.image_storage_service.build_detection_image_url(
-                    ocr_image_path,
-                )
+                ocr_image = preprocess_plate_for_ocr(plate_crop)
 
-            recognition = self.plate_recognizer.recognize(ocr_image)
+                if SAVE_OCR_PREPROCESSED_IMAGE:
+                    ocr_image_path = self.image_storage_service.save_detection_image(
+                        image=ocr_image,
+                        camera_code=camera_code,
+                        captured_at=captured_at,
+                        suffix="ocr",
+                    )
+                    ocr_image_url = self.image_storage_service.build_detection_image_url(
+                        ocr_image_path,
+                    )
 
-            plate_number = recognition.text
-            detection_type = "PLATE" if plate_number else "VEHICLE"
+                recognition = self.plate_recognizer.recognize(ocr_image)
+
+                plate_number = recognition.text
+                detection_type = "PLATE" if plate_number else "VEHICLE"
+                confidence_score = plate_detection.confidence_score
 
         return DetectionResult(
             camera_code=camera_code,

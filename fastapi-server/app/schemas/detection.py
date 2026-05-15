@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 DirectionType = Literal["IN", "OUT", "BOTH"]
-DetectionType = Literal["VEHICLE", "PLATE"]
+DetectionType = Literal["VEHICLE", "PLATE", "UNKNOWN"]
 AnalysisStatus = Literal[
     "ANALYSIS_ONLY",
     "SENT_TO_BACKEND",

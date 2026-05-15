@@ -17,6 +17,8 @@ from app.services.backend_client import BackendClient
 from app.services.inference_service import InferenceService
 from app.services.plate_detector import PlateDetection
 from app.services.plate_recognizer import PlateRecognition, PlateRecognizer
+from app.services.vehicle_detector import VehicleDetection
+from app.services.vehicle_detector import VehicleDetector
 from app.services.frame_buffer import FrameBuffer
 from app.services.stream_event_service import (
     STREAM_STATUS_FINALIZED,
@@ -39,11 +41,68 @@ def make_test_image_bytes() -> bytes:
     return buffer.tobytes()
 
 
+class FakeYoloBox:
+    def __init__(
+        self,
+        *,
+        class_id: int,
+        confidence_score: float,
+        bbox: list[int],
+    ) -> None:
+        self.cls = [class_id]
+        self.conf = [confidence_score]
+        self.xyxy = [bbox]
+
+
+class FakeYoloResult:
+    def __init__(self, *, boxes: list[FakeYoloBox]) -> None:
+        self.names = {
+            0: "person",
+            2: "car",
+            3: "motorcycle",
+            5: "bus",
+            7: "truck",
+        }
+        self.boxes = boxes
+
+
+class FakeYoloModel:
+    def __init__(self, *, boxes: list[FakeYoloBox]) -> None:
+        self.names = {
+            0: "person",
+            2: "car",
+            3: "motorcycle",
+            5: "bus",
+            7: "truck",
+        }
+        self.boxes = boxes
+
+    def __call__(self, image, *, conf, iou, max_det):
+        return [FakeYoloResult(boxes=self.boxes)]
+
+
+def mock_vehicle_detection(
+    monkeypatch,
+    service: InferenceService,
+    *,
+    confidence_score: float = 0.82,
+) -> None:
+    monkeypatch.setattr(
+        service.vehicle_detector,
+        "detect",
+        lambda image: VehicleDetection(
+            detection_type="VEHICLE",
+            confidence_score=confidence_score,
+            bbox=(0, 0, 150, 70),
+        ),
+    )
+
+
 def make_unrecognized_detection() -> DetectionResult:
     return DetectionResult(
         camera_code="CAM_001",
         plate_number=None,
-        detection_type="VEHICLE",
+        detection_type="UNKNOWN",
         direction_type="IN",
         confidence_score=0.0,
         image_path="storage/detections/2026/04/30/CAM_001_103000_frame.jpg",
@@ -97,6 +156,58 @@ def test_plate_number_normalization_keeps_korean_plate_characters() -> None:
         assert recognizer._normalize_plate_number(raw_text) == expected
 
 
+def test_vehicle_detector_returns_best_allowed_vehicle_class(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("app.services.vehicle_detector.VEHICLE_MODEL_SOURCE", "fake.pt")
+    monkeypatch.setattr(
+        "app.services.vehicle_detector.VEHICLE_CLASS_NAMES",
+        ("car", "bus", "truck", "motorcycle"),
+    )
+
+    detector = VehicleDetector()
+    fake_model = FakeYoloModel(
+        boxes=[
+            FakeYoloBox(class_id=0, confidence_score=0.99, bbox=[0, 0, 20, 20]),
+            FakeYoloBox(class_id=2, confidence_score=0.88, bbox=[10, 20, 80, 60]),
+            FakeYoloBox(class_id=7, confidence_score=0.77, bbox=[30, 40, 100, 90]),
+        ]
+    )
+    monkeypatch.setattr(detector, "_load_model", lambda: fake_model)
+
+    result = detector.detect(np.zeros((100, 120, 3), dtype=np.uint8))
+
+    assert result.detection_type == "VEHICLE"
+    assert result.confidence_score == 0.88
+    assert result.bbox == (10, 20, 80, 60)
+    assert [box.class_name for box in result.boxes] == ["car", "truck"]
+
+
+def test_vehicle_detector_returns_unknown_when_no_vehicle_class(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("app.services.vehicle_detector.VEHICLE_MODEL_SOURCE", "fake.pt")
+    monkeypatch.setattr(
+        "app.services.vehicle_detector.VEHICLE_CLASS_NAMES",
+        ("car", "bus", "truck", "motorcycle"),
+    )
+
+    detector = VehicleDetector()
+    fake_model = FakeYoloModel(
+        boxes=[
+            FakeYoloBox(class_id=0, confidence_score=0.99, bbox=[0, 0, 20, 20]),
+        ]
+    )
+    monkeypatch.setattr(detector, "_load_model", lambda: fake_model)
+
+    result = detector.detect(np.zeros((100, 120, 3), dtype=np.uint8))
+
+    assert result.detection_type == "UNKNOWN"
+    assert result.confidence_score == 0.0
+    assert result.bbox is None
+    assert result.boxes == []
+
+
 def test_create_mock_detection(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(
         "app.services.image_storage_service.IMAGE_STORAGE_DIR",
@@ -120,7 +231,7 @@ def test_create_mock_detection(monkeypatch, tmp_path) -> None:
 
     assert data["cameraCode"] == "CAM_001"
     assert data["plateNumber"] is None
-    assert data["detectionType"] == "VEHICLE"
+    assert data["detectionType"] == "UNKNOWN"
     assert data["directionType"] == "IN"
     assert data["confidenceScore"] == 0.0
     assert data["imagePath"] is not None
@@ -169,7 +280,7 @@ def test_create_detection_from_image(monkeypatch, tmp_path) -> None:
 
     assert data["cameraCode"] == "CAM_001"
     assert data["plateNumber"] is None
-    assert data["detectionType"] == "VEHICLE"
+    assert data["detectionType"] == "UNKNOWN"
     assert data["imagePath"] is not None
     assert Path(data["imagePath"]).exists()
     assert data["imageUrl"].startswith("/static/detections/")
@@ -192,6 +303,7 @@ def test_detection_saves_frame_crop_and_ocr_images_when_enabled(
     )
 
     service = InferenceService()
+    mock_vehicle_detection(monkeypatch, service)
 
     monkeypatch.setattr(
         service.plate_detector,
@@ -249,6 +361,7 @@ def test_detection_includes_crop_and_ocr_images_when_ocr_fails_after_bbox(
     )
 
     service = InferenceService()
+    mock_vehicle_detection(monkeypatch, service)
 
     monkeypatch.setattr(
         service.plate_detector,
@@ -280,6 +393,42 @@ def test_detection_includes_crop_and_ocr_images_when_ocr_fails_after_bbox(
     assert result.detection_type == "VEHICLE"
     assert result.plate_crop_image_url.endswith("/2026/04/30/CAM_001_103000_plate_crop.jpg")
     assert result.ocr_image_url.endswith("/2026/04/30/CAM_001_103000_ocr.jpg")
+
+
+def test_detection_returns_vehicle_when_vehicle_detected_without_plate(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(
+        "app.services.image_storage_service.IMAGE_STORAGE_DIR",
+        str(tmp_path / "detections"),
+    )
+
+    service = InferenceService()
+    mock_vehicle_detection(monkeypatch, service, confidence_score=0.81)
+    monkeypatch.setattr(
+        service.plate_detector,
+        "detect",
+        lambda image: PlateDetection(
+            detection_type="UNKNOWN",
+            confidence_score=0.0,
+            bbox=None,
+        ),
+    )
+
+    result = asyncio.run(
+        service.detect_from_image_bytes(
+            camera_code="CAM_001",
+            captured_at=datetime(2026, 4, 30, 10, 30, 0),
+            image_bytes=make_test_image_bytes(),
+        )
+    )
+
+    assert result.plate_number is None
+    assert result.detection_type == "VEHICLE"
+    assert result.confidence_score == 0.81
+    assert result.plate_crop_image_url is None
+    assert result.ocr_image_url is None
 
 
 def test_detection_preprocess_none_keeps_frame_unchanged(monkeypatch) -> None:
@@ -325,8 +474,8 @@ def test_inference_uses_detection_preprocess_before_detector(
 
     def fake_detect(image):
         detector_image_ids.append(id(image))
-        return PlateDetection(
-            detection_type="VEHICLE",
+        return VehicleDetection(
+            detection_type="UNKNOWN",
             confidence_score=0.0,
             bbox=None,
         )
@@ -335,7 +484,7 @@ def test_inference_uses_detection_preprocess_before_detector(
         "app.services.inference_service.preprocess_frame_for_detection",
         fake_preprocess,
     )
-    monkeypatch.setattr(service.plate_detector, "detect", fake_detect)
+    monkeypatch.setattr(service.vehicle_detector, "detect", fake_detect)
 
     result = asyncio.run(
         service.detect_from_image_bytes(
@@ -345,7 +494,7 @@ def test_inference_uses_detection_preprocess_before_detector(
         )
     )
 
-    assert result.detection_type == "VEHICLE"
+    assert result.detection_type == "UNKNOWN"
     assert len(original_image_ids) == 1
     assert len(detector_image_ids) == 1
     assert detector_image_ids[0] != original_image_ids[0]
@@ -366,6 +515,7 @@ def test_detection_can_reprocess_saved_image_without_resaving_frame(
     )
 
     service = InferenceService()
+    mock_vehicle_detection(monkeypatch, service)
 
     monkeypatch.setattr(
         service.plate_detector,
@@ -456,17 +606,17 @@ def test_stream_event_service_finalizes_after_bbox_misses(
 
     image_bytes = make_test_image_bytes()
     detections = [
-        PlateDetection("VEHICLE", 0.0, None),
-        PlateDetection("PLATE", 0.93, (20, 20, 120, 50)),
-        PlateDetection("VEHICLE", 0.0, None),
-        PlateDetection("VEHICLE", 0.0, None),
-        PlateDetection("VEHICLE", 0.0, None),
-        PlateDetection("VEHICLE", 0.0, None),
-        PlateDetection("VEHICLE", 0.0, None),
+        VehicleDetection("UNKNOWN", 0.0, None),
+        VehicleDetection("VEHICLE", 0.93, (20, 20, 120, 50)),
+        VehicleDetection("UNKNOWN", 0.0, None),
+        VehicleDetection("UNKNOWN", 0.0, None),
+        VehicleDetection("UNKNOWN", 0.0, None),
+        VehicleDetection("UNKNOWN", 0.0, None),
+        VehicleDetection("UNKNOWN", 0.0, None),
     ]
 
     class FakeInferenceService:
-        def detect_plate_bbox_from_image(self, image):
+        def detect_vehicle_bbox_from_image(self, image):
             return detections.pop(0)
 
         async def detect_from_image_bytes(self, *, camera_code, captured_at, image_bytes):
@@ -774,7 +924,7 @@ def test_create_and_send_mock_detection_sends_ocr_failed_when_plate_is_not_recog
     )
     assert body["analysisStatus"] == "OCR_FAILED"
     assert body["data"]["plateNumber"] is None
-    assert body["data"]["detectionType"] == "VEHICLE"
+    assert body["data"]["detectionType"] == "UNKNOWN"
     assert sent_statuses == ["OCR_FAILED"]
 
 
@@ -818,7 +968,7 @@ def test_create_and_send_image_detection_sends_ocr_failed_when_plate_is_not_reco
     )
     assert body["analysisStatus"] == "OCR_FAILED"
     assert body["data"]["plateNumber"] is None
-    assert body["data"]["detectionType"] == "VEHICLE"
+    assert body["data"]["detectionType"] == "UNKNOWN"
     assert sent_statuses == ["OCR_FAILED"]
 
 

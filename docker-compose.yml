@@ -38,6 +38,12 @@ services:
       BACKEND_INTERNAL_API_KEY: traffic-ai-internal-key-2026
       IMAGE_STORAGE_DIR: storage/detections
       MODEL_PATH: /app/models/best.pt
+      PLATE_MODEL_PATH: /app/models/best.pt
+      VEHICLE_MODEL_NAME: yolo26s.pt
+      VEHICLE_YOLO_CONF_THRESHOLD: 0.35
+      VEHICLE_YOLO_IOU_THRESHOLD: 0.45
+      VEHICLE_YOLO_MAX_DET: 10
+      VEHICLE_CLASS_NAMES: car,bus,truck,motorcycle
       DETECTION_PREPROCESS_MODE: none
       SAVE_PLATE_CROP: "true"
       SAVE_OCR_PREPROCESSED_IMAGE: "true"

@@ -53,7 +53,7 @@ public class DetectionAnalysisResultService {
     }
 
     private DetectionType resolveDetectionType(DetectionRequest request) {
-        return request.getDetectionType() != null ? request.getDetectionType() : DetectionType.VEHICLE;
+        return request.getDetectionType() != null ? request.getDetectionType() : DetectionType.UNKNOWN;
     }
 
     private BigDecimal toBigDecimal(Double value) {
