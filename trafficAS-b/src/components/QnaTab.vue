@@ -2,7 +2,10 @@
   <div class="qna">
     <div class="top-row">
       <p class="info">궁금한 점을 질문하고 전문가 답변을 받으세요.</p>
-      <button class="wbtn" @click="openQuestionForm">질문하기</button>
+      <button class="wbtn" :disabled="!isLoggedIn" @click="onWrite"
+              :title="isLoggedIn ? '새 질문 작성' : '로그인이 필요합니다'">
+        <i class="bi bi-question-circle"></i> 질문하기
+      </button>
     </div>
 
     <div v-if="message" class="notice" :class="messageType">{{ message }}</div>
@@ -268,6 +271,12 @@ import { useAuth } from "../composables/useAuth";
 
 const { isAdmin, isLoggedIn, openLogin } = useAuth();
 
+/* 비회원 차단 — 로그인 안 했으면 로그인 모달, 했으면 질문 폼 오픈 */
+function onWrite() {
+  if (!isLoggedIn.value) { openLogin(); return; }
+  openQuestionForm();
+}
+
 const query = ref("");
 const expandedId = ref(null);
 const answerDraft = ref("");
@@ -448,7 +457,7 @@ onMounted(loadQuestions);
   margin-bottom: 12px;
 }
 .info {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--t2);
   font-weight: 300;
 }
@@ -456,20 +465,20 @@ onMounted(loadQuestions);
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: 9px 18px;
   background: var(--a);
   color: var(--bg);
   font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
   border-radius: 4px;
   cursor: pointer;
   border: none;
 }
-.wbtn:hover {
-  opacity: 0.87;
-}
+.wbtn:hover:not(:disabled) { opacity: 0.87; }
+.wbtn:disabled { opacity: 0.45; cursor: not-allowed; }
+.wbtn i { margin-right: 4px; }
 
 .notice {
   margin-bottom: 10px;
@@ -548,10 +557,10 @@ onMounted(loadQuestions);
 }
 .s-input {
   flex: 1;
-  padding: 9px 0;
+  padding: 11px 0;
   background: none;
   border: none;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--t);
   outline: none;
   font-family: "Noto Sans KR", sans-serif;
@@ -575,7 +584,7 @@ onMounted(loadQuestions);
 }
 .s-count {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--a);
   padding: 0 10px 0 0;
   white-space: nowrap;
@@ -590,18 +599,18 @@ onMounted(loadQuestions);
   overflow: hidden;
 }
 .th {
-  padding: 10px 16px;
+  padding: 12px 18px;
   border-bottom: 1px solid var(--b);
   background: rgba(255, 255, 255, 0.025);
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   color: var(--t3);
 }
 .tr {
-  padding: 11px 16px;
+  padding: 13px 18px;
   border-bottom: 1px solid var(--b);
-  font-size: 12px;
+  font-size: 14px;
   align-items: center;
   transition: background 0.15s;
   cursor: pointer;
@@ -641,22 +650,22 @@ onMounted(loadQuestions);
   color: var(--a);
 }
 .sub {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--t3);
 }
 .nb {
   font-family: "JetBrains Mono", monospace;
-  font-size: 8px;
+  font-size: 10.5px;
   background: rgba(255, 255, 255, 0.1);
   color: var(--a);
-  padding: 1px 5px;
+  padding: 2px 7px;
   border-radius: 100px;
   flex-shrink: 0;
 }
 .sts {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
-  padding: 2px 8px;
+  font-size: 11px;
+  padding: 3px 9px;
   border-radius: 3px;
 }
 .done {
@@ -688,21 +697,21 @@ onMounted(loadQuestions);
   align-items: center;
   gap: 6px;
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--t3);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   letter-spacing: 0.08em;
 }
 .qbody-text {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--t2);
-  line-height: 1.7;
-  margin: 0 0 6px 0;
+  line-height: 1.75;
+  margin: 0 0 8px 0;
   white-space: pre-wrap;
 }
 .qmeta {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--t3);
 }
 
@@ -719,24 +728,24 @@ onMounted(loadQuestions);
   align-items: center;
   gap: 6px;
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--a);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   letter-spacing: 0.08em;
 }
 .answer-head.write {
   color: var(--t3);
 }
 .answer-time {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--t3);
   margin-left: 4px;
   flex: 1;
 }
 .answer-text {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--t2);
-  line-height: 1.7;
+  line-height: 1.75;
   white-space: pre-wrap;
 }
 
@@ -757,8 +766,8 @@ onMounted(loadQuestions);
   background: var(--bg);
   border: 1px solid var(--b);
   border-radius: 5px;
-  padding: 8px 10px;
-  font-size: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
   color: var(--t);
   font-family: "Noto Sans KR", sans-serif;
   outline: none;
@@ -780,8 +789,8 @@ onMounted(loadQuestions);
 }
 .cact {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
-  padding: 2px 8px;
+  font-size: 11px;
+  padding: 3px 9px;
   border-radius: 3px;
   border: 1px solid var(--b);
   background: none;
@@ -794,12 +803,12 @@ onMounted(loadQuestions);
   color: var(--a);
 }
 .cbtn-save {
-  padding: 5px 14px;
+  padding: 6px 16px;
   background: var(--a);
   color: #fff;
   border: none;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 12.5px;
   font-family: "JetBrains Mono", monospace;
   cursor: pointer;
   transition: opacity 0.2s;
@@ -812,11 +821,11 @@ onMounted(loadQuestions);
   cursor: not-allowed;
 }
 .cbtn-cancel {
-  padding: 5px 12px;
+  padding: 6px 14px;
   background: none;
   border: 1px solid var(--b);
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 12.5px;
   font-family: "JetBrains Mono", monospace;
   color: var(--t3);
   cursor: pointer;
@@ -829,11 +838,11 @@ onMounted(loadQuestions);
 
 /* 답변 대기 */
 .waiting {
-  padding: 18px 16px;
+  padding: 20px 18px;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--t3);
   border-top: 1px dashed rgba(255, 255, 255, 0.06);
 }
@@ -841,7 +850,7 @@ onMounted(loadQuestions);
 /* 관리자 배지 */
 .admin-badge {
   margin-top: 10px;
-  padding: 8px 12px;
+  padding: 9px 13px;
   background: rgba(96, 165, 250, 0.06);
   border: 1px solid rgba(96, 165, 250, 0.2);
   border-radius: 5px;
@@ -849,7 +858,7 @@ onMounted(loadQuestions);
   align-items: center;
   gap: 6px;
   font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
+  font-size: 11.5px;
   color: var(--a);
 }
 
@@ -867,7 +876,7 @@ onMounted(loadQuestions);
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--t3);
 }
 </style>

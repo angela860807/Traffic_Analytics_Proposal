@@ -14,7 +14,7 @@ CCTV 기반 번호판 자동 인식(ANPR), 구역별 혼잡도 히트맵, 차량
 
 - **Frontend:** Vue 3 (`<script setup>` Composition API) + Vue Router 4
 - **백엔드 API:** FastAPI (`VITE_FASTAPI_BASE_URL`) — 도로 혼잡도, 최근 OCR 인식 결과 등
-- **AI 채팅:** Groq API (LLaMA 3.3-70B) 기반 교통 관제 어시스턴트
+- **실시간 채팅:** 키워드 매칭 + 대시보드 실시간 상태 조회 기반 어시스턴트 (외부 API 의존 없음)
 - **시각화:** ECharts (혼잡도/도넛/통계 차트), Leaflet (지도/히트맵)
 - **도로 geometry:** OpenStreetMap Overpass API + 24시간 localStorage 캐시
 - **배포:** Vite 정적 빌드 → 웹 서버 배포
@@ -31,8 +31,8 @@ CCTV 기반 번호판 자동 인식(ANPR), 구역별 혼잡도 히트맵, 차량
     ├── Overpass API → overpass-api.de (다중 미러 + 캐시)
     │                  └── 강남/서초/송파 주요 도로 geometry
     │
-    └── Groq API ───→ LLaMA 3.3-70B
-                       └── AI 교통 관제 어시스턴트
+    └── 실시간 채팅 (로컬)
+                       └── 키워드 매칭 + 대시보드 상태 실시간 조회
 ```
 
 ---
@@ -77,7 +77,6 @@ CCTV 기반 번호판 자동 인식(ANPR), 구역별 혼잡도 히트맵, 차량
 - FastAPI REST 호출 (`/api/v1/road-congestion`, `/api/v1/plates/recent`)
 - Spring Boot (Java 백엔드 — 도메인 엔티티 / DB)
 - YOLO + OCR 엔진 (차량/번호판 감지)
-- Groq API — LLaMA 3.3-70B-Versatile (교통 관제 어시스턴트)
 - HTMLVideoElement (실시간 CCTV 영상 6분할)
 
 ### 6-3 인증 / 상태 관리
@@ -102,7 +101,7 @@ CCTV 기반 번호판 자동 인식(ANPR), 구역별 혼잡도 히트맵, 차량
     ▼
 Vue 3 SPA (Vite)
     │
-    ├── Vue Router ──→ / (메인) /sub/intro /sub/usage /sub/support /login /signup /dashboard
+    ├── Vue Router ──→ / (메인) /sub/intro /sub/support /login /signup /dashboard
     │
     ├── useAuth.js ───────→ LocalStorage (사용자 세션)
     ├── useDashboardData ─→ 공유 상태 (KPI / OCR / 카메라 / 카메라 혼잡도 / 설정)
@@ -114,8 +113,8 @@ Vue 3 SPA (Vite)
     ├── Overpass API → 다중 미러 (overpass-api.de / kumi.systems / private.coffee / lz4)
     │                     └── 강남/서초/송파 motorway~secondary 도로
     │
-    └── Groq API ─────→ LLaMA 3.3-70B
-                          └── AI 교통 관제 어시스턴트 (한국어 전용)
+    └── 실시간 채팅 (로컬 키워드 매칭)
+                          └── 대시보드 상태 실시간 조회 + 자동 이벤트 푸시
 ```
 
 ---
@@ -150,8 +149,8 @@ npm install
 ### 9-3 환경 변수 설정 (`.env`)
 
 ```env
+VITE_API_BASE_URL=http://localhost:8080       # Spring Boot 서버 주소
 VITE_FASTAPI_BASE_URL=http://localhost:8000   # FastAPI 서버 주소 (비어있으면 데모 모드)
-VITE_GROQ_API_KEY=gsk_...                     # Groq API 키 (선택)
 ```
 
 > `VITE_FASTAPI_BASE_URL`이 비어있으면 모든 API 호출이 우회되고 데모 데이터(랜덤)로 동작합니다.
@@ -195,7 +194,6 @@ trafficAS-b/
 │   ├── views/
 │   │   ├── MainView.vue              # 메인 랜딩 페이지 (Hero / 시스템 소개 / Features / CTA)
 │   │   ├── IntroView.vue             # 서비스 소개
-│   │   ├── UsageView.vue             # 이용 방법
 │   │   ├── LoginView.vue             # 로그인
 │   │   ├── SignupView.vue            # 회원가입
 │   │   ├── SupportView.vue           # 고객지원
@@ -204,8 +202,9 @@ trafficAS-b/
 │   ├── components/
 │   │   ├── AppNav.vue                # 공통 네비게이션 (다크/라이트 토글)
 │   │   ├── AppFab.vue                # 플로팅 버튼 (채팅/테마/상단이동)
+│   │   ├── AppFooter.vue             # 공통 푸터 (4컬럼, 마케팅 페이지용)
 │   │   ├── AuthModal.vue             # 로그인/회원가입 모달
-│   │   ├── ChatTab.vue               # AI 채팅 (Groq API)
+│   │   ├── ChatTab.vue               # 실시간 채팅 (키워드 매칭 + 대시보드 상태 조회)
 │   │   ├── BoardTab.vue              # 커뮤니티 게시판
 │   │   ├── QnaTab.vue                # Q&A
 │   │   ├── HeroStats.vue             # 메인 히어로 통계 카운터
@@ -323,16 +322,36 @@ trafficAS-b/
 - 알림 패널: 12건 표시 + 편집 모드 (개별 X 삭제 / 전체 삭제)
 - 외부 클릭 시 자동 닫힘
 
-### 11-9 AI 교통 어시스턴트
+### 11-9 실시간 관제 어시스턴트 (채팅)
 
-- Groq API (LLaMA 3.3-70B) 기반 한국어 전용 챗봇
-- 교통 관제 특화 시스템 프롬프트
+- **키워드 매칭** + 대시보드 실시간 상태(`useDashboardData`) 직접 조회로 즉답 — 외부 API 의존 없음
+- 빠른 명령 칩 5개 (시스템 상태 / 카메라 현황 / 혼잡 TOP3 / 통행량 / 알림)
+- 새 알림 발생 시 채팅창에 자동 푸시 (LIVE/OFF 토글)
+- 헤더에 실시간 카메라 가동 수 표시 (5초 갱신)
+- DEMO 모드 — 백엔드 미연동 시 8~15초마다 샘플 이벤트 시뮬레이션 (운영 환경에선 자동 OFF)
 
 ### 11-10 동적 날짜 처리
 
 - 모든 시각 표시는 `todayStr`(`new Date()` 기반 로컬 yyyy-MM-dd)로 일원화
 - 카메라 lastSeen / 이벤트 시각 / 시스템 정보 모두 자동 갱신
 - 검색 탭 날짜 필터도 동일 기준으로 동작
+
+### 11-11 카메라 Heartbeat 모니터링 + 자동 알람
+
+- 카메라별 `📡 N초 전` heartbeat 배지 (실시간 갱신)
+- 상태 3단계: `online` (녹색 펄스) / `warn` (주황) / `offline` (빨강 + 카드 강조)
+- 임계값 기반 자동 알람 — 인식률 / FPS / heartbeat 끊김 초 사용자 설정 가능
+- 디바운스(60초): 같은 카메라·같은 사유로 중복 알림 방지
+- 음소거 토글 (점검 중인 카메라는 알람 제외)
+
+### 11-12 고객 지원 (SupportView)
+
+- 사이드바 + 컨텐츠 패널의 풀스크린 SaaS 레이아웃 (Slack/Discord 스타일)
+- 3채널: **게시판** / **Q&A** / **실시간 채팅**
+- 채널별 아이콘 + 활성 시 글로우 효과 + LIVE 펄스 도트
+- 게시판: 검색·페이지네이션·댓글 CRUD·검색어 하이라이트
+- Q&A: 질문·답변·관리자 권한·상태 배지(답변 대기/답변 완료)
+- 채팅: 키워드 매칭 + 대시보드 실시간 상태 조회 어시스턴트 (외부 API 의존 없음, 자동 이벤트 푸시)
 
 ---
 
@@ -412,20 +431,100 @@ onUnmounted(() => {
 
 ---
 
-## 14. 향후 개선 사항
+## 14. 디자인 시스템 / UI 일관성
 
-## 14. 향후 개선 사항
+### 14-1 공통 컴포넌트 — `AppFooter.vue`
+- 4컬럼 구조 (브랜드 / 서비스 / 기술 / 팀·산출물)
+- `MainView`, `IntroView`, `SupportView`에서 import해 일관된 푸터 유지
+- 한 번 수정하면 페이지 동시 반영
+
+### 14-2 폰트 시스템
+- **한글 본문**: Pretendard Variable (가독성)
+- **헤딩 (랜딩)**: Syne 700/800 (디스플레이용)
+- **코드 / 라벨**: IBM Plex Mono / JetBrains Mono
+- 본문 14~15px / 라벨 11px / 헤딩 clamp() 반응형
+
+### 14-3 컬러 토큰 (`base.css`)
+- `--bg / --bg2 / --bg3` 배경 3단계
+- `--t / --t2 / --t3` 텍스트 명도 3단계
+- `--a / --ba / --glow` 강조 / 보더 / 글로우
+- 다크 ↔ 라이트는 `.theme-navy.light` 변수만 재정의
+
+### 14-4 페이지별 푸터 정책
+| 페이지 유형 | 푸터 |
+|---|---|
+| 랜딩 / 소개 / 고객 지원 | `<AppFooter />` 마케팅 푸터 |
+| 로그인 / 회원가입 | 풀스크린 폼 — 푸터 없음 |
+| 관리자 대시보드 | 한 줄짜리 © (관제 UI 전용) |
+
+---
+
+## 15. 향후 개선 사항
 
 - 실제 FastAPI 백엔드 연동 실전 검증 (`.env`의 `VITE_FASTAPI_BASE_URL` 채우면 즉시 통신 시도)
 - WebSocket 도입 (현재는 3초 폴링)
 - ECharts 트리쉐이킹 — 사용 차트 타입만 import해서 대시보드 청크 추가 100KB 절감
+- 비디오 자산 트랜스코드 (현재 280MB+ → 720p로 약 30MB까지 절감 가능)
 - 검색 결과 서버사이드 페이지네이션 + 가상 스크롤
 - 차량 이미지 다양화 + 번호판 좌표 메타데이터 기반 자동 합성
-- 에러 / 로딩 상태 통합 안내 (현재는 console.warn 중심)
+- 에러 / 로딩 상태 통합 안내 (토스트 시스템)
 - 사용자별 알림 구독 설정
 - 모바일 반응형 대시보드
 - 데이터 내보내기 (CSV / PDF 리포트)
 - 다중 관제 센터 지원
 - 차량 이동 이력 추적 (camera-to-camera 경로 시각화)
+- SEO 메타(Open Graph, Twitter Card) + 모니터링(Sentry 등) 도입
+
+---
+
+## 16. 인덱스 / 고객지원 페이지 리뉴얼 (2026-05-15)
+
+### 16-1 메인(MainView) 변경 요약
+- **HERO**: 좌측 텍스트 / 우측 이미지(`/main1.png`) 사이드바이사이드.
+  - 그리드 비율 3:7, 우측 이미지가 화면 끝까지 풀블리드(`margin-right: calc(60px - (50vw - 50%))`).
+  - 좌측 30%까지 mask gradient로 텍스트 영역과 자연스럽게 페이드.
+  - 우측 이미지 영역 `align-self: stretch`로 박스 위/아래 가득.
+- **4 FEATURE 카드**: 히어로 끝선에 살짝 걸치도록 `margin-top: -50px` + `z-index: 5`.
+  - 아이콘 + 제목 같은 행(flex row), 카드 우상단 화살표 링크.
+- **SOLUTION 개요**: 좌측 대시보드 스크린샷 / 우측 카피 + 체크리스트. 그리드 `1.25fr / 1fr`, gap 80px + `padding-left: 40px`.
+- **SERVICE PROCESS**: 4스텝 아이콘 원형. 번호 원이 아이콘 좌상단에 absolute 오버랩 + `box-shadow`. 옆 스텝과 dashed line으로 연결(`.process-line`).
+- **CORE FEATURES**: 5개 항목 가로 정렬, 아이콘 좌 / 텍스트 우, 세로 구분선(`border-right`).
+- **CTA**: 파란 그라데이션 카드. 데모/문의 버튼.
+- **파트너 섹션**: 삭제.
+- **Bootstrap arrow-right 아이콘**: 모든 버튼/링크에서 제거.
+- **Lucide 도입**: 데이터 수집(`Cctv`), 핵심기능 5개 (`Cctv`/`ScanText`/`BellRing`/`BarChart3`/`Network`)는 Lucide, 나머지는 Bootstrap Icons.
+
+### 16-2 고객지원(SupportView) 변경 요약
+시안 기반 풀스크린에서 일반 페이지로 재구성:
+1. **HERO**: 좌측 라벨 `CUSTOMER SUPPORT` + h1 `고객 지원` + 4채널(공지사항 / 질문답변 / 실시간채팅 / 운영시간) 그리드. 우측 `/support_headset_hero.png` 헤드셋 일러스트. 히어로 박스 사이즈 `height: 480px` 고정 + 이미지는 `height: 100%; object-fit: contain`으로 박스 안에 정확히 맞춤. 좌측 mask gradient로 텍스트 영역과 어우러짐.
+2. **MAIN 레이아웃**: 280px 사이드바 + 콘텐츠 패널(`<BoardTab>` / `<QnaTab>` / `<ChatTab>`).
+   - 사이드바: 4개 카드(공지사항 / 질문답변 / 실시간채팅[Live 펄스 뱃지] / 운영시간[disabled])
+   - 패널: 흰 카드 + 라운드 + `padding: 32px 36px` + `min-height: 720px`. `.panel-inner :deep(> *)`로 자식 컴포넌트가 박스 가득 채우게 강제.
+3. **VALUES**: 4개 카드(빠른 응답 / 전문 기술 지원 / 다양한 채널 / 안전한 서비스), 짧은 파란 선 액센트.
+4. **CTA**: 헤드셋 아이콘 + `실시간 채팅 시작` 버튼 — 클릭 시 `tab = 'chat'`.
+5. **AppFooter** 포함.
+
+### 16-3 헤더 / 푸터 톤 정리
+- **AppNav**: 메뉴 링크 색 `--t3 (24%)` → `--t 100%` + `weight: 600`, 호버 색은 `--a`(파랑)로 일관.
+- **AppFooter**: 본문/링크는 `--t opacity: 0.62`(보조 정보 톤)로 약하게, 호버 시 `--a + opacity:1`로 부각.
+
+### 16-4 폰트 / 색상 톤 통일
+- 본문 설명류는 `var(--t2)` 대신 **`var(--t) + opacity: 0.62~0.78`**로 통일 → 다크/라이트 모드 둘 다 또렷.
+- 하이라이트(`<em>`) 컬러: 라이트 `#4f9cf9`, 다크 `#60a5fa` — 평소 `--a`보다 한 톤 밝은 시안 블루.
+- 한글 본문은 `word-break: keep-all` 적용으로 어절 단위 줄바꿈.
+
+### 16-5 의존성 추가
+```json
+"dependencies": {
+  "lucide-vue-next": "^0.x"
+}
+```
+
+### 16-6 LAN/팀 공유 메모
+로컬 데모 공유:
+```bash
+npm run dev -- --host
+```
+출력의 `Network: http://192.168.x.x:5173/`를 같은 WiFi 팀원에게 공유. 외부망은 `npx cloudflared tunnel --url http://localhost:5173`.
 
 ---
