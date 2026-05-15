@@ -20,6 +20,7 @@ from app.schemas.detection import DetectionResult
 from app.services.frame_buffer import BufferedFrame, FrameBuffer, frame_buffer
 from app.services.image_decoder import ImageDecoder
 from app.services.inference_service import InferenceService
+from app.services.vehicle_detector import VehicleDetection
 
 
 STREAM_STATUS_IDLE = "IDLE"
@@ -247,6 +248,11 @@ class StreamEventService:
                 camera_code=candidate.camera_code,
                 captured_at=candidate.captured_at,
                 image_bytes=candidate.image_bytes,
+                vehicle_detection=VehicleDetection(
+                    detection_type="VEHICLE",
+                    confidence_score=candidate.confidence_score,
+                    bbox=candidate.bbox,
+                ),
             )
 
             if best_result is None:
