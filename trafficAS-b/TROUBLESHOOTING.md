@@ -1359,3 +1359,92 @@ function onWrite() {
 ### 교훈
 **기능 제거 ≠ 코드 삭제**. 토글 UI/액션만 비활성화하고 내부 분기 메커니즘은 보존하면, 미래 복원 비용이 0에 가까워진다.
 
+
+## 37. 인라인 expand 패턴 → 상세 페이지 mutex 전환
+
+### 증상
+공지사항 행을 클릭하면 그 자리에서 본문/댓글이 펼쳐지는 inline expand 방식이었는데, 본문이 길거나 댓글이 많으면 시각적 흐름이 어지러움. 사용자가 "상세 페이지로 진입"하는 형태를 원함.
+
+### 해결
+컴포넌트 내부 상태 `detailPost`(`ref(null) | post 객체`) 도입, 템플릿에서 `v-if="detailPost"` / `v-else`로 **mutex 전환**:
+```vue
+<div v-if="detailPost" class="detail-view">...</div>
+<template v-else>
+  <div class="search-bar">...</div>
+  <div class="tbl">...</div>
+</template>
+```
+라우터 분리 없이 같은 컴포넌트에서 두 뷰를 토글하므로 백엔드 / 라우트 변경 0.
+
+### 교훈
+- "상세 페이지"는 꼭 새 라우트일 필요 없음. 컴포넌트 상태만으로 충분히 페이지처럼 느껴진다
+- 빠르게 만들 땐 라우트 추가보다 mutex 패턴이 더 단순 (URL 공유 필요 없으면)
+
+---
+
+## 38. 권한 매트릭스 — `v-if` vs `:disabled`
+
+### 증상
+글쓰기 버튼을 `:disabled="!isAdmin"`으로 설정하니, 일반 회원에게도 회색 비활성 버튼이 보임. "있긴 한데 안 눌리는" 어색한 UX.
+
+### 해결
+**완전히 숨기려면 `v-if`, 있되 막으려면 `:disabled`** — 의도에 맞게 선택.
+```vue
+<!-- 관리자에게만 노출 -->
+<button v-if="isAdmin" class="wbtn" @click="onWrite">글쓰기</button>
+```
+댓글 수정/삭제 액션도 권한 없는 사용자 입장에서는 존재 자체가 안 보이는 게 맞다 → `v-if="canEdit(c)"`로 컨테이너 자체를 숨김.
+
+### 교훈
+- `:disabled`: 권한은 있지만 일시적으로 막힌 상태 (네트워크 진행 중 등)
+- `v-if`: 권한 자체가 없는 상태 (UI에서 존재할 이유 없음)
+둘은 의미가 다르고 사용자에게 주는 인상도 다름. 권한 분기는 보통 `v-if` 쪽이 더 깔끔.
+
+---
+
+## 39. 댓글 권한 — `canEdit` 한 함수에 두 케이스 통합
+
+### 증상
+"관리자는 모든 댓글, 일반 회원은 본인 댓글만" 권한 분리하려는데, 수정·삭제 버튼을 각각 두 번 체크하면 코드가 지저분.
+
+### 해결
+한 함수 `canEdit(c)`에 권한 로직 통합 + 템플릿에서 부모 컨테이너에만 v-if 적용:
+```js
+function canEdit(c) {
+  if (!isLoggedIn.value) return false;
+  if (isAdmin.value) return true;
+  return currentUser.value?.email === c.authorEmail;
+}
+```
+```vue
+<div class="cacts" v-if="canEdit(c)">
+  <button @click="startEdit(c)">수정</button>
+  <button @click="removeComment(p.id, c.id)">삭제</button>
+</div>
+```
+권한 로직 한 곳, 버튼 그룹 한 번. 새 권한 추가도 함수 한 줄만 고치면 끝.
+
+### 교훈
+같은 권한을 공유하는 액션은 **한 분기로 묶기** — DRY + 일관성. 권한이 분리되어야 할 때만 `canEdit`과 `canDelete`로 쪼개면 됨.
+
+---
+
+## 40. 시드 데이터 + 사용자 작성 데이터 — `computed`로 합치는 패턴
+
+### 증상
+기본 게시글 6개는 코드에 박혀 있어야 하고, 관리자가 새로 작성한 글은 localStorage에 저장돼야 함. 둘을 분리하면서도 목록은 합쳐 보여야 함.
+
+### 해결
+```js
+const seedPosts = [/* 불변 데모 데이터 */];
+const customPosts = ref(JSON.parse(localStorage.getItem("tas_board_posts") || "[]"));
+
+const posts = computed(() => [...customPosts.value, ...seedPosts]);
+```
+- 새 글 추가: `customPosts.value.unshift(...)` + `persistPosts()` → 자동으로 `posts` 갱신
+- 삭제 권한: customPosts에 포함된 글만 (`canEditPost`), 시드는 보호
+- 검색·페이지네이션은 합쳐진 `posts.value` 기준
+
+### 교훈
+**가변 데이터와 불변 데이터를 한 컴퓨티드로 합치는 패턴**은 데모/MVP에서 매우 유용. 백엔드 연동 시엔 customPosts를 API 응답으로 교체만 하면 끝.
+
