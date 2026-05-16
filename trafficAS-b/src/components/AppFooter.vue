@@ -1,7 +1,6 @@
 <template>
   <footer class="ftw">
     <div class="ft-top">
-      <!-- 브랜드 컬럼 -->
       <div class="ft-brand">
         <div class="ft-logo">
           <span class="ft-logo-dot"></span>
@@ -10,7 +9,6 @@
         <p class="ft-tag">YOLO 기반 실시간 차량 감지와<br />번호판 OCR로 교통 흐름을 분석합니다.</p>
       </div>
 
-      <!-- 서비스 컬럼 -->
       <div class="ft-col">
         <div class="ft-h">서비스</div>
         <ul>
@@ -20,7 +18,6 @@
         </ul>
       </div>
 
-      <!-- 팀 컬럼 -->
       <div class="ft-col">
         <div class="ft-h">팀 · 산출물</div>
         <ul>
@@ -80,7 +77,7 @@ import { RouterLink } from "vue-router";
   margin-bottom: 8px;
 }
 .ft-col {
-  text-align: center;          /* 컬럼 전체 가운데 정렬 */
+  text-align: center;
 }
 .ft-col .ft-h {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
@@ -97,7 +94,7 @@ import { RouterLink } from "vue-router";
   margin: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;         /* 리스트 아이템 가운데 */
+  align-items: center;
   gap: 7px;
 }
 .ft-col a {

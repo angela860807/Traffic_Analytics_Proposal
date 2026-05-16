@@ -3,7 +3,6 @@
     <AppNav />
     <AppFab />
 
-    <!-- HERO -->
     <section class="hero">
       <div class="hero-in">
         <div class="hero-left">
@@ -15,7 +14,7 @@
           </p>
           <div class="hero-btns">
             <RouterLink to="/sub/support?tab=chat" class="btn-a">데모 신청</RouterLink>
-            <RouterLink to="/sub/intro" class="btn-g">서비스 소개</RouterLink>
+            <RouterLink to="/sub/intro" class="btn-g">시스템 소개</RouterLink>
           </div>
         </div>
         <div class="hero-right">
@@ -24,7 +23,6 @@
       </div>
     </section>
 
-    <!-- 4 FEATURES -->
     <section class="sec">
       <div class="sw">
         <div class="features-grid fu" ref="fuRef1">
@@ -45,7 +43,6 @@
       </div>
     </section>
 
-    <!-- SOLUTION OVERVIEW -->
     <section class="sec bg2">
       <div class="sw">
         <div class="solution-row fu" ref="fuRef2">
@@ -70,7 +67,6 @@
       </div>
     </section>
 
-    <!-- SERVICE PROCESS -->
     <section class="sec">
       <div class="sw">
         <div class="ey-tag">서비스 이용 프로세스</div>
@@ -92,7 +88,6 @@
       </div>
     </section>
 
-    <!-- CORE FEATURES -->
     <section class="sec core-sec">
       <div class="sw">
         <div class="ey-tag">핵심 기능</div>
@@ -111,7 +106,6 @@
       </div>
     </section>
 
-    <!-- CTA -->
     <section class="cta-wrap">
       <div class="sw">
         <div class="cta-card">
@@ -222,7 +216,7 @@ const coreFeatures = [
 </script>
 
 <style scoped>
-/* ───── HERO ───── */
+/* hero */
 .hero {
   position: relative;
   background: var(--bg);
@@ -232,13 +226,13 @@ const coreFeatures = [
   max-width: 1440px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);  /* 텍스트 3 : 이미지 7 */
+  grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);  /* 3:7 */
   align-items: end;
 }
 .hero-left {
   position: relative;
   z-index: 2;
-  align-self: center;  /* 세로 5:5 가운데 정렬 */
+  align-self: center;
 }
 .hero-tag {
   display: inline-block;
@@ -259,7 +253,7 @@ const coreFeatures = [
   margin: 0 0 20px;
   word-break: keep-all;
 }
-/* 히어로 강조 컬러는 살짝 밝은 톤으로 — 시안 톤 */
+/* em 컬러 살짝 밝게 */
 .hero h1 em {
   color: #4f9cf9;
   font-style: normal;
@@ -284,8 +278,8 @@ const coreFeatures = [
 
 .hero-right {
   position: relative;
-  align-self: stretch;  /* 헤더 끝부터 하단까지 가득 */
-  margin-right: calc(60px - (50vw - 50%));  /* 우측 패딩 탈출 — 화면 우측 끝까지 */
+  align-self: stretch;
+  margin-right: calc(60px - (50vw - 50%));  /* 화면 우측 끝까지 */
   overflow: hidden;
   min-height: 600px;
 }
@@ -296,9 +290,9 @@ const coreFeatures = [
   max-height: 720px;
   display: block;
   object-fit: cover;
-  /* 톤다운: 채도/밝기 더 낮춰 차분하게 */
+  /* 톤다운 */
   filter: saturate(0.78) brightness(0.85);
-  /* 부드러운 ease-in 페이드 — 좌측 38%까지 점진적으로 진해짐 */
+  /* 좌측 페이드 */
   --hero-mask: linear-gradient(to right,
     transparent 0%,
     rgba(0,0,0,0.02) 4%,
@@ -315,14 +309,14 @@ const coreFeatures = [
   mask-image: var(--hero-mask);
 }
 
-/* ───── 공통 ───── */
+/* common */
 .sec {
   padding: 80px 60px;
 }
 .sec.bg2 {
   background: var(--bg2);
 }
-/* 히어로 바로 다음 첫 섹션 — 카드가 히어로 끝선에 자연스럽게 걸침 */
+/* 카드가 히어로 끝선에 살짝 걸치게 */
 .hero + .sec {
   margin-top: -50px;
   padding-top: 0;
@@ -355,7 +349,7 @@ const coreFeatures = [
   font-style: normal;
 }
 
-/* ───── 4 FEATURES ───── */
+/* features */
 .features-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -383,7 +377,7 @@ const coreFeatures = [
 .theme-navy.light .feat-card:hover {
   box-shadow: 0 14px 36px rgba(37, 99, 235, 0.1);
 }
-/* 아이콘 + 제목 같은 행 */
+/* icon + title 한 줄 */
 .feat-head {
   display: flex;
   align-items: center;
@@ -434,10 +428,10 @@ const coreFeatures = [
   gap: 8px;
 }
 
-/* ───── SOLUTION ───── */
+/* solution */
 .solution-row {
   display: grid;
-  grid-template-columns: 1.5fr 1fr;  /* 대시보드 이미지를 더 시원하게 강조 */
+  grid-template-columns: 1.5fr 1fr;
   gap: 80px;
   align-items: center;
 }
@@ -490,7 +484,7 @@ const coreFeatures = [
   flex-shrink: 0;
 }
 
-/* ───── PROCESS ───── */
+/* process */
 .process-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -503,7 +497,7 @@ const coreFeatures = [
   align-items: center;
   text-align: center;
 }
-/* 아이콘+번호 wrapper — 번호가 아이콘 위 좌측으로 떠 있고 점선이 옆 스텝까지 이어짐 */
+/* num을 icon 좌상단에 띄움 */
 .process-icon-wrap {
   position: relative;
   display: inline-block;
@@ -541,7 +535,7 @@ const coreFeatures = [
   position: relative;
   z-index: 2;
 }
-/* 옆 스텝과 잇는 점선 */
+/* step 연결선 */
 .process-line {
   position: absolute;
   top: 50%;
@@ -576,10 +570,10 @@ const coreFeatures = [
   word-break: keep-all;
   text-align: center;
   width: 100%;
-  max-width: 200px;  /* 너무 길게 늘어지지 않게 + 가운데 배치 안정화 */
+  max-width: 200px;
 }
 
-/* ───── CORE FEATURES ───── */
+/* core features */
 .core-sec {
   padding-top: 40px;
   padding-bottom: 40px;
@@ -598,7 +592,7 @@ const coreFeatures = [
   align-items: center;
   gap: 16px;
   text-align: left;
-  border-right: 1px solid var(--b);  /* 항목 사이 세로 구분선 */
+  border-right: 1px solid var(--b);
 }
 .core-item:last-child { border-right: none; }
 .core-icon {
@@ -627,7 +621,7 @@ const coreFeatures = [
   margin: 0;
 }
 
-/* ───── CTA ───── */
+/* cta */
 .cta-wrap {
   padding: 30px 60px 80px;
 }
@@ -663,7 +657,7 @@ const coreFeatures = [
   flex-wrap: wrap;
 }
 
-/* ───── BUTTONS ───── */
+/* buttons */
 .btn-a,
 .btn-g,
 .btn-w,
@@ -731,7 +725,7 @@ const coreFeatures = [
   transform: none;
 }
 
-/* ───── RESPONSIVE ───── */
+/* responsive */
 @media (max-width: 1200px) {
   .features-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -780,7 +774,7 @@ const coreFeatures = [
   .process-row {
     grid-template-columns: repeat(2, 1fr);
   }
-  /* 2-col 그리드에서 우측 열 항목은 보더 제거 */
+  /* 2-col 우측 항목 보더 제거 */
   .core-item:nth-child(2n) { border-right: none; }
   .cta-card {
     flex-direction: column;
