@@ -4,7 +4,6 @@
     <AppFab />
 
     <main class="content">
-      <!-- HERO -->
       <section class="hero">
         <div class="hero-in">
           <div class="hero-left">
@@ -21,7 +20,6 @@
         </div>
       </section>
 
-      <!-- MAIN: 게시판 -->
       <section class="sec">
         <div class="sw">
           <section class="panel">
@@ -32,7 +30,6 @@
         </div>
       </section>
 
-      <!-- VALUES -->
       <section class="sec values-sec">
         <div class="sw">
           <div class="values-head">
@@ -72,9 +69,9 @@ const values = [
 </script>
 
 <style scoped>
-.content { padding-top: 69px; background: var(--bg); }  /* 헤더 68px + border 1px */
+.content { padding-top: 69px; background: var(--bg); }
 
-/* ───── HERO (IntroView와 동일) ───── */
+/* hero */
 .hero { background: var(--bg); border-bottom: 1px solid var(--b); overflow: hidden; }
 .hero-in {
   max-width: 1440px; margin: 0 auto;
@@ -83,7 +80,7 @@ const values = [
   grid-template-columns: minmax(0, 0.55fr) minmax(0, 2.4fr);
   gap: 0;
   align-items: stretch;
-  height: 360px;                  /* 서브페이지 — 조금 더 컴팩트 */
+  height: 360px;
   overflow: hidden;
 }
 .hero-left { align-self: center; min-width: 0; }
@@ -106,10 +103,10 @@ const values = [
   word-break: keep-all;
 }
 
-/* 우측 이미지 — 헤더 바로 아래선 ~ 박스 끝선까지 풀스트레치 + 화면 우측 끝까지 */
+/* 이미지 풀스트레치 */
 .hero-right {
   position: relative;
-  margin-top: -33px;          /* hero-in 상단 padding(32) + 1px 보정 */
+  margin-top: -33px;
   margin-bottom: -33px;
   margin-left: 0;
   margin-right: min(-60px, calc(660px - 50vw));
@@ -138,11 +135,11 @@ const values = [
   mask-image: var(--hero-mask);
 }
 
-/* ───── 공통 SECTION ───── */
+/* common */
 .sec { padding: 80px 60px; }
 .sw { max-width: 1440px; margin: 0 auto; }
 
-/* ───── 게시판 패널 ───── */
+/* board panel */
 .panel {
   background: var(--card);
   border: 1px solid var(--b);
@@ -168,7 +165,7 @@ const values = [
 }
 .panel-inner :deep(.tbl) { flex: 1; min-height: 0; }
 
-/* ───── VALUES ───── */
+/* values */
 .values-sec { padding-top: 20px; padding-bottom: 80px; }
 .values-head {
   display: flex; align-items: center; gap: 14px;
@@ -221,7 +218,7 @@ const values = [
   word-break: keep-all;
 }
 
-/* ───── RESPONSIVE ───── */
+/* responsive */
 @media (max-width: 1100px) {
   .values-grid { grid-template-columns: repeat(2, 1fr); }
 }

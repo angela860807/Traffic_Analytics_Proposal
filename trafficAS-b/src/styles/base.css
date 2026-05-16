@@ -4,7 +4,7 @@ html { scroll-behavior: smooth; overflow-x: hidden; background: #f1f5fb; }
 body { -webkit-font-smoothing: antialiased; background: #f1f5fb; }
 a { text-decoration: none; color: inherit; }
 
-/* 헤더 고정 - 전역 스타일로 강제 고정 */
+/* 헤더 고정 */
 .appnav-line {
   position: fixed !important;
   top: 0; left: 0; right: 0;
@@ -21,7 +21,7 @@ nav.appnav {
   border-bottom: 1px solid var(--b);
 }
 
-/* ── NAVY THEME (Dark) ── */
+/* navy theme - dark */
 .theme-navy {
   --bg:   #020b18; --bg2:  #03101f; --bg3:  #041528;
   --card: rgba(2, 11, 24, .92);
@@ -39,7 +39,7 @@ nav.appnav {
   transition: background .3s, color .3s;
 }
 
-/* ── NAVY THEME (Light) ── */
+/* navy theme - light */
 .theme-navy.light {
   --bg:   #f1f5fb; --bg2:  #e8eff8; --bg3:  #dde8f4;
   --card: rgba(255,255,255,.9);
