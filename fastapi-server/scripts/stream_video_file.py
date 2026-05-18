@@ -46,6 +46,19 @@ class PreviewTracker:
     confidence_score: float = 0.0
 
 
+@dataclass
+class PreviewOverlay:
+    bbox_xyxy: tuple[int, int, int, int]
+    response_frame_number: int
+    confidence_score: float = 0.0
+
+
+@dataclass
+class PreviewFrame:
+    frame_number: int
+    frame: Any
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Stream a local video file to FastAPI /api/detections/stream-frame.",
@@ -74,8 +87,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--jpeg-quality",
         type=int,
-        default=65,
+        default=55,
         help="JPEG quality for uploaded frames.",
+    )
+    parser.add_argument(
+        "--upload-scale",
+        type=float,
+        default=0.5,
+        help=(
+            "Resize frames before upload to reduce server YOLO load. "
+            "1.0 uploads original resolution."
+        ),
     )
     parser.add_argument(
         "--timeout",
@@ -110,6 +132,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--preview-bbox",
         action="store_true",
         help="Open an OpenCV window and draw bbox overlay from FastAPI stream response.",
+    )
+    parser.add_argument(
+        "--preview-fps",
+        type=float,
+        default=8.0,
+        help="Maximum OpenCV GUI redraw FPS. 0 displays every decoded video frame.",
+    )
+    parser.add_argument(
+        "--preview-tracker",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Track response bbox between server responses. Disable for smoother low-end CPU preview.",
+    )
+    parser.add_argument(
+        "--bbox-hold-seconds",
+        type=float,
+        default=0.6,
+        help="Keep drawing the latest response bbox for this many seconds without OpenCV tracking.",
     )
     parser.add_argument(
         "--model-path",
@@ -245,6 +285,35 @@ def make_blank_frame_bytes(width: int, height: int, jpeg_quality: int) -> bytes:
     return buffer.tobytes()
 
 
+def encode_upload_frame(
+    frame,
+    *,
+    upload_scale: float,
+    jpeg_quality: int,
+) -> bytes | None:
+    upload_frame = frame
+
+    if upload_scale != 1.0:
+        upload_frame = cv2.resize(
+            frame,
+            None,
+            fx=upload_scale,
+            fy=upload_scale,
+            interpolation=cv2.INTER_AREA,
+        )
+
+    success, buffer = cv2.imencode(
+        ".jpg",
+        upload_frame,
+        [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality],
+    )
+
+    if not success:
+        return None
+
+    return buffer.tobytes()
+
+
 def draw_text(
     frame,
     text: str,
@@ -285,6 +354,7 @@ def draw_preview(
     wait_ms: int,
     tracker_bbox: tuple[int, int, int, int] | None = None,
     tracker_confidence: float = 0.0,
+    response_coord_scale: float = 1.0,
 ) -> int:
     if scale != 1.0:
         display_frame = cv2.resize(
@@ -313,12 +383,12 @@ def draw_preview(
 
     for index, current_bbox in enumerate(bboxes):
         x1, y1, x2, y2 = [
-            int(round(float(value) * coord_scale))
+            int(round(float(value) * response_coord_scale * coord_scale))
             for value in current_bbox
         ]
         color = (0, 255, 0)
         cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
-        label = f"TRACK {index + 1}" if tracker_bbox is not None else f"PLATE {index + 1}"
+        label = f"TRACK {index + 1}" if tracker_bbox is not None else f"VEHICLE {index + 1}"
 
         if index == 0:
             label = f"{label} {bbox_confidence:.3f}"
@@ -333,14 +403,14 @@ def draw_preview(
 
     if not bboxes and bbox is not None:
         x1, y1, x2, y2 = [
-            int(round(float(value) * coord_scale))
+            int(round(float(value) * response_coord_scale * coord_scale))
             for value in bbox
         ]
         color = (0, 255, 0)
         cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
         draw_text(
             display_frame,
-            f"PLATE {bbox_confidence:.3f}",
+            f"VEHICLE {bbox_confidence:.3f}",
             (x1, max(overlay_line_height, y1 - 8)),
             color,
             overlay_font_scale,
@@ -429,22 +499,40 @@ def get_response_for_frame(
         return None
 
 
+def get_response_at_or_before_frame(
+    upload_state: UploadState,
+    frame_number: int,
+) -> tuple[int | None, dict[str, Any] | None]:
+    with upload_state.lock:
+        eligible_frame_numbers = [
+            response_frame_number
+            for response_frame_number in upload_state.responses_by_frame
+            if response_frame_number <= frame_number
+        ]
+
+        if not eligible_frame_numbers:
+            return None, None
+
+        response_frame_number = max(eligible_frame_numbers)
+        return response_frame_number, upload_state.responses_by_frame[response_frame_number]
+
+
 def create_cv_tracker():
     tracker_factories = [
-        ("TrackerCSRT_create", cv2),
         ("TrackerKCF_create", cv2),
         ("TrackerMOSSE_create", cv2),
         ("TrackerMIL_create", cv2),
+        ("TrackerCSRT_create", cv2),
     ]
 
     legacy = getattr(cv2, "legacy", None)
     if legacy is not None:
         tracker_factories.extend(
             [
-                ("TrackerCSRT_create", legacy),
                 ("TrackerKCF_create", legacy),
                 ("TrackerMOSSE_create", legacy),
                 ("TrackerMIL_create", legacy),
+                ("TrackerCSRT_create", legacy),
             ]
         )
 
@@ -459,6 +547,8 @@ def create_cv_tracker():
 
 def select_response_bbox(
     response_body: dict[str, Any] | None,
+    *,
+    response_coord_scale: float = 1.0,
 ) -> tuple[tuple[int, int, int, int] | None, float]:
     if not isinstance(response_body, dict):
         return None, 0.0
@@ -469,7 +559,10 @@ def select_response_bbox(
     if bbox is None:
         return None, 0.0
 
-    x1, y1, x2, y2 = [int(value) for value in bbox]
+    x1, y1, x2, y2 = [
+        int(round(float(value) * response_coord_scale))
+        for value in bbox
+    ]
     return (x1, y1, x2, y2), float(response_body.get("bboxConfidenceScore", 0.0))
 
 
@@ -493,8 +586,12 @@ def rebuild_tracker_from_response(
     response_frame_number: int,
     response_body: dict[str, Any] | None,
     frame_history: deque[tuple[int, Any]],
+    response_coord_scale: float,
 ) -> PreviewTracker | None:
-    bbox, confidence_score = select_response_bbox(response_body)
+    bbox, confidence_score = select_response_bbox(
+        response_body,
+        response_coord_scale=response_coord_scale,
+    )
 
     if bbox is None:
         return None
@@ -650,6 +747,9 @@ def main() -> None:
     if args.scale <= 0:
         raise SystemExit("--scale must be greater than 0")
 
+    if args.upload_scale <= 0:
+        raise SystemExit("--upload-scale must be greater than 0")
+
     if args.window_width <= 0 or args.window_height <= 0:
         raise SystemExit("--window-width and --window-height must be greater than 0")
 
@@ -658,6 +758,12 @@ def main() -> None:
 
     if args.preview_delay_seconds < 0:
         raise SystemExit("--preview-delay-seconds must be greater than or equal to 0")
+
+    if args.preview_fps < 0:
+        raise SystemExit("--preview-fps must be greater than or equal to 0")
+
+    if args.bbox_hold_seconds < 0:
+        raise SystemExit("--bbox-hold-seconds must be greater than or equal to 0")
 
     if args.preview_bbox:
         configure_preview_window(args.window_width, args.window_height)
@@ -672,9 +778,20 @@ def main() -> None:
 
     source_fps = capture.get(cv2.CAP_PROP_FPS) or args.fps
     frame_step = max(1, round(source_fps / args.fps))
+    preview_frame_step = (
+        1
+        if args.preview_fps == 0
+        else max(1, round(source_fps / args.preview_fps))
+    )
+    preview_delay_frames = (
+        round(source_fps * args.preview_delay_seconds)
+        if args.preview_bbox
+        else 0
+    )
     preview_wait_ms = max(1, round(1000 / source_fps))
+    response_coord_scale = 1.0 / args.upload_scale
     use_async_upload = args.preview_bbox and args.async_upload
-    preview_delay_frames = 0
+    use_preview_tracker = use_async_upload and args.preview_tracker
     uploaded_count = 0
     finalized_count = 0
     read_count = 0
@@ -686,7 +803,11 @@ def main() -> None:
     upload_state = UploadState()
     upload_queue: queue.Queue[UploadTask] | None = None
     frame_history: deque[tuple[int, Any]] = deque(maxlen=max(30, round(source_fps * 6)))
+    preview_buffer: deque[PreviewFrame] = deque(
+        maxlen=max(30, preview_delay_frames + round(source_fps * 2))
+    )
     active_tracker: PreviewTracker | None = None
+    active_overlay: PreviewOverlay | None = None
     consumed_response_frame_number: int | None = None
     stop_event = threading.Event()
     worker_thread: threading.Thread | None = None
@@ -721,14 +842,18 @@ def main() -> None:
                 "flushFrames": args.flush_frames,
                 "previewBbox": args.preview_bbox,
                 "previewAllFrames": args.preview_all_frames,
+                "previewFps": args.preview_fps,
+                "previewFrameStep": preview_frame_step,
+                "previewTracker": use_preview_tracker,
+                "bboxHoldSeconds": args.bbox_hold_seconds,
                 "displayScale": args.scale,
+                "uploadScale": args.upload_scale,
                 "windowWidth": args.window_width,
                 "windowHeight": args.window_height,
                 "asyncUpload": use_async_upload,
                 "uploadQueueSize": args.upload_queue_size,
-                "previewDelaySeconds": 0,
+                "previewDelaySeconds": args.preview_delay_seconds,
                 "previewDelayFrames": preview_delay_frames,
-                "previewTracker": use_async_upload,
                 "bboxSource": "fastapi-response" if args.preview_bbox else None,
             },
             ensure_ascii=False,
@@ -766,19 +891,26 @@ def main() -> None:
                 break
 
             read_count += 1
-            frame_history.append((read_count, frame.copy()))
+            preview_buffer.append(PreviewFrame(read_count, frame.copy()))
+            should_preview_frame = (
+                args.preview_bbox
+                and ((read_count - 1) % preview_frame_step == 0)
+            )
+
+            if use_preview_tracker:
+                frame_history.append((read_count, frame.copy()))
 
             should_upload = (read_count - 1) % frame_step == 0
 
             if use_async_upload:
                 if should_upload:
-                    success, buffer = cv2.imencode(
-                        ".jpg",
+                    frame_bytes = encode_upload_frame(
                         frame,
-                        [cv2.IMWRITE_JPEG_QUALITY, args.jpeg_quality],
+                        upload_scale=args.upload_scale,
+                        jpeg_quality=args.jpeg_quality,
                     )
 
-                    if not success:
+                    if frame_bytes is None:
                         print(f"frame={read_count} encode_failed")
                     else:
                         captured_at = base_time + timedelta(seconds=uploaded_count / args.fps)
@@ -788,49 +920,110 @@ def main() -> None:
                             UploadTask(
                                 frame_number=read_count,
                                 captured_at=captured_at,
-                                frame_bytes=buffer.tobytes(),
+                                frame_bytes=frame_bytes,
                             ),
                         )
                         uploaded_count += 1
 
-                response_frame_number, response_body = get_latest_response_packet(upload_state)
+                display_frame_number = read_count
+                display_frame = frame
+
+                if preview_delay_frames > 0 and preview_buffer:
+                    target_frame_number = max(1, read_count - preview_delay_frames)
+
+                    while (
+                        len(preview_buffer) > 1
+                        and preview_buffer[1].frame_number <= target_frame_number
+                    ):
+                        preview_buffer.popleft()
+
+                    if preview_buffer[0].frame_number <= target_frame_number:
+                        display_packet = preview_buffer[0]
+                        display_frame_number = display_packet.frame_number
+                        display_frame = display_packet.frame
+
+                if preview_delay_frames > 0:
+                    response_frame_number, response_body = get_response_at_or_before_frame(
+                        upload_state,
+                        display_frame_number,
+                    )
+                else:
+                    response_frame_number, response_body = get_latest_response_packet(upload_state)
 
                 if (
-                    response_frame_number is not None
+                    should_preview_frame
+                    and response_frame_number is not None
                     and response_frame_number != consumed_response_frame_number
                 ):
-                    rebuilt_tracker = rebuild_tracker_from_response(
-                        response_frame_number=response_frame_number,
-                        response_body=response_body,
-                        frame_history=frame_history,
-                    )
+                    if use_preview_tracker:
+                        rebuilt_tracker = rebuild_tracker_from_response(
+                            response_frame_number=response_frame_number,
+                            response_body=response_body,
+                            frame_history=frame_history,
+                            response_coord_scale=response_coord_scale,
+                        )
 
-                    if rebuilt_tracker is not None:
-                        active_tracker = rebuilt_tracker
+                        if rebuilt_tracker is not None:
+                            active_tracker = rebuilt_tracker
+                            active_overlay = None
+                    else:
+                        bbox, confidence_score = select_response_bbox(
+                            response_body,
+                            response_coord_scale=response_coord_scale,
+                        )
+
+                        if bbox is not None:
+                            active_overlay = PreviewOverlay(
+                                bbox_xyxy=bbox,
+                                response_frame_number=response_frame_number,
+                                confidence_score=confidence_score,
+                            )
 
                     consumed_response_frame_number = response_frame_number
 
-                active_tracker = update_preview_tracker(
-                    active_tracker,
-                    frame_number=read_count,
-                    frame=frame,
-                )
-                tracker_bbox = active_tracker.bbox_xyxy if active_tracker is not None else None
-                tracker_confidence = (
-                    active_tracker.confidence_score
-                    if active_tracker is not None
-                    else 0.0
-                )
-                key = draw_preview(
-                    frame=frame,
-                    frame_number=read_count,
-                    response_body=response_body,
-                    scale=args.scale,
-                    wait_ms=preview_wait_ms if args.realtime else 1,
-                    tracker_bbox=tracker_bbox,
-                    tracker_confidence=tracker_confidence,
-                )
-                should_quit, should_toggle_pause = handle_preview_key(key)
+                if should_preview_frame:
+                    hold_frames = round(source_fps * args.bbox_hold_seconds)
+
+                    if (
+                        active_overlay is not None
+                        and read_count - active_overlay.response_frame_number > hold_frames
+                    ):
+                        active_overlay = None
+
+                    if use_preview_tracker:
+                        active_tracker = update_preview_tracker(
+                            active_tracker,
+                            frame_number=display_frame_number,
+                            frame=display_frame,
+                        )
+                    tracker_bbox = (
+                        active_tracker.bbox_xyxy
+                        if active_tracker is not None and use_preview_tracker
+                        else None
+                    )
+                    tracker_confidence = (
+                        active_tracker.confidence_score
+                        if active_tracker is not None and use_preview_tracker
+                        else 0.0
+                    )
+                    if tracker_bbox is None and active_overlay is not None:
+                        tracker_bbox = active_overlay.bbox_xyxy
+                        tracker_confidence = active_overlay.confidence_score
+
+                    key = draw_preview(
+                        frame=display_frame,
+                        frame_number=display_frame_number,
+                        response_body=response_body,
+                        scale=args.scale,
+                        wait_ms=preview_wait_ms if args.realtime else 1,
+                        tracker_bbox=tracker_bbox,
+                        tracker_confidence=tracker_confidence,
+                        response_coord_scale=response_coord_scale,
+                    )
+                    should_quit, should_toggle_pause = handle_preview_key(key)
+                else:
+                    key = cv2.waitKey(1) & 0xFF if args.preview_bbox else 255
+                    should_quit, should_toggle_pause = handle_preview_key(key)
 
                 if should_quit:
                     print("stopReason=user_quit")
@@ -855,10 +1048,11 @@ def main() -> None:
                     key = draw_preview(
                         frame=frame,
                         frame_number=read_count,
-                        response_body=latest_response_body,
-                        scale=args.scale,
-                        wait_ms=preview_wait_ms if args.realtime else 1,
-                    )
+                    response_body=latest_response_body,
+                    scale=args.scale,
+                    wait_ms=preview_wait_ms if args.realtime else 1,
+                    response_coord_scale=response_coord_scale,
+                )
                     should_quit, should_toggle_pause = handle_preview_key(key)
 
                     if should_quit:
@@ -871,18 +1065,17 @@ def main() -> None:
 
                 continue
 
-            success, buffer = cv2.imencode(
-                ".jpg",
+            frame_bytes = encode_upload_frame(
                 frame,
-                [cv2.IMWRITE_JPEG_QUALITY, args.jpeg_quality],
+                upload_scale=args.upload_scale,
+                jpeg_quality=args.jpeg_quality,
             )
 
-            if not success:
+            if frame_bytes is None:
                 print(f"frame={read_count} encode_failed")
                 continue
 
             captured_at = base_time + timedelta(seconds=uploaded_count / args.fps)
-            frame_bytes = buffer.tobytes()
 
             if use_async_upload and upload_queue is not None:
                 enqueue_upload_task(
@@ -917,6 +1110,7 @@ def main() -> None:
                     response_body=response_body,
                     scale=args.scale,
                     wait_ms=preview_wait_ms if args.realtime else 1,
+                    response_coord_scale=response_coord_scale,
                 )
                 should_quit, should_toggle_pause = handle_preview_key(key)
 
@@ -967,8 +1161,8 @@ def main() -> None:
         and not use_async_upload
     ):
         blank_frame_bytes = make_blank_frame_bytes(
-            video_width,
-            video_height,
+            max(1, round(video_width * args.upload_scale)),
+            max(1, round(video_height * args.upload_scale)),
             args.jpeg_quality,
         )
 
