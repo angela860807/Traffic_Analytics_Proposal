@@ -1,13 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 
-/* 라우트 lazy loading — 메인 페이지 방문자는 대시보드/ECharts/Leaflet 코드를 받지 않음 */
 const MainView          = () => import('@/views/MainView.vue')
 const IntroView         = () => import('@/views/IntroView.vue')
 const SupportView       = () => import('@/views/SupportView.vue')
 const LoginView         = () => import('@/views/LoginView.vue')
 const SignupView        = () => import('@/views/SignupView.vue')
 const RoadDashboardView = () => import('@/views/RoadDashboardView.vue')
+
+const ReportsView   = () => import('@/views/admin/ReportsView.vue')
+const ControlView   = () => import('@/views/admin/ControlView.vue')
+const ReviewView    = () => import('@/views/admin/ReviewView.vue')
+const AnalyticsView = () => import('@/views/admin/AnalyticsView.vue')
+const OpsView       = () => import('@/views/admin/OpsView.vue')
+const SuperView     = () => import('@/views/admin/SuperView.vue')
 
 const router = createRouter({
   history: createWebHistory(),
@@ -19,12 +25,20 @@ const router = createRouter({
     { path: '/login',         component: LoginView         },
     { path: '/signup',        component: SignupView        },
     { path: '/dashboard',     component: RoadDashboardView },
+    { path: '/admin',         redirect: '/admin/reports'   },
+    { path: '/admin/reports',   component: ReportsView   },
+    { path: '/admin/control',   component: ControlView   },
+    { path: '/admin/review',    component: ReviewView    },
+    { path: '/admin/analytics', component: AnalyticsView },
+    { path: '/admin/ops',       component: OpsView       },
+    { path: '/admin/super',     component: SuperView     },
   ],
   scrollBehavior: () => ({ top: 0 })
 })
 
 router.beforeEach((to) => {
-  if (to.path === '/dashboard') {
+  const protectedPaths = ['/dashboard', '/admin']
+  if (protectedPaths.some(p => to.path.startsWith(p))) {
     const { isLoggedIn, isAdmin } = useAuth()
     if (!isLoggedIn.value) return '/login'
     if (!isAdmin.value)    return '/'

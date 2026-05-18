@@ -72,7 +72,26 @@ export function useAuth() {
     return user
   }
 
+  // ── 프론트 임시 계정 (백엔드 미연동 시 시연용) ──
+  const LOCAL_ACCOUNTS = [
+    { email: 'admin@local',   password: 'admin',  name: '임시 관리자', role: 'ADMIN' },
+    { email: 'user@local',    password: 'user',   name: '임시 사용자', role: 'USER'  },
+  ]
+
   const login = async (email, password) => {
+    // 1) 프론트 임시 계정 우선 체크 (백엔드 없이 즉시 통과)
+    const local = LOCAL_ACCOUNTS.find(a => a.email === email && a.password === password)
+    if (local) {
+      const user = { email: local.email, role: local.role, name: local.name }
+      localStorage.setItem('tas_access_token', 'local-' + Date.now())
+      localStorage.setItem('tas_user', JSON.stringify(user))
+      _user.value = user
+      closeModal()
+      goHome()
+      return user
+    }
+
+    // 2) 백엔드 정상 로그인
     const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

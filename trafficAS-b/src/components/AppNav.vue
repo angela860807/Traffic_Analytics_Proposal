@@ -13,7 +13,22 @@
       <div class="right">
         <template v-if="isLoggedIn">
           <span class="uname">{{ currentUser?.name || currentUser?.email?.split('@')[0] }}님 좋은하루되세요</span>
-          <RouterLink v-if="isAdmin" to="/dashboard" class="btn-dash">대시보드</RouterLink>
+          <div v-if="isAdmin" class="admin-menu" ref="menuRef">
+            <button class="btn-admin" @click.stop="open = !open">
+              관제 시스템 <i class="bi bi-chevron-down"></i>
+            </button>
+            <div v-if="open" class="admin-pop">
+              <RouterLink to="/admin/super"     class="ap-i" @click="open = false"><i class="bi bi-shield-shaded"></i><div><strong>경영전략본부</strong><span>전사 통합 운영</span></div></RouterLink>
+              <div class="ap-sep"></div>
+              <RouterLink to="/admin/reports"   class="ap-i" @click="open = false"><i class="bi bi-file-earmark-text"></i><div><strong>운영기획팀</strong><span>KPI · 보고서 발행</span></div></RouterLink>
+              <RouterLink to="/admin/control"   class="ap-i" @click="open = false"><i class="bi bi-bullseye"></i><div><strong>교통정보센터</strong><span>실시간 관제 · 이벤트</span></div></RouterLink>
+              <RouterLink to="/admin/review"    class="ap-i" @click="open = false"><i class="bi bi-check2-square"></i><div><strong>단속관리팀</strong><span>위반 검토 · 판정</span></div></RouterLink>
+              <RouterLink to="/admin/analytics" class="ap-i" @click="open = false"><i class="bi bi-bar-chart"></i><div><strong>교통분석팀</strong><span>구간 · 시간대 분석</span></div></RouterLink>
+              <RouterLink to="/admin/ops"       class="ap-i" @click="open = false"><i class="bi bi-hdd-rack"></i><div><strong>시설운영팀</strong><span>카메라 · 서버 · 네트워크</span></div></RouterLink>
+              <div class="ap-sep"></div>
+              <RouterLink to="/dashboard" class="ap-i" @click="open = false"><i class="bi bi-grid"></i><div><strong>기존 대시보드</strong><span>통합 관제</span></div></RouterLink>
+            </div>
+          </div>
           <button class="btn-out" @click="logout">로그아웃</button>
         </template>
         <template v-else>
@@ -27,9 +42,18 @@
 
 <script setup>
 import { RouterLink } from "vue-router";
+import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useAuth } from "@/composables/useAuth";
 
 const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
+const open = ref(false);
+const menuRef = ref(null);
+const onDocClick = (e) => {
+  if (!open.value) return;
+  if (menuRef.value && !menuRef.value.contains(e.target)) open.value = false;
+};
+onMounted(() => document.addEventListener("click", onDocClick));
+onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 </script>
 
 <style scoped>
@@ -171,13 +195,56 @@ const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
   border-color: #f87171;
   color: #f87171;
 }
+.admin-menu { position: relative; }
+.btn-admin {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px;
+  background: var(--a); color: var(--bg);
+  border: 0; border-radius: 6px;
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
+  font-size: 14px; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+  transition: opacity 0.18s;
+}
+.btn-admin:hover { opacity: 0.9; }
+.btn-admin i { font-size: 11px; }
+.admin-pop {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  min-width: 240px;
+  background: var(--bg2);
+  border: 1px solid var(--b);
+  border-radius: 10px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.2);
+  padding: 6px;
+  z-index: 250;
+}
+.theme-navy.light .admin-pop { background: #fff; box-shadow: 0 18px 50px rgba(15, 40, 90, 0.15); }
+.ap-i {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: var(--t); text-decoration: none;
+  transition: background 0.15s;
+}
+.ap-i:hover { background: rgba(96, 165, 250, 0.08); }
+.theme-navy.light .ap-i:hover { background: rgba(37, 99, 235, 0.06); }
+.ap-i > i {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: rgba(96, 165, 250, 0.12);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--a); font-size: 14px; flex-shrink: 0;
+}
+.theme-navy.light .ap-i > i { background: rgba(37, 99, 235, 0.1); }
+.ap-i > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ap-i strong { font-size: 13.5px; font-weight: 700; }
+.ap-i span { font-size: 11.5px; opacity: 0.78; }
+.theme-navy.light .ap-i span { color: rgba(12,31,64,.78); opacity: 1; }
+.ap-i strong { font-size: 13px; }
+.theme-navy.light .ap-i strong { color: #0c1f40; }
+.ap-sep { height: 1px; background: var(--b); margin: 4px 8px; }
+
 @media (max-width: 768px) {
-  .ni {
-    padding: 0 16px;
-  }
-  .links a {
-    padding: 0 10px;
-    font-size: 12.5px;
-  }
+  .ni { padding: 0 16px; }
+  .links a { padding: 0 10px; font-size: 12.5px; }
 }
 </style>
