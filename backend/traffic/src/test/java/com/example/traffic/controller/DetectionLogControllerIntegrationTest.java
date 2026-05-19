@@ -16,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,13 +29,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-@Sql(
-        statements = {
-                "ALTER TABLE detection_logs ALTER COLUMN plate_number DROP NOT NULL",
-                "ALTER TABLE detection_logs ALTER COLUMN detection_type DROP NOT NULL"
-        },
-        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
-)
 class DetectionLogControllerIntegrationTest {
 
     private static final String INTERNAL_API_KEY = "traffic-ai-internal-key-2026";
