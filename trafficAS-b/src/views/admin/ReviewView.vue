@@ -1,11 +1,14 @@
 <template>
   <div class="rev-shell">
     <header class="top">
-      <h1>
-        <RouterLink to="/" class="brand-link"><span class="dot"></span> Traffic AS</RouterLink>
-        <span class="t-sub">단속관리팀</span>
-      </h1>
+      <h1><a class="t-main" @click="goHome">단속관리팀</a></h1>
       <div class="t-right">
+        <span class="hdr-time"><i class="bi bi-clock"></i> 마지막 업데이트 <strong>14:32:18</strong></span>
+        <button class="km-toggle" :class="{ on: autoRefresh }" @click="autoRefresh = !autoRefresh" :aria-pressed="autoRefresh">
+          <span class="km-dot"></span>
+          <span class="km-lab">자동 새로고침</span>
+          <span class="km-state">{{ autoRefresh ? 'ON' : 'OFF' }}</span>
+        </button>
         <DeptSwitcher />
         <div class="t-user"><i class="bi bi-person-circle"></i> 단속관리팀 매니저 <i class="bi bi-chevron-down"></i></div>
       </div>
@@ -51,7 +54,7 @@
           </div>
         </div>
         <table class="tbl-rev">
-          <thead><tr><th>시간</th><th>위치</th><th>차량번호</th><th>속도</th><th>OCR 신뢰도</th><th>상태</th></tr></thead>
+          <thead><tr><th>시간</th><th>위치</th><th>차량번호</th><th>상태</th></tr></thead>
           <tbody>
             <tr v-for="e in pagedEvents" :key="e.id"
               :class="{ sel: selected && selected.id === e.id }"
@@ -59,11 +62,9 @@
               <td class="mono">{{ e.time }}<div class="row-sub">2024-05-16</div></td>
               <td class="ttl">{{ e.place }}<div class="row-sub">{{ e.type === '속도 위반' ? '드론 구간' : '단속 임시' }}</div></td>
               <td class="mono">{{ e.plate }}</td>
-              <td class="mono"><span :class="e.detectSpeed > e.limitSpeed ? 'sp-rd' : ''">{{ e.detectSpeed > e.limitSpeed ? `+${e.detectSpeed - e.limitSpeed} km/h` : `${e.detectSpeed} km/h` }}</span></td>
-              <td class="mono">{{ e.conf }}%</td>
               <td><span class="stat" :class="stTone(e.st)">{{ e.st }}</span></td>
             </tr>
-            <tr v-if="!pagedEvents.length"><td colspan="6" class="empty">검색 결과가 없습니다.</td></tr>
+            <tr v-if="!pagedEvents.length"><td colspan="4" class="empty">검색 결과가 없습니다.</td></tr>
           </tbody>
         </table>
         <div class="pager">
@@ -288,6 +289,15 @@ const avgConf = computed(() => {
   return Math.round((sum / allEvents.value.length + 94) / 2);
 });
 
+const autoRefresh = ref(true);
+function goHome() {
+  selected.value = null;
+  page.value = 1;
+  query.value = "";
+  filterType.value = "all";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function selectEvent(e) {
   selected.value = e;
   thumbIdx.value = 0;
@@ -359,19 +369,18 @@ function copyId() {
 .lh-search { position: relative; }
 .lh-search i { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); opacity: .55; font-size: 12px; }
 .lh-search input { background: #06101e; border: 1px solid #1f3055; color: #e4eeff; padding: 5px 8px 5px 26px; border-radius: 5px; font-size: 12px; width: 170px; }
-.tbl-rev { width: 100%; border-collapse: collapse; font-size: 12px; }
-.tbl-rev th, .tbl-rev td { padding: 8px; text-align: left; border-bottom: 1px solid #1a2a45; }
-.tbl-rev th { font-weight: 600; opacity: .55; font-size: 11px; }
+.tbl-rev { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tbl-rev th, .tbl-rev td { padding: 10px 10px; text-align: left; border-bottom: 1px solid #1a2a45; }
+.tbl-rev th { font-weight: 700; opacity: .65; font-size: 13px; }
 .tbl-rev tr.sel { background: rgba(96,165,250,.08); }
-.tbl-rev tr.sel td { border-left: 2px solid #60a5fa; }
 .tbl-rev .mono { font-family: "JetBrains Mono", monospace; }
-.tbl-rev .ttl { font-weight: 600; max-width: 200px; }
-.tbl-rev .row-sub { font-size: 10px; opacity: .5; font-weight: 400; margin-top: 2px; font-family: "JetBrains Mono", monospace; }
+.tbl-rev .ttl { font-weight: 600; max-width: 220px; }
+.tbl-rev .row-sub { font-size: 12px; opacity: .55; font-weight: 400; margin-top: 2px; font-family: "JetBrains Mono", monospace; }
 .tbl-rev .sp-rd { color: #f87171; }
 .tag { padding: 2px 8px; border-radius: 100px; font-size: 10.5px; font-weight: 700; }
 .tag.tg-rd { background: rgba(239,68,68,.18); color: #f87171; }
 .tag.tg-bl { background: rgba(96,165,250,.18); color: #60a5fa; }
-.stat { padding: 2px 10px; border-radius: 100px; font-size: 10.5px; font-weight: 700; }
+.stat { padding: 3px 11px; border-radius: 100px; font-size: 12.5px; font-weight: 700; }
 .stat.wait { background: rgba(96,165,250,.1); color: #60a5fa; border: 1px solid rgba(96,165,250,.3); }
 .stat.ok { background: rgba(16,185,129,.15); color: #34d399; }
 .stat.no { background: rgba(239,68,68,.15); color: #f87171; }

@@ -21,11 +21,15 @@
 
     <div class="main">
       <header class="top">
-        <h1>경영전략본부 <span class="t-tag">SUPER ADMIN</span></h1>
+        <h1><a class="t-main" @click="goHome">경영전략본부</a></h1>
         <div class="t-right">
+          <span class="hdr-time"><i class="bi bi-clock"></i> 마지막 업데이트 <strong>10:30:00</strong></span>
+          <button class="km-toggle" :class="{ on: autoRefresh }" @click="autoRefresh = !autoRefresh" :aria-pressed="autoRefresh">
+            <span class="km-dot"></span>
+            <span class="km-lab">자동 새로고침</span>
+            <span class="km-state">{{ autoRefresh ? 'ON' : 'OFF' }}</span>
+          </button>
           <DeptSwitcher />
-          <i class="bi bi-bell t-ic"></i>
-          <i class="bi bi-question-circle t-ic"></i>
           <div class="t-user"><i class="bi bi-person-circle"></i> SUPER ADMIN <i class="bi bi-chevron-down"></i></div>
         </div>
       </header>
@@ -207,13 +211,42 @@
       </template>
 
       <section v-if="tab === 'perms'" class="card pnl">
-        <h3>권한 관리</h3>
+        <h3>권한 관리 <span class="seg-sub">계층 · 사용자별 부여 권한</span></h3>
         <table class="pnl-tbl">
-          <thead><tr><th>역할</th><th>권한 범위</th><th>인원</th><th>작업</th></tr></thead>
+          <thead><tr><th>계층</th><th>권한 범위</th><th>인원</th><th>작업</th></tr></thead>
           <tbody>
             <tr v-for="r in roleRows" :key="r.role">
-              <td class="dn">{{ r.role }}</td><td>{{ r.scope }}</td><td>{{ r.count }}명</td>
+              <td class="dn">
+                <span class="role-badge" :class="r.badge">{{ r.tier }}</span>
+                {{ r.role }}
+              </td>
+              <td>{{ r.scope }}</td>
+              <td class="mono">{{ r.count }}명</td>
               <td><button class="btn-mini" @click="flash(`${r.role} 권한 편집`)">편집</button></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3 style="margin-top: 18px;">권한 매트릭스 <span class="seg-sub">예시 사용자별 접근 권한</span></h3>
+        <table class="pnl-tbl perm-matrix">
+          <thead>
+            <tr>
+              <th>기능</th>
+              <th>김사원<br><em>사원급</em></th>
+              <th>김대리<br><em>대리급</em></th>
+              <th>김과장<br><em>과장급</em></th>
+              <th>김부장<br><em>부장급</em></th>
+              <th>이실장<br><em>경영전략실</em></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in permMatrix" :key="p.feat">
+              <td class="dn">{{ p.feat }}</td>
+              <td class="pm-cell" :class="{ on: p.rd === '🟢' }">{{ p.rd === '🟢' ? '✓' : '—' }}</td>
+              <td class="pm-cell" :class="{ on: p.lj === '🟢' }">{{ p.lj === '🟢' ? '✓' : '—' }}</td>
+              <td class="pm-cell" :class="{ on: p.pa === '🟢' }">{{ p.pa === '🟢' ? '✓' : '—' }}</td>
+              <td class="pm-cell" :class="{ on: p.gh === '🟢' }">{{ p.gh === '🟢' ? '✓' : '—' }}</td>
+              <td class="pm-cell" :class="{ on: p.sa === '🟢' }">{{ p.sa === '🟢' ? '✓' : '—' }}</td>
             </tr>
           </tbody>
         </table>
@@ -221,17 +254,22 @@
       </section>
 
       <section v-if="tab === 'users'" class="card pnl">
-        <h3>사용자 관리 — 총 236명</h3>
+        <h3>사용자 관리 — 총 {{ userList.length }}명 (예시)</h3>
         <input class="pnl-search" v-model="userQuery" placeholder="이름·이메일·부서 검색" />
         <table class="pnl-tbl">
-          <thead><tr><th>이름</th><th>이메일</th><th>역할</th><th>부서</th><th>상태</th></tr></thead>
+          <thead><tr><th>이름</th><th>이메일</th><th>역할</th><th>계층</th><th>부여 권한</th><th>부서</th><th>상태</th><th>작업</th></tr></thead>
           <tbody>
             <tr v-for="u in filteredUserList" :key="u.id">
-              <td class="dn">{{ u.name }}</td><td class="mono">{{ u.email }}</td>
-              <td>{{ u.role }}</td><td>{{ u.dept }}</td>
+              <td class="dn">{{ u.name }}</td>
+              <td class="mono">{{ u.email }}</td>
+              <td>{{ u.role }}</td>
+              <td><span class="role-badge" :class="u.role === '슈퍼어드민' ? 'super' : (u.role === '관리자' ? 'admin' : (u.role === '게스트' ? 'guest' : 'user'))">{{ u.tier }}</span></td>
+              <td>{{ u.perms }}</td>
+              <td>{{ u.dept }}</td>
               <td><span class="stat" :class="u.tone">{{ u.st }}</span></td>
+              <td><button class="btn-mini" @click="flash(`${u.name} 권한 편집`)">권한 편집</button></td>
             </tr>
-            <tr v-if="!filteredUserList.length"><td colspan="5" class="pnl-empty">검색 결과 없음</td></tr>
+            <tr v-if="!filteredUserList.length"><td colspan="8" class="pnl-empty">검색 결과 없음</td></tr>
           </tbody>
         </table>
       </section>
@@ -295,6 +333,11 @@ import { RouterLink } from "vue-router";
 import DeptSwitcher from "@/components/dashboard/DeptSwitcher.vue";
 
 const tab = ref("dashboard");
+const autoRefresh = ref(true);
+function goHome() {
+  tab.value = "dashboard";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
 const topNav = [
   { id: "ops",     icon: "bi bi-speedometer2",      label: "운영현황" },
   { id: "map",     icon: "bi bi-map",               label: "지도" },
@@ -328,20 +371,33 @@ const topNavTabs = computed(() => topNav.map(n => n.id));
 const topNavLabel = computed(() => topNav.find(n => n.id === tab.value)?.label || "");
 
 const roleRows = [
-  { role: "경영전략본부", scope: "전체 시스템 · 모든 데이터", count: 2 },
-  { role: "관리자",     scope: "운영/모니터링 · 보고서 발행", count: 18 },
-  { role: "팀장",       scope: "부서 내 사용자 관리 · 부서 통계", count: 46 },
-  { role: "일반 사용자", scope: "본인 업무 영역", count: 148 },
-  { role: "게스트",     scope: "읽기 전용", count: 22 },
+  { role: "총괄 관리자 (슈퍼어드민)", tier: "경영전략실", scope: "시스템 전체 · 경영전략실 정책 수정", count: 2,  badge: "super" },
+  { role: "관리자 (부장급)",           tier: "관리자",     scope: "모든 권한 · 반려/승인 · 보고서 발행", count: 18, badge: "admin" },
+  { role: "관리자 (과장급)",           tier: "관리자",     scope: "속도 추이 · 이벤트 상세 · 분석 도구",  count: 24, badge: "admin" },
+  { role: "일반 사용자 (대리급)",      tier: "일반",       scope: "카메라 + 지도 조회",                  count: 64, badge: "user" },
+  { role: "일반 사용자 (사원급)",      tier: "일반",       scope: "카메라 조회만",                       count: 106, badge: "user" },
+  { role: "게스트",                    tier: "게스트",     scope: "읽기 전용 (제한 영역)",               count: 22, badge: "guest" },
 ];
+
+const permMatrix = [
+  { feat: "카메라 조회",        rd: "🟢", lj: "🟢", pa: "🟢", gh: "🟢", sa: "🟢" },
+  { feat: "지도 조회",           rd: "—", lj: "🟢", pa: "🟢", gh: "🟢", sa: "🟢" },
+  { feat: "속도 추이 분석",     rd: "—", lj: "—", pa: "🟢", gh: "🟢", sa: "🟢" },
+  { feat: "이벤트 상세 / OCR",  rd: "—", lj: "—", pa: "🟢", gh: "🟢", sa: "🟢" },
+  { feat: "반려 / 승인",         rd: "—", lj: "—", pa: "—", gh: "🟢", sa: "🟢" },
+  { feat: "사용자 / 권한 관리", rd: "—", lj: "—", pa: "—", gh: "—",  sa: "🟢" },
+  { feat: "경영전략실 정책 수정",rd: "—", lj: "—", pa: "—", gh: "—",  sa: "🟢" },
+];
+
 const userQuery = ref("");
 const userList = [
-  { id: 1, name: "김재현", email: "kim.jh@traffic.kr",  role: "관리자",   dept: "관제1팀", st: "정상", tone: "ok" },
-  { id: 2, name: "박서연", email: "park.sy@traffic.kr", role: "팀장",     dept: "관제2팀", st: "정상", tone: "ok" },
-  { id: 3, name: "이준호", email: "lee.jh@traffic.kr",  role: "일반",     dept: "시설운영팀", st: "정상", tone: "ok" },
-  { id: 4, name: "최민지", email: "choi.mj@traffic.kr", role: "관리자",   dept: "분석팀",   st: "휴직", tone: "wn" },
-  { id: 5, name: "정유진", email: "jung.yj@traffic.kr", role: "일반",     dept: "검토팀",   st: "정상", tone: "ok" },
-  { id: 6, name: "한도윤", email: "han.dy@traffic.kr",  role: "게스트",   dept: "외부",     st: "비활성", tone: "no" },
+  { id: 1, name: "김사원", email: "kim.sw@traffic.kr",  role: "일반 사용자", tier: "사원급",  perms: "카메라",                          dept: "교통정보센터", st: "정상", tone: "ok" },
+  { id: 2, name: "김대리", email: "kim.dl@traffic.kr",  role: "일반 사용자", tier: "대리급",  perms: "카메라, 지도",                    dept: "교통정보센터", st: "정상", tone: "ok" },
+  { id: 3, name: "김과장", email: "kim.kj@traffic.kr",  role: "관리자",      tier: "과장급",  perms: "속도 추이, 이벤트 상세",          dept: "교통분석팀",   st: "정상", tone: "ok" },
+  { id: 4, name: "김부장", email: "kim.bj@traffic.kr",  role: "관리자",      tier: "부장급",  perms: "모든 권한 · 반려/승인",            dept: "단속관리팀",   st: "정상", tone: "ok" },
+  { id: 5, name: "이실장", email: "lee.sj@traffic.kr",  role: "슈퍼어드민",  tier: "경영전략실", perms: "시스템 전체 · 정책 수정",       dept: "경영전략본부", st: "정상", tone: "ok" },
+  { id: 6, name: "박과장", email: "park.kj@traffic.kr", role: "관리자",      tier: "과장급",  perms: "속도 추이, 이벤트 상세",          dept: "교통분석팀",   st: "휴직", tone: "wn" },
+  { id: 7, name: "한도윤", email: "han.dy@traffic.kr",  role: "게스트",      tier: "외부",    perms: "읽기 전용",                       dept: "외부",         st: "비활성", tone: "no" },
 ];
 const filteredUserList = computed(() => {
   const q = userQuery.value.trim().toLowerCase();

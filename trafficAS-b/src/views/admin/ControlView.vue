@@ -13,10 +13,15 @@
 
     <div class="main">
       <header class="top">
-        <h1>Traffic AS <span class="t-sub">교통정보센터</span></h1>
+        <h1><a class="t-main" @click="goHome">교통정보센터</a></h1>
         <div class="t-right">
+          <span class="hdr-time"><i class="bi bi-clock"></i> 마지막 업데이트 <strong>14:32:18</strong></span>
+          <button class="km-toggle" :class="{ on: autoRefresh }" @click="autoRefresh = !autoRefresh" :aria-pressed="autoRefresh">
+            <span class="km-dot"></span>
+            <span class="km-lab">자동 새로고침</span>
+            <span class="km-state">{{ autoRefresh ? 'ON' : 'OFF' }}</span>
+          </button>
           <DeptSwitcher />
-          <div class="t-bell"><i class="bi bi-bell"></i><span class="bdg">12</span></div>
           <div class="t-user"><i class="bi bi-person-circle"></i> 교통정보센터 매니저 <i class="bi bi-chevron-down"></i></div>
         </div>
       </header>
@@ -78,7 +83,7 @@
             <button class="qc-more">전체 보기 <i class="bi bi-chevron-right"></i></button>
           </div>
           <div class="qc-th">
-            <span>우선순위</span><span>구간 / 내용</span><span>경과</span><span>조치</span>
+            <span>우선순위</span><span>구간 / 내용</span><span>경과</span><span>확인</span>
           </div>
           <div v-for="(q, i) in queue" :key="i" class="qc-row">
             <span class="qc-num" :class="q.sev">{{ i + 1 }}</span>
@@ -89,12 +94,12 @@
             <span class="qc-time">{{ q.time }}</span>
             <div class="qc-acts">
               <button class="btn-ok" @click="resolveQueue(i, '확인')">확인</button>
-              <button class="btn-fwd" @click="resolveQueue(i, '전달')">전달</button>
             </div>
           </div>
           <div v-if="!queue.length" class="qc-empty">처리 대기 항목이 없습니다.</div>
           <div class="qc-foot">
-            <span class="dot-live"></span> 자동 갱신 중
+            <i class="bi bi-info-circle"></i>
+            실제 사고·정체 처리는 관할 구청·시청·경찰에서 수행하며, 본 큐는 모니터링·확인 용도입니다.
           </div>
         </div>
       </section>
@@ -180,19 +185,38 @@
           <div v-if="flashMsg" class="ea-msg">{{ flashMsg }}</div>
         </div>
 
-        <div class="bot-card role-card">
-          <div class="bc-head"><h3>역할 및 권한</h3><button class="bc-more">자세히 보기 <i class="bi bi-chevron-right"></i></button></div>
-          <div class="role-row">
-            <span class="role-lab">현재 역할</span>
-            <span class="role-val">교통정보센터 매니저 <i class="bi bi-shield-fill-check"></i></span>
-          </div>
-          <div class="role-h">주요 권한</div>
-          <div class="role-perms">
-            <div class="rp"><span class="rp-tag bl">실시간 조회</span><span>지도, 카메라, 통계 실시간 조회</span></div>
-            <div class="rp"><span class="rp-tag bl">이벤트 접수</span><span>이벤트 확인 및 접수</span></div>
-            <div class="rp"><span class="rp-tag gr">부서 전달</span><span>유관 부서로 이벤트 전달</span></div>
-            <div class="rp"><span class="rp-tag gr">상황 종료</span><span>이벤트 처리 및 상황 종료</span></div>
-          </div>
+        <div class="bot-card guide-card">
+          <div class="bc-head"><h3>관제 가이드</h3><button class="bc-more">전체 가이드 <i class="bi bi-chevron-right"></i></button></div>
+          <ol class="gd-list">
+            <li>
+              <span class="gd-n">1</span>
+              <div>
+                <strong>이벤트 식별</strong>
+                <span>지도·카메라·긴급 처리 큐에서 사고·정체·고장을 확인합니다.</span>
+              </div>
+            </li>
+            <li>
+              <span class="gd-n">2</span>
+              <div>
+                <strong>심각도 분류</strong>
+                <span>교통사고(매우 심각) · 정체(심각) · 차량고장(주의) 기준으로 우선순위를 부여합니다.</span>
+              </div>
+            </li>
+            <li>
+              <span class="gd-n">3</span>
+              <div>
+                <strong>외부 기관 통보</strong>
+                <span>실제 처리는 관할 구청·시청·경찰 담당. 본 시스템은 모니터링·기록 용도입니다.</span>
+              </div>
+            </li>
+            <li>
+              <span class="gd-n">4</span>
+              <div>
+                <strong>확인 / 상황 종료</strong>
+                <span>현장 해소를 확인하면 큐에서 [확인]으로 처리하고 로그에 보존됩니다.</span>
+              </div>
+            </li>
+          </ol>
         </div>
       </section>
 
@@ -304,6 +328,11 @@ import DeptSwitcher from "@/components/dashboard/DeptSwitcher.vue";
 import SideWeather from "@/components/dashboard/SideWeather.vue";
 
 const tab = ref("center");
+const autoRefresh = ref(true);
+function goHome() {
+  tab.value = "center";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
 const nav = [
   { id: "center",  icon: "bi bi-broadcast",         label: "교통정보센터" },
   { id: "map",     icon: "bi bi-map",               label: "지도" },
@@ -315,11 +344,11 @@ const nav = [
 ];
 
 const queue = ref([
-  { line: "강변북로 (구리 → 한남)",     detail: "교통사고 발생", time: "2분", sev: "critical", sevLabel: "매우 심각" },
-  { line: "올림픽대로 (가양 → 여의도)", detail: "차량 정체",     time: "9분", sev: "serious",  sevLabel: "심각" },
-  { line: "내부순환로 (정릉 → 성수)",   detail: "속도 급감",     time: "8분", sev: "serious",  sevLabel: "심각" },
-  { line: "경부고속도로 (서울TG 부근)", detail: "차량 고장",     time: "5분", sev: "caution",  sevLabel: "주의" },
-  { line: "동부간선도로 (수락 → 성수)", detail: "서행",           time: "4분", sev: "caution",  sevLabel: "주의" },
+  { line: "강변북로 (구리 → 한남)",     detail: "교통사고 발생 — 2개 차로 통제", time: "2분", sev: "critical", sevLabel: "교통사고" },
+  { line: "올림픽대로 (가양 → 여의도)", detail: "차량 정체 (평균 18km/h)",       time: "9분", sev: "serious",  sevLabel: "정체" },
+  { line: "내부순환로 (정릉 → 성수)",   detail: "차량 정체 — 사고 여파",           time: "8분", sev: "serious",  sevLabel: "정체" },
+  { line: "경부고속도로 (서울TG 부근)", detail: "차량 고장 — 갓길 정차",           time: "5분", sev: "caution",  sevLabel: "차량고장" },
+  { line: "동부간선도로 (수락 → 성수)", detail: "차량 정체 — 출근시간 누적",       time: "4분", sev: "caution",  sevLabel: "정체" },
 ]);
 
 const mapMode = ref("flow");

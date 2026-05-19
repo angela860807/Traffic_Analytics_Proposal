@@ -712,7 +712,7 @@ import { useRouter } from "vue-router";
 import { useAuth } from "@/composables/useAuth";
 import { useDashboardData } from "@/composables/useDashboardData";
 import { useVideoOptimize } from "@/composables/useVideoOptimize";
-import * as echarts from "echarts";
+import echarts from "@/composables/echartsSetup";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DISTRICT_LIST, INITIAL_DISTRICTS_WEATHER } from "@/data/weather";

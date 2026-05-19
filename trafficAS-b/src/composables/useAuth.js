@@ -74,8 +74,22 @@ export function useAuth() {
 
   // ── 프론트 임시 계정 (백엔드 미연동 시 시연용) ──
   const LOCAL_ACCOUNTS = [
-    { email: 'admin@local',   password: 'admin',  name: '임시 관리자', role: 'ADMIN' },
-    { email: 'user@local',    password: 'user',   name: '임시 사용자', role: 'USER'  },
+    // 관리자 계정 (모든 대시보드 접근 가능)
+    { email: 'admin',           password: '1234',  name: '관리자',          role: 'ADMIN' },
+    { email: 'admin@local',     password: 'admin', name: '임시 관리자',     role: 'ADMIN' },
+    { email: 'admin@test.com',  password: '1234',  name: '테스트 관리자',   role: 'ADMIN' },
+    { email: 'super',           password: '1234',  name: '슈퍼 관리자',     role: 'ADMIN' },
+
+    // 부서별 매니저 계정
+    { email: 'ops',             password: '1234',  name: '시설운영팀 매니저',  role: 'ADMIN' },
+    { email: 'control',         password: '1234',  name: '교통정보센터 매니저', role: 'ADMIN' },
+    { email: 'review',          password: '1234',  name: '단속관리팀 매니저',  role: 'ADMIN' },
+    { email: 'analytics',       password: '1234',  name: '교통분석팀 매니저',  role: 'ADMIN' },
+    { email: 'reports',         password: '1234',  name: '운영기획팀 매니저',  role: 'ADMIN' },
+
+    // 일반 사용자
+    { email: 'user',            password: '1234',  name: '일반 사용자',     role: 'USER' },
+    { email: 'user@local',      password: 'user',  name: '임시 사용자',     role: 'USER' },
   ]
 
   const login = async (email, password) => {

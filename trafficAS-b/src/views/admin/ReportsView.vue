@@ -26,12 +26,15 @@
 
     <div class="main">
       <header class="top">
-        <h1>Traffic AS <span class="t-sub">운영기획팀</span></h1>
+        <h1><a class="t-main" @click="goHome">운영기획팀</a></h1>
         <div class="t-right">
+          <span class="hdr-time"><i class="bi bi-clock"></i> 마지막 업데이트 <strong>10:30:00</strong></span>
+          <button class="km-toggle" :class="{ on: autoRefresh }" @click="autoRefresh = !autoRefresh" :aria-pressed="autoRefresh">
+            <span class="km-dot"></span>
+            <span class="km-lab">자동 새로고침</span>
+            <span class="km-state">{{ autoRefresh ? 'ON' : 'OFF' }}</span>
+          </button>
           <DeptSwitcher />
-          <div class="t-pick"><i class="bi bi-calendar3"></i> 2025-05-16 (금) <i class="bi bi-chevron-down"></i></div>
-          <div class="t-pick">전체 <i class="bi bi-chevron-down"></i></div>
-          <div class="t-bell"><i class="bi bi-bell"></i><span class="bdg">7</span></div>
           <div class="t-user"><i class="bi bi-person-circle"></i> 운영기획팀 매니저 <i class="bi bi-chevron-down"></i></div>
         </div>
       </header>
@@ -184,6 +187,16 @@
               </tr>
             </tfoot>
           </table>
+
+          <div class="steps inline compact">
+            <span class="steps-h">운영 절차</span>
+            <div class="steps-row">
+              <template v-for="(s, i) in steps" :key="i">
+                <span class="step"><b>{{ i + 1 }}.</b> {{ s.t }}</span>
+                <i v-if="i < 3" class="bi bi-chevron-right step-arrow"></i>
+              </template>
+            </div>
+          </div>
         </div>
 
         <div class="card report-card">
@@ -210,7 +223,7 @@
               <a class="rr-all" href="#">전체 보기 <i class="bi bi-chevron-right"></i></a>
             </div>
             <div class="rr-list">
-              <div v-for="r in recentReports.slice(0, 3)" :key="r.t" class="rr-i">
+              <div v-for="r in recentReports.slice(0, 2)" :key="r.t" class="rr-i">
                 <div class="rr-i-l">
                   <span class="rr-t">{{ r.t }}</span>
                   <span class="rr-meta">{{ r.date }} · {{ r.by }} · {{ r.size }}</span>
@@ -225,15 +238,6 @@
 
       </template>
 
-      <section v-if="tab === 'map'" class="card panel">
-        <h3>지도 <span class="seg-sub">실시간 도로망 상태</span></h3>
-        <div class="map-stub">
-          <i class="bi bi-map"></i>
-          <div>지도 패널 — 도로별 혼잡도 색상 표시</div>
-          <div class="ms-legend"><span><i class="d gr"></i>원활</span><span><i class="d yl"></i>보통</span><span><i class="d or"></i>혼잡</span><span><i class="d rd"></i>정체</span></div>
-        </div>
-      </section>
-
       <section v-if="tab === 'events'" class="card panel">
         <h3>이벤트 <span class="seg-sub">최근 이벤트 목록</span></h3>
         <table class="tbl-dept">
@@ -242,31 +246,6 @@
             <tr v-for="e in eventsList" :key="e.id">
               <td class="dn">{{ e.time }}</td><td>{{ e.line }}</td><td>{{ e.type }}</td>
               <td><span :class="e.tone">{{ e.st }}</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-
-      <section v-if="tab === 'cams'" class="card panel">
-        <h3>카메라 <span class="seg-sub">24/25 정상 가동</span></h3>
-        <div class="cam-grid">
-          <div v-for="c in camList" :key="c.id" class="cam-cell" :class="c.tone">
-            <i class="bi bi-camera-video"></i>
-            <div class="cc-id">{{ c.id }}</div>
-            <div class="cc-loc">{{ c.loc }}</div>
-            <span class="cc-st">{{ c.st }}</span>
-          </div>
-        </div>
-      </section>
-
-      <section v-if="tab === 'ocr'" class="card panel">
-        <h3>OCR <span class="seg-sub">번호판 인식 현황</span></h3>
-        <table class="tbl-dept">
-          <thead><tr><th>시간</th><th>번호판</th><th>신뢰도</th><th>판정</th></tr></thead>
-          <tbody>
-            <tr v-for="o in ocrList" :key="o.id">
-              <td class="dn">{{ o.time }}</td><td>{{ o.plate }}</td><td>{{ o.conf }}%</td>
-              <td><span :class="o.tone">{{ o.st }}</span></td>
             </tr>
           </tbody>
         </table>
@@ -295,16 +274,6 @@
         <div v-if="setMsg" class="set-msg">{{ setMsg }}</div>
       </section>
 
-      <section v-if="tab === 'ops'" class="steps">
-        <div v-for="(s, i) in steps" :key="i" class="step">
-          <span class="sn">{{ i + 1 }}</span>
-          <div>
-            <div class="st">{{ s.t }}</div>
-            <div class="sd">{{ s.d }}</div>
-          </div>
-          <i v-if="i < 3" class="bi bi-chevron-right step-arrow"></i>
-        </div>
-      </section>
 
       <footer class="foot">Traffic AS · 운영성과 보고 v2.0.0</footer>
     </div>
@@ -317,6 +286,11 @@ import { RouterLink } from "vue-router";
 import DeptSwitcher from "@/components/dashboard/DeptSwitcher.vue";
 
 const tab = ref("ops");
+const autoRefresh = ref(true);
+function goHome() {
+  tab.value = "ops";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
 const hoverBar = ref(-1);
 
 const eventsList = [
@@ -325,20 +299,6 @@ const eventsList = [
   { id: 3, time: "14:28:55", line: "내부순환로 (월계 → 성수)", type: "속도 급감", st: "대기", tone: "dn" },
   { id: 4, time: "14:25:40", line: "강남구 테헤란로", type: "OCR 인식", st: "완료", tone: "up" },
   { id: 5, time: "14:22:11", line: "동부간선로 (수락 → 성수)", type: "서행", st: "처리중", tone: "up" },
-];
-const camList = [
-  { id: "CAM-K-014", loc: "강변북로 한남TG", st: "정상", tone: "ok" },
-  { id: "CAM-O-011", loc: "올림픽대로 가양", st: "정상", tone: "ok" },
-  { id: "CAM-J-007", loc: "내부순환 정릉", st: "경고", tone: "warn" },
-  { id: "CAM-D-031", loc: "동부간선 수락", st: "정상", tone: "ok" },
-  { id: "CAM-G-004", loc: "강남 테헤란", st: "정상", tone: "ok" },
-  { id: "CAM-M-002", loc: "마포구 마포대로", st: "오프라인", tone: "bad" },
-];
-const ocrList = [
-  { id: 1, time: "14:32:18", plate: "12가 4567", conf: 96, st: "승인", tone: "up" },
-  { id: 2, time: "14:31:54", plate: "12서 3456", conf: 93, st: "검토", tone: "flat" },
-  { id: 3, time: "14:30:11", plate: "11가 2233", conf: 97, st: "승인", tone: "up" },
-  { id: 4, time: "14:27:31", plate: "71너 9900", conf: 93, st: "반려", tone: "dn" },
 ];
 const statsBars = [
   { day: "5/11", value: 142 }, { day: "5/12", value: 168 }, { day: "5/13", value: 155 },
@@ -363,10 +323,7 @@ function saveSettings() {
 }
 const nav = [
   { id: "ops",      icon: "bi bi-speedometer2",      label: "운영현황" },
-  { id: "map",      icon: "bi bi-map",               label: "지도" },
   { id: "events",   icon: "bi bi-bell",              label: "이벤트" },
-  { id: "cams",     icon: "bi bi-camera-video",      label: "카메라" },
-  { id: "ocr",      icon: "bi bi-card-text",         label: "OCR" },
   { id: "stats",    icon: "bi bi-bar-chart",         label: "통계" },
   { id: "reports",  icon: "bi bi-file-earmark-text", label: "보고서" },
   { id: "settings", icon: "bi bi-gear",              label: "설정" },
