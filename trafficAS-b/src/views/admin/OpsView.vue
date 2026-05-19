@@ -1,9 +1,21 @@
 <template>
-  <div class="ops-shell">
+  <div class="ops-shell" :class="{ 'side-collapsed': !sideOpen }">
     <aside class="side">
-      <RouterLink to="/" class="brand"
-        ><span class="dot"></span> Traffic <em>AS</em></RouterLink
-      >
+      <div class="side-top">
+        <RouterLink to="/" class="brand" v-if="sideOpen">
+          <span class="dot"></span> Traffic <em>AS</em>
+        </RouterLink>
+        <button
+          class="side-toggle"
+          @click="sideOpen = !sideOpen"
+          :aria-label="sideOpen ? '사이드바 접기' : '사이드바 펼치기'"
+          :title="sideOpen ? '접기' : '펼치기'"
+        >
+          <i
+            :class="sideOpen ? 'bi bi-chevron-double-left' : 'bi bi-chevron-double-right'"
+          ></i>
+        </button>
+      </div>
       <nav class="snav">
         <button
           v-for="n in nav"
@@ -11,13 +23,17 @@
           class="snav-i"
           :class="{ on: tab === n.id }"
           @click="tab = n.id"
+          :title="!sideOpen ? n.label + (n.bdg ? ` (${n.bdg})` : '') : ''"
         >
-          <i :class="n.icon"></i><span class="snav-lab">{{ n.label }}</span>
-          <span v-if="n.bdg" class="snav-bdg">{{ n.bdg }}</span>
+          <span class="snav-ic">
+            <i :class="n.icon"></i>
+            <span v-if="n.bdg && !sideOpen" class="snav-bdg-dot"></span>
+          </span>
+          <span class="snav-lab">{{ n.label }}</span>
+          <span v-if="n.bdg && sideOpen" class="snav-bdg">{{ n.bdg }}</span>
         </button>
       </nav>
-      <SideWeather />
-      <div class="side-foot">시설운영팀 v2.1.0<br />© 2026</div>
+      <div class="side-foot" v-if="sideOpen">시설운영팀 v2.1.0<br />© 2026</div>
     </aside>
 
     <div class="main">
@@ -48,73 +64,36 @@
       <template v-if="tab === 'status'">
         <!-- ============ 메인 그리드 (좌 2x2 + 우 풀세로 장애상세) ============ -->
         <section class="main-grid">
-          <!-- 카메라 상태 -->
-          <div class="card cam-card">
+          <!-- 네트워크 지연 (top-left, 위치 변경) -->
+          <div class="card net-card">
             <div class="ch">
-              <h3>
-                카메라 상태 <span class="ch-kpi gr">24/25 <em>96.0%</em></span>
-              </h3>
-              <a class="ch-link" @click="tab = 'cams'">전체 보기 ›</a>
+              <h3>네트워크 지연 <span class="ch-kpi">평균 128ms · 최대 286ms</span></h3>
+              <a class="ch-link" @click="tab = 'net'">전체 보기 ›</a>
             </div>
-            <div class="cam-filter">
-              <span class="cf on">전체 25</span>
-              <span class="cf gr">정상 23</span>
-              <span class="cf yl">지연 1</span>
-              <span class="cf rd">장애 2</span>
-              <div class="cf-r">
-                <input placeholder="카메라명 검색" /><select>
-                  <option>전체 위치</option>
-                </select>
+            <div class="net-summary">
+              <div class="ns-head">
+                <div class="ns-status">
+                  <span class="ns-dot yl"></span>
+                  <span class="ns-st-label">주의</span>
+                </div>
+                <div class="ns-avg">
+                  <strong>128<small>ms</small></strong>
+                  <span>평균</span>
+                </div>
               </div>
-            </div>
-            <table class="cam-tbl">
-              <thead>
-                <tr>
-                  <th>카메라명</th>
-                  <th>상태</th>
-                  <th>지연(ms)</th>
-                  <th>최근 응답</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(c, i) in cams"
-                  :key="i"
-                  :class="{ bad: c.st === '장애' }"
-                  @click="openCam(c)"
-                  style="cursor: pointer"
-                >
-                  <td><i class="bi bi-camera-video"></i> {{ c.name }}</td>
-                  <td>
-                    <span class="stat" :class="c.stTone">{{ c.st }}</span>
-                  </td>
-                  <td class="mono">{{ c.lat }}</td>
-                  <td class="mono">{{ c.ts }}</td>
-                </tr>
-              </tbody>
-            </table>
-            <div class="cam-foot">
-              <span>총 25개</span>
-              <div class="pg-row">
-                <button><i class="bi bi-chevron-double-left"></i></button>
-                <button><i class="bi bi-chevron-left"></i></button>
-                <button class="on">1</button>
-                <button><i class="bi bi-chevron-right"></i></button>
-                <button><i class="bi bi-chevron-double-right"></i></button>
-              </div>
+
+              <div ref="netChartEl" class="net-echart"></div>
+
             </div>
           </div>
 
           <!-- 서버 상태 (3 cards with CPU/메모리/디스크/서비스 bars) -->
           <div class="card srv-card">
             <div class="ch">
-              <h3>
-                서버 상태 <span class="ch-kpi gr">2/3 정상</span>
-                <span class="ch-kpi yl">1 경고</span>
-              </h3>
+              <h3>서버 상태 <span class="ch-kpi gr">대표 · ocr-srv-01</span></h3>
               <a class="ch-link" @click="tab = 'srv'">전체 보기 ›</a>
             </div>
-            <div v-for="(s, i) in servers" :key="i" class="srv">
+            <div v-for="(s, i) in servers.slice(0, 1)" :key="i" class="srv">
               <div class="srv-h">
                 <div class="srv-name">
                   <svg viewBox="0 0 32 32" class="srv-icon" aria-hidden="true">
@@ -164,177 +143,18 @@
                 </div>
                 <span class="stat" :class="s.stTone">{{ s.st }}</span>
               </div>
-              <div class="srv-bars">
-                <div v-for="b in s.bars" :key="b.l" class="srv-b">
-                  <div class="srv-lab">{{ b.l }}</div>
-                  <div class="srv-val" :class="b.tone">{{ b.v }}</div>
-                  <div class="bar">
-                    <span :style="{ width: b.bar + '%', background: b.color }"></span>
-                  </div>
+              <div class="srv-gauges">
+                <div v-for="b in s.bars" :key="b.l" class="srv-g" :class="b.tone">
+                  <div class="srv-g-wrap" :ref="(el) => setSrvChart(el, b)"></div>
+                  <div class="srv-g-lab">{{ b.l }}</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- 장애 상세 (풀 패널) -->
-          <div class="card fail-card">
-            <div class="ch">
-              <h3>
-                장애 상세 <span class="b-rd">진행 중</span>
-                <span class="ch-kpi rd">1건 장애 · 2건 처리 대기</span>
-              </h3>
-              <i class="bi bi-arrows-fullscreen"></i>
-            </div>
-            <div class="fl-head">
-              <div class="fl-title">
-                정릉터널_입구_B1 <span class="fl-tag">장애</span>
-              </div>
-            </div>
-            <div class="fl-rows">
-              <div class="fl-row"><span>장비 ID</span><strong>NSN-N-0023</strong></div>
-              <div class="fl-row">
-                <span>위치</span><strong>내부순환로 03K+150</strong>
-              </div>
-              <div class="fl-row">
-                <span>최초 감지</span><strong>10:24:17 (8분 전)</strong>
-              </div>
-              <div class="fl-row">
-                <span>최근 상태</span><strong>10:32:18 — 응답 없음</strong>
-              </div>
-              <div class="fl-row">
-                <span>증상</span><strong>RTSP 스트림 타임아웃 (30s)</strong>
-              </div>
-              <div class="fl-row">
-                <span>추정 원인</span><strong>L2 스위치 측 경로 단절 (의심)</strong>
-              </div>
-            </div>
-            <h4>조치 이력</h4>
-            <div class="hst">
-              <div><span class="hst-t">10:24:17</span> 장애 자동 감지 — 임계 30s</div>
-              <div><span class="hst-t">10:24:20</span> 자동 재연결 1차 — TIMEOUT</div>
-              <div><span class="hst-t">10:25:05</span> 자동 재연결 2차 — TIMEOUT</div>
-              <div><span class="hst-t">10:25:30</span> 경로 ping 실패 (10.20.13.42)</div>
-              <div>
-                <span class="hst-t">10:28:11</span> 김기사(IT) 상황 확인 — 현장 점검 예정
-              </div>
-            </div>
-            <a class="ch-link" @click="tab = 'fault'">전체 보기 ›</a>
-            <h4>권장 조치</h4>
-            <p class="rec-p">
-              PoE 스위치 포트(SW3-G14) 재기동 후 카메라 측 전원 확인. 30분 내 미복구 시
-              현장 출동.
-            </p>
-            <div class="act-row">
-              <button class="ab bl">재연결</button>
-              <button class="ab rd">장애 등록</button>
-              <button class="ab gy">점검 요청</button>
-              <button class="ab gr">복구 완료</button>
-            </div>
-            <div class="resp-row">
-              <span>담당자</span><strong>김기사 (IT)</strong
-              ><button class="ab-sm">변경</button>
-            </div>
-            <div class="memo-row">
-              <span>메모</span
-              ><input v-model="failMemo" placeholder="메모를 입력하세요..." /><button
-                class="ab-sm"
-              >
-                저장
-              </button>
-            </div>
-          </div>
-          <div class="bot-row">
-            <!-- 네트워크 지연 현황 (왼쪽, 비율 3) -->
-            <div class="card net-card">
-              <div class="ch">
-                <h3>네트워크 지연 <span class="ch-kpi">평균 128ms · 최대 286ms</span></h3>
-                <a class="ch-link" @click="tab = 'net'">전체 보기 ›</a>
-              </div>
-              <div class="net-grid">
-                <div class="nb">
-                  <div class="nb-l">평균 지연</div>
-                  <div class="nb-v">128 <span class="u">ms</span></div>
-                  <svg viewBox="0 0 100 24" class="ns" preserveAspectRatio="none">
-                    <line
-                      x1="0"
-                      y1="20"
-                      x2="100"
-                      y2="20"
-                      stroke="#1f3055"
-                      stroke-dasharray="2 3"
-                      stroke-width="0.5"
-                    />
-                    <polyline
-                      points="0,15 20,11 40,13 60,9 80,12 100,7"
-                      fill="none"
-                      stroke="#7e7ad8"
-                      stroke-width="1.2"
-                    />
-                    <circle cx="100" cy="7" r="1.8" fill="#7e7ad8" />
-                  </svg>
-                </div>
-                <div class="nb">
-                  <div class="nb-l">최대 지연</div>
-                  <div class="nb-v">286 <span class="u">ms</span></div>
-                  <svg viewBox="0 0 100 24" class="ns" preserveAspectRatio="none">
-                    <line
-                      x1="0"
-                      y1="20"
-                      x2="100"
-                      y2="20"
-                      stroke="#1f3055"
-                      stroke-dasharray="2 3"
-                      stroke-width="0.5"
-                    />
-                    <polyline
-                      points="0,16 20,12 40,15 60,5 80,9 100,3"
-                      fill="none"
-                      stroke="#d4a652"
-                      stroke-width="1.2"
-                    />
-                    <circle cx="100" cy="3" r="1.8" fill="#d4a652" />
-                  </svg>
-                </div>
-                <div class="nb nb-wide">
-                  <div class="nb-l">정상 구간</div>
-                  <div class="nb-v">23<span class="u">/25 (92%)</span></div>
-                  <svg viewBox="0 0 100 24" class="ns" preserveAspectRatio="none">
-                    <line
-                      x1="0"
-                      y1="20"
-                      x2="100"
-                      y2="20"
-                      stroke="#1f3055"
-                      stroke-dasharray="2 3"
-                      stroke-width="0.5"
-                    />
-                    <polyline
-                      points="0,9 20,7 40,8 60,6 80,7 100,5"
-                      fill="none"
-                      stroke="#6fa581"
-                      stroke-width="1.2"
-                    />
-                    <circle cx="100" cy="5" r="1.8" fill="#6fa581" />
-                  </svg>
-                </div>
-                <div class="nb">
-                  <div class="nb-l">지연 구간</div>
-                  <div class="nb-v">1<span class="u">/25 (4%)</span></div>
-                  <div class="bar-line">
-                    <span style="width: 4%; background: #fbbf24"></span>
-                  </div>
-                </div>
-                <div class="nb">
-                  <div class="nb-l">장애 구간</div>
-                  <div class="nb-v">1<span class="u">/25 (4%)</span></div>
-                  <div class="bar-line">
-                    <span style="width: 4%; background: #ef4444"></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 알람 타임라인 (오른쪽, 비율 7) -->
+          <!-- ▶ 우측 컬럼 스택: 알람타임라인(작게) + 장애상세(크게) ◀ -->
+          <div class="col3-stack">
+            <!-- 알람 타임라인 (위, 작게) -->
             <div class="card timeline-card">
               <div class="ch">
                 <h3>알람 타임라인</h3>
@@ -351,41 +171,155 @@
                 </div>
               </div>
               <div class="tl-list">
+                <div class="tl-th">
+                  <span>시간</span>
+                  <span>내용</span>
+                  <span>담당자</span>
+                  <span></span>
+                </div>
                 <div
-                  v-for="a in filteredAlarms"
+                  v-for="a in filteredAlarms.slice(0, 3)"
                   :key="a.id"
                   class="tl-row"
                   :class="a.kind"
                   @click="openAlarm(a)"
-                  style="cursor:pointer"
+                  style="cursor: pointer"
                 >
                   <span class="tl-t">{{ a.time }}</span>
-                  <span class="tl-k">{{
-                    a.kind === "recovered" ? "R" : a.kind === "info" ? "I" : "E"
-                  }}</span>
-                  <span class="tl-sev" :class="a.sev.toLowerCase()">{{ a.sev }}</span>
-                  <span class="tl-id">{{ a.dev }}</span>
                   <span class="tl-msg">{{ a.msg }}</span>
                   <span class="tl-who">{{ a.who }}</span>
                   <i class="bi bi-chevron-right tl-arrow"></i>
                 </div>
                 <div v-if="!filteredAlarms.length" class="tl-empty">해당 분류 없음</div>
               </div>
-              <div class="tl-foot">
-                <span>표시 {{ filteredAlarms.length }} / 24</span>
+              <div class="tl-foot" style="justify-content: flex-end;">
                 <a class="ch-link" @click="tab = 'alarm'">전체 알람 보기 ›</a>
               </div>
             </div>
+
+            <!-- 장애 상세 (아래, 크게) -->
+            <div class="card fail-card">
+              <div class="ch">
+                <h3>
+                  장애 상세 <span class="b-rd">진행 중</span>
+                  <span class="ch-kpi rd">1건 장애 · 2건 처리 대기</span>
+                </h3>
+                <i class="bi bi-arrows-fullscreen"></i>
+              </div>
+              <div class="fl-head">
+                <div class="fl-title">
+                  정릉터널_입구_B1 <span class="fl-tag">장애</span>
+                </div>
+              </div>
+              <div class="fl-rows">
+                <div class="fl-row"><span><i class="bi bi-hdd-network"></i> 장비 ID</span><strong>NSN-N-0023</strong></div>
+                <div class="fl-row">
+                  <span><i class="bi bi-geo-alt"></i> 위치</span><strong>내부순환로 03K+150</strong>
+                </div>
+                <div class="fl-row">
+                  <span><i class="bi bi-clock-history"></i> 최초 감지</span><strong>10:24:17 <em>(8분 전)</em></strong>
+                </div>
+                <div class="fl-row">
+                  <span><i class="bi bi-exclamation-triangle"></i> 증상</span><strong>RTSP 스트림 타임아웃</strong>
+                </div>
+              </div>
+              <h4><i class="bi bi-list-check"></i> 조치 이력</h4>
+              <div class="hst">
+                <div><i class="bi bi-circle-fill hst-i"></i><span class="hst-t">10:24:17</span> 장애 자동 감지</div>
+                <div>
+                  <i class="bi bi-circle-fill hst-i"></i><span class="hst-t">10:28:11</span> 김기사(IT) 상황 확인 — 현장 출동 예정
+                </div>
+              </div>
+              <a class="ch-link" @click="tab = 'fault'">전체 보기 ›</a>
+              <div class="act-row">
+                <button class="ab bl"><i class="bi bi-arrow-repeat"></i> 재연결</button>
+                <button class="ab rd"><i class="bi bi-exclamation-octagon"></i> 장애 등록</button>
+                <button class="ab gy"><i class="bi bi-tools"></i> 점검 요청</button>
+                <button class="ab gr"><i class="bi bi-check2-circle"></i> 복구 완료</button>
+              </div>
+              <div class="resp-row">
+                <span><i class="bi bi-person-badge"></i> 담당자</span><strong>김기사 (IT)</strong
+                ><button class="ab-sm">변경</button>
+              </div>
+              <div class="memo-row">
+                <span><i class="bi bi-pencil-square"></i> 메모</span
+                ><input v-model="failMemo" placeholder="메모를 입력하세요..." /><button
+                  class="ab-sm"
+                >
+                  저장
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="bot-row">
+            <!-- 카메라 상태 (왼쪽, 위치 변경) -->
+            <div class="card cam-card">
+              <div class="ch">
+                <h3>
+                  카메라 상태 <span class="ch-kpi gr">24/25 <em>96.0%</em></span>
+                </h3>
+                <a class="ch-link" @click="tab = 'cams'">전체 보기 ›</a>
+              </div>
+              <div class="cam-filter">
+                <span class="cf on">전체 25</span>
+                <span class="cf gr">정상 23</span>
+                <span class="cf yl">지연 1</span>
+                <span class="cf rd">장애 2</span>
+                <div class="cf-r">
+                  <input placeholder="카메라명 검색" /><select>
+                    <option>전체 위치</option>
+                  </select>
+                </div>
+              </div>
+              <table class="cam-tbl">
+                <thead>
+                  <tr>
+                    <th>카메라명</th>
+                    <th>상태</th>
+                    <th>지연(ms)</th>
+                    <th>최근 응답</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="(c, i) in cams.slice(0, 3)"
+                    :key="i"
+                    :class="{ bad: c.st === '장애' }"
+                    @click="openCam(c)"
+                    style="cursor: pointer"
+                  >
+                    <td><i class="bi bi-camera-video"></i> {{ c.name }}</td>
+                    <td>
+                      <span class="stat" :class="c.stTone">{{ c.st }}</span>
+                    </td>
+                    <td class="mono">{{ c.lat }}</td>
+                    <td class="mono">{{ c.ts }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="cam-foot">
+                <span>총 25개</span>
+                <div class="pg-row">
+                  <button><i class="bi bi-chevron-double-left"></i></button>
+                  <button><i class="bi bi-chevron-left"></i></button>
+                  <button class="on">1</button>
+                  <button><i class="bi bi-chevron-right"></i></button>
+                  <button><i class="bi bi-chevron-double-right"></i></button>
+                </div>
+              </div>
+            </div>
+
           </div>
           <!-- /.bot-row -->
         </section>
       </template>
 
-      <section v-if="tab === 'cams'" class="card pnl">
+      <section v-if="tab === 'cams'" class="card pnl net-detail">
         <div class="pnl-head">
           <h3>
-            카메라 전체 목록
-            <span class="ch-kpi">{{ cams.length }}대 (전체 25대 중)</span>
+            카메라 운영 현황
+            <span class="ch-kpi">전체 25대 모니터링</span>
           </h3>
           <div class="pnl-tools">
             <input
@@ -399,130 +333,282 @@
               <option>지연</option>
               <option>장애</option>
             </select>
+            <button class="pnl-act"><i class="bi bi-download"></i> CSV 내보내기</button>
           </div>
         </div>
-        <div class="pnl-summary">
+
+        <!-- 상단 KPI 7박스 -->
+        <div class="pnl-summary nd-kpi nd-kpi-7">
           <div class="ps-box">
             <div class="ps-l">전체</div>
             <div class="ps-v">25</div>
+            <div class="ps-sub">운영 카메라</div>
           </div>
           <div class="ps-box gr">
             <div class="ps-l">정상</div>
             <div class="ps-v">23</div>
+            <div class="ps-sub">92.0%</div>
           </div>
           <div class="ps-box yl">
             <div class="ps-l">지연</div>
             <div class="ps-v">1</div>
+            <div class="ps-sub">4.0%</div>
           </div>
           <div class="ps-box rd">
             <div class="ps-l">장애</div>
             <div class="ps-v">1</div>
+            <div class="ps-sub">4.0%</div>
           </div>
           <div class="ps-box">
             <div class="ps-l">평균 지연</div>
             <div class="ps-v">94<span>ms</span></div>
+            <div class="ps-sub">전일 -3ms</div>
           </div>
           <div class="ps-box">
             <div class="ps-l">평균 가동률</div>
             <div class="ps-v">96.2<span>%</span></div>
+            <div class="ps-sub">최근 30일</div>
+          </div>
+          <div class="ps-box">
+            <div class="ps-l">평균 OCR 신뢰도</div>
+            <div class="ps-v">94.8<span>%</span></div>
+            <div class="ps-sub">최근 24h</div>
           </div>
         </div>
-        <table class="pnl-tbl">
-          <thead>
-            <tr>
-              <th>장비 ID</th>
-              <th>카메라명</th>
-              <th>위치</th>
-              <th>IP</th>
-              <th>상태</th>
-              <th>지연(ms)</th>
-              <th>가동률</th>
-              <th>최근 응답</th>
-              <th>설치일</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(c, i) in filteredCams"
-              :key="i"
-              @click="openCam(c)"
-              style="cursor: pointer"
-              :class="{ bad: c.st === '장애' }"
-            >
-              <td class="mono">{{ c.id }}</td>
-              <td><i class="bi bi-camera-video"></i> {{ c.name }}</td>
-              <td>{{ c.loc }}</td>
-              <td class="mono">10.20.{{ 10 + i }}.{{ 100 + i }}</td>
-              <td>
-                <span class="stat" :class="c.stTone">{{ c.st }}</span>
-              </td>
-              <td class="mono">{{ c.lat }}</td>
-              <td class="mono">{{ (95 + (i % 5)).toFixed(1) }}%</td>
-              <td class="mono">{{ c.ts }}</td>
-              <td class="mono">
-                {{
-                  [
-                    "2024-03-12",
-                    "2024-05-08",
-                    "2024-08-22",
-                    "2023-11-15",
-                    "2024-01-30",
-                    "2024-06-17",
-                    "2024-02-04",
-                    "2024-09-11",
-                  ][i]
-                }}
-              </td>
-              <td><i class="bi bi-chevron-right" style="opacity: 0.5"></i></td>
-            </tr>
-            <tr v-if="!filteredCams.length">
-              <td colspan="10" class="pnl-empty">검색 결과 없음</td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="pnl-foot">
-          <span>표시 {{ filteredCams.length }} / {{ cams.length }} (전체 25)</span>
-          <div class="pg-row">
-            <button>‹</button>
-            <button class="on">1</button><button>2</button><button>3</button>
-            <button>›</button>
+
+        <!-- 위치별 분포 -->
+        <div class="nd-block">
+          <div class="nd-h">
+            <h4>위치별 분포</h4>
+            <span class="nd-h-cnt">6개 구역</span>
           </div>
+          <div class="cd-zones">
+            <div class="cdz" v-for="z in camZones" :key="z.name">
+              <div class="cdz-h">
+                <span class="cdz-n">{{ z.name }}</span>
+                <span class="cdz-c"
+                  ><strong>{{ z.ok + z.warn + z.bad }}</strong
+                  ><em>대</em></span
+                >
+              </div>
+              <div class="cdz-bar">
+                <span class="gr" :style="{ flex: z.ok }"></span>
+                <span class="yl" :style="{ flex: z.warn }"></span>
+                <span class="rd" :style="{ flex: z.bad }"></span>
+              </div>
+              <div class="cdz-leg">
+                <span><span class="ns-d gr"></span>{{ z.ok }}</span>
+                <span><span class="ns-d yl"></span>{{ z.warn }}</span>
+                <span><span class="ns-d rd"></span>{{ z.bad }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 카메라 전체 목록 -->
+        <div class="nd-block">
+          <div class="nd-h">
+            <h4>카메라 전체 목록</h4>
+            <span class="nd-h-cnt">{{ filteredCams.length }} / {{ cams.length }}대</span>
+          </div>
+          <table class="pnl-tbl nd-tbl">
+            <thead>
+              <tr>
+                <th>장비 ID</th>
+                <th>카메라명</th>
+                <th>위치</th>
+                <th>IP</th>
+                <th>상태</th>
+                <th>지연</th>
+                <th>가동률</th>
+                <th>OCR 신뢰도</th>
+                <th>펌웨어</th>
+                <th>마지막 점검</th>
+                <th>최근 응답</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(c, i) in filteredCams"
+                :key="i"
+                @click="openCam(c)"
+                style="cursor: pointer"
+                :class="{ bad: c.st === '장애' }"
+              >
+                <td class="mono">{{ c.id }}</td>
+                <td><i class="bi bi-camera-video"></i> {{ c.name }}</td>
+                <td>{{ c.loc }}</td>
+                <td class="mono">10.20.{{ 10 + i }}.{{ 100 + i }}</td>
+                <td>
+                  <span class="stat" :class="c.stTone">{{ c.st }}</span>
+                </td>
+                <td class="mono">{{ c.lat }}<span v-if="c.lat !== '—'">ms</span></td>
+                <td
+                  class="mono"
+                  :class="c.st === '장애' ? 'rd-txt' : c.st === '지연' ? 'yl-txt' : ''"
+                >
+                  {{ c.st === "장애" ? "0.0" : (95 + (i % 5)).toFixed(1) }}%
+                </td>
+                <td class="mono">{{ c.st === "장애" ? "—" : 88 + (i % 11) + "%" }}</td>
+                <td class="mono">
+                  v{{
+                    [
+                      "3.2.1",
+                      "3.2.1",
+                      "3.1.8",
+                      "3.2.0",
+                      "3.2.1",
+                      "3.0.5",
+                      "3.2.1",
+                      "2.9.4",
+                    ][i]
+                  }}
+                </td>
+                <td class="mono">
+                  {{
+                    [
+                      "2025-04-12",
+                      "2025-03-28",
+                      "2025-04-22",
+                      "2024-12-15",
+                      "2025-04-30",
+                      "2025-02-17",
+                      "2025-04-04",
+                      "2025-05-10",
+                    ][i]
+                  }}
+                </td>
+                <td class="mono">{{ c.ts }}</td>
+                <td><i class="bi bi-chevron-right" style="opacity: 0.5"></i></td>
+              </tr>
+              <tr v-if="!filteredCams.length">
+                <td colspan="12" class="pnl-empty">검색 결과 없음</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="pnl-foot">
+            <span>표시 {{ filteredCams.length }} / {{ cams.length }} (전체 25)</span>
+            <div class="pg-row">
+              <button>‹</button>
+              <button class="on">1</button><button>2</button><button>3</button>
+              <button>›</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 최근 카메라 이벤트 -->
+        <div class="nd-block">
+          <div class="nd-h"><h4>최근 카메라 이벤트</h4></div>
+          <table class="pnl-tbl nd-tbl">
+            <thead>
+              <tr>
+                <th>발생 시각</th>
+                <th>장비 ID</th>
+                <th>이벤트</th>
+                <th>심각도</th>
+                <th>지속 시간</th>
+                <th>담당자</th>
+                <th>조치</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="mono">14:24:17</td>
+                <td class="mono">CAM-M-002</td>
+                <td>오프라인 (RTSP timeout)</td>
+                <td><span class="stat no">CRIT</span></td>
+                <td class="mono rd-txt">8분 1초</td>
+                <td>김기사</td>
+                <td><button class="pnl-act sm">상세</button></td>
+              </tr>
+              <tr>
+                <td class="mono">14:11:42</td>
+                <td class="mono">CAM-J-007</td>
+                <td>지연 286ms 임계 초과</td>
+                <td><span class="stat wn">HIGH</span></td>
+                <td class="mono yl-txt">20분 36초</td>
+                <td>자동</td>
+                <td><button class="pnl-act sm">상세</button></td>
+              </tr>
+              <tr>
+                <td class="mono">13:55:18</td>
+                <td class="mono">CAM-IC-0011</td>
+                <td>연결 복구 완료 (재기동)</td>
+                <td><span class="stat ok">INFO</span></td>
+                <td class="mono">—</td>
+                <td>이대리</td>
+                <td><button class="pnl-act sm">상세</button></td>
+              </tr>
+              <tr>
+                <td class="mono">12:48:22</td>
+                <td class="mono">GBN-S-0032</td>
+                <td>이미지 노이즈 임계 초과</td>
+                <td><span class="stat wn">MED</span></td>
+                <td class="mono">1시간 44분</td>
+                <td>자동</td>
+                <td><button class="pnl-act sm">상세</button></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
-      <section v-if="tab === 'srv'" class="card pnl">
+      <section v-if="tab === 'srv'" class="card pnl net-detail">
         <div class="pnl-head">
           <h3>
             서버 / OCR 엔진 상태 <span class="ch-kpi">{{ servers.length }}대 운영</span>
           </h3>
+          <div class="pnl-tools">
+            <select v-model="srvRange">
+              <option value="1h">최근 1시간</option>
+              <option value="24h">최근 24시간</option>
+              <option value="7d">최근 7일</option>
+            </select>
+            <button class="pnl-act">
+              <i class="bi bi-arrow-clockwise"></i> 새로고침
+            </button>
+            <button class="pnl-act"><i class="bi bi-download"></i> CSV</button>
+          </div>
         </div>
-        <div class="pnl-summary">
+        <div class="pnl-summary nd-kpi nd-kpi-7">
           <div class="ps-box">
-            <div class="ps-l">전체</div>
-            <div class="ps-v">3</div>
+            <div class="ps-l">전체 서버</div>
+            <div class="ps-v">2</div>
+            <div class="ps-sub">운영 중</div>
           </div>
           <div class="ps-box gr">
             <div class="ps-l">정상</div>
-            <div class="ps-v">2</div>
+            <div class="ps-v">1</div>
+            <div class="ps-sub">50.0%</div>
           </div>
           <div class="ps-box yl">
             <div class="ps-l">경고</div>
             <div class="ps-v">1</div>
+            <div class="ps-sub">50.0%</div>
           </div>
           <div class="ps-box">
             <div class="ps-l">평균 CPU</div>
             <div class="ps-v">42<span>%</span></div>
+            <div class="ps-sub">최근 1시간</div>
           </div>
           <div class="ps-box">
             <div class="ps-l">평균 메모리</div>
             <div class="ps-v">55<span>%</span></div>
+            <div class="ps-sub">최근 1시간</div>
           </div>
           <div class="ps-box">
             <div class="ps-l">서비스 가동</div>
             <div class="ps-v">14<span>/15</span></div>
+            <div class="ps-sub">93.3%</div>
+          </div>
+          <div class="ps-box">
+            <div class="ps-l">평균 응답시간</div>
+            <div class="ps-v">48<span>ms</span></div>
+            <div class="ps-sub">OCR 처리</div>
           </div>
         </div>
+
         <div v-for="(s, i) in servers" :key="i" class="srv srv-detail">
           <div class="srv-h">
             <div class="srv-name">
@@ -585,70 +671,349 @@
             <span><i class="bi bi-people"></i> 접속 {{ [42, 0, 18][i] }}</span>
           </div>
         </div>
+
+        <!-- 서비스 / 프로세스 상태 -->
+        <div class="nd-block">
+          <div class="nd-h">
+            <h4>서비스 / 프로세스 상태</h4>
+            <span class="nd-h-cnt">{{ srvServices.length }}개 서비스</span>
+          </div>
+          <table class="pnl-tbl nd-tbl">
+            <thead>
+              <tr>
+                <th>서비스명</th>
+                <th>호스트</th>
+                <th>포트</th>
+                <th>PID</th>
+                <th>버전</th>
+                <th>응답시간</th>
+                <th>업타임</th>
+                <th>마지막 재시작</th>
+                <th>상태</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="s in srvServices" :key="s.name">
+                <td class="mono"><i class="bi bi-hdd-fill"></i> {{ s.name }}</td>
+                <td>{{ s.host }}</td>
+                <td class="mono">{{ s.port }}</td>
+                <td class="mono">{{ s.pid }}</td>
+                <td class="mono">{{ s.ver }}</td>
+                <td
+                  class="mono"
+                  :class="s.tone === 'rd' ? 'rd-txt' : s.tone === 'yl' ? 'yl-txt' : ''"
+                >
+                  {{ s.rt }}
+                </td>
+                <td class="mono">{{ s.uptime }}</td>
+                <td class="mono">{{ s.lastRestart }}</td>
+                <td>
+                  <span class="stat" :class="s.statTone">{{ s.stat }}</span>
+                </td>
+                <td><button class="pnl-act sm">재시작</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 최근 서버 이벤트 -->
+        <div class="nd-block">
+          <div class="nd-h"><h4>최근 서버 이벤트</h4></div>
+          <table class="pnl-tbl nd-tbl">
+            <thead>
+              <tr>
+                <th>발생 시각</th>
+                <th>호스트</th>
+                <th>이벤트</th>
+                <th>심각도</th>
+                <th>지속</th>
+                <th>처리</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="mono">14:18:42</td>
+                <td class="mono">ocr-srv-02</td>
+                <td>디스크 사용량 78% 임계 초과</td>
+                <td><span class="stat wn">HIGH</span></td>
+                <td class="mono yl-txt">14분</td>
+                <td>박과장</td>
+              </tr>
+              <tr>
+                <td class="mono">10:32:15</td>
+                <td class="mono">ocr-srv-02</td>
+                <td>메모리 88% 일시 spike</td>
+                <td><span class="stat wn">MED</span></td>
+                <td class="mono">3분 22초</td>
+                <td>자동 GC</td>
+              </tr>
+              <tr>
+                <td class="mono">08:00:00</td>
+                <td class="mono">ocr-srv-01</td>
+                <td>주간 정기 백업 완료 (4.2GB)</td>
+                <td><span class="stat ok">INFO</span></td>
+                <td class="mono">—</td>
+                <td>자동</td>
+              </tr>
+              <tr>
+                <td class="mono">02:15:03</td>
+                <td class="mono">ocr-srv-03</td>
+                <td>로그 로테이트 완료</td>
+                <td><span class="stat ok">INFO</span></td>
+                <td class="mono">—</td>
+                <td>자동</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      <section v-if="tab === 'net'" class="card pnl">
+      <section v-if="tab === 'net'" class="card pnl net-detail">
         <div class="pnl-head">
           <h3>
             네트워크 지연 현황
             <span class="ch-kpi">{{ netPaths.length }}개 경로 모니터링</span>
           </h3>
+          <div class="pnl-tools">
+            <select v-model="netZone">
+              <option value="all">전체 구역</option>
+              <option>강변북로</option>
+              <option>올림픽대로</option>
+              <option>내부순환</option>
+              <option>경부고속</option>
+            </select>
+            <select v-model="netRange">
+              <option value="1h">최근 1시간</option>
+              <option value="6h">최근 6시간</option>
+              <option value="24h">최근 24시간</option>
+              <option value="7d">최근 7일</option>
+            </select>
+            <button class="pnl-act"><i class="bi bi-download"></i> CSV 내보내기</button>
+          </div>
         </div>
-        <div class="pnl-summary">
+
+        <!-- 상단 KPI 6개 -->
+        <div class="pnl-summary nd-kpi">
           <div class="ps-box">
             <div class="ps-l">평균 지연</div>
             <div class="ps-v">128<span>ms</span></div>
+            <div class="ps-sub">전일 대비 +4ms</div>
           </div>
           <div class="ps-box yl">
             <div class="ps-l">최대 지연</div>
             <div class="ps-v">286<span>ms</span></div>
+            <div class="ps-sub">14:24 NSN-N-0023</div>
+          </div>
+          <div class="ps-box">
+            <div class="ps-l">P95 지연</div>
+            <div class="ps-v">142<span>ms</span></div>
+            <div class="ps-sub">상위 5% 기준</div>
           </div>
           <div class="ps-box gr">
             <div class="ps-l">정상</div>
             <div class="ps-v">23<span>/25</span></div>
-          </div>
-          <div class="ps-box yl">
-            <div class="ps-l">지연</div>
-            <div class="ps-v">1<span>/25</span></div>
+            <div class="ps-sub">92.0%</div>
           </div>
           <div class="ps-box rd">
             <div class="ps-l">장애</div>
             <div class="ps-v">1<span>/25</span></div>
+            <div class="ps-sub">4.0%</div>
           </div>
           <div class="ps-box">
             <div class="ps-l">패킷 손실</div>
-            <div class="ps-v">0.02<span>%</span></div>
+            <div class="ps-v">0.4<span>%</span></div>
+            <div class="ps-sub">최근 1시간</div>
           </div>
         </div>
-        <table class="pnl-tbl">
-          <thead>
-            <tr>
-              <th>경로</th>
-              <th>출발지</th>
-              <th>도착지</th>
-              <th>지연(ms)</th>
-              <th>지연 24h 평균</th>
-              <th>패킷 손실</th>
-              <th>상태</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(p, i) in netPaths" :key="i">
-              <td class="mono">PATH-{{ String(i + 1).padStart(3, "0") }}</td>
-              <td>{{ p.from }}</td>
-              <td>{{ p.to }}</td>
-              <td class="mono">{{ p.lat }}</td>
-              <td class="mono">{{ p.avg }}</td>
-              <td class="mono">{{ p.loss }}%</td>
-              <td>
-                <span class="stat" :class="p.tone">{{ p.st }}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+
+        <!-- 24h 라인 차트 + 임계선 -->
+        <div class="nd-block">
+          <div class="nd-h">
+            <h4>24시간 지연 추이</h4>
+            <div class="nd-h-r">
+              <span><span class="lg-l bl"></span> 평균 지연</span>
+              <span><span class="lg-l gr"></span> 정상 ≤100ms</span>
+              <span><span class="lg-l rd"></span> 임계 200ms</span>
+              <span><span class="lg-l sp"></span> 이상</span>
+            </div>
+          </div>
+          <div class="nd-chart">
+            <div class="nc-y">
+              <span>300</span><span>200</span><span>100</span><span>0</span>
+            </div>
+            <div class="nc-svgwrap">
+              <svg viewBox="0 0 480 140" preserveAspectRatio="none" class="nc-svg">
+                <rect x="0" y="0" width="480" height="46.67" fill="rgba(220,38,38,.06)" />
+                <rect
+                  x="0"
+                  y="46.67"
+                  width="480"
+                  height="46.67"
+                  fill="rgba(180,83,9,.05)"
+                />
+                <line
+                  x1="0"
+                  y1="46.67"
+                  x2="480"
+                  y2="46.67"
+                  stroke="#b91c1c"
+                  stroke-dasharray="4 4"
+                  stroke-width="0.6"
+                />
+                <line
+                  x1="0"
+                  y1="93.33"
+                  x2="480"
+                  y2="93.33"
+                  stroke="#047857"
+                  stroke-dasharray="4 4"
+                  stroke-width="0.6"
+                />
+                <polyline
+                  points="0,100 40,105 80,98 120,89 160,96 200,79 240,91 280,7 320,86 360,96 400,99 440,92 480,97"
+                  fill="none"
+                  stroke="#2563eb"
+                  stroke-width="1.8"
+                  vector-effect="non-scaling-stroke"
+                />
+                <circle
+                  cx="280"
+                  cy="7"
+                  r="4"
+                  fill="#dc2626"
+                  stroke="#fff"
+                  stroke-width="1.2"
+                />
+              </svg>
+              <div class="nc-spike" style="left: 58%">
+                <strong>NSN-N-0023</strong>
+                <span>286ms · 14:24</span>
+              </div>
+            </div>
+            <div class="nc-x">
+              <span>00</span><span>04</span><span>08</span><span>12</span><span>16</span
+              ><span>20</span><span>24</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 구간별 상세 표 -->
+        <div class="nd-block">
+          <div class="nd-h">
+            <h4>경로별 상세</h4>
+            <span class="nd-h-cnt">{{ netPaths.length }}개 경로</span>
+          </div>
+          <table class="pnl-tbl nd-tbl">
+            <thead>
+              <tr>
+                <th>경로 ID</th>
+                <th>출발</th>
+                <th>도착</th>
+                <th>현재 RTT</th>
+                <th>24h 평균</th>
+                <th>최대</th>
+                <th>패킷 손실</th>
+                <th>업타임</th>
+                <th>마지막 응답</th>
+                <th>상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(p, i) in netPaths" :key="i">
+                <td class="mono">PATH-{{ String(i + 1).padStart(3, "0") }}</td>
+                <td>{{ p.from }}</td>
+                <td>{{ p.to }}</td>
+                <td class="mono">
+                  <strong>{{ p.lat }}</strong
+                  >{{ typeof p.lat === "number" ? "ms" : "" }}
+                </td>
+                <td class="mono">{{ p.avg }}ms</td>
+                <td class="mono">{{ Math.round(p.avg * 1.6) }}ms</td>
+                <td
+                  class="mono"
+                  :class="p.loss > 0 ? (p.loss >= 50 ? 'rd-txt' : 'yl-txt') : ''"
+                >
+                  {{ p.loss }}%
+                </td>
+                <td class="mono">
+                  {{ p.tone === "bad" ? "0.0%" : p.tone === "warn" ? "98.4%" : "99.97%" }}
+                </td>
+                <td class="mono">
+                  {{
+                    p.tone === "bad"
+                      ? "12분 전"
+                      : p.tone === "warn"
+                      ? "8초 전"
+                      : "< 1초 전"
+                  }}
+                </td>
+                <td>
+                  <span class="stat" :class="p.tone">{{ p.st }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 최근 이상 이벤트 -->
+        <div class="nd-block">
+          <div class="nd-h"><h4>최근 네트워크 이상 이벤트</h4></div>
+          <table class="pnl-tbl nd-tbl">
+            <thead>
+              <tr>
+                <th>발생 시각</th>
+                <th>장비</th>
+                <th>구간</th>
+                <th>유형</th>
+                <th>심각도</th>
+                <th>지속 시간</th>
+                <th>조치</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="mono">14:24:17</td>
+                <td>NSN-N-0023</td>
+                <td>EDGE-W → 한남TG</td>
+                <td>RTSP 응답 없음</td>
+                <td><span class="stat no">CRIT</span></td>
+                <td class="mono rd-txt">8분 1초</td>
+                <td><button class="pnl-act sm">상세</button></td>
+              </tr>
+              <tr>
+                <td class="mono">14:18:05</td>
+                <td>GBG-S-0077</td>
+                <td>EDGE-S → 강변북로</td>
+                <td>지연 286ms 임계 초과</td>
+                <td><span class="stat wn">HIGH</span></td>
+                <td class="mono yl-txt">14분 13초</td>
+                <td><button class="pnl-act sm">상세</button></td>
+              </tr>
+              <tr>
+                <td class="mono">13:55:18</td>
+                <td>CAM-IC-0011</td>
+                <td>EDGE-N → 정릉</td>
+                <td>연결 복구 완료</td>
+                <td><span class="stat ok">INFO</span></td>
+                <td class="mono">—</td>
+                <td><button class="pnl-act sm">상세</button></td>
+              </tr>
+              <tr>
+                <td class="mono">11:15:09</td>
+                <td>OLP-W-0041</td>
+                <td>EDGE-S → 올림픽대로</td>
+                <td>전원 차단 후 복구</td>
+                <td><span class="stat ok">INFO</span></td>
+                <td class="mono">—</td>
+                <td><button class="pnl-act sm">상세</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      <section v-if="tab === 'alarm'" class="card pnl">
+      <section v-if="tab === 'alarm'" class="card pnl net-detail">
         <div class="pnl-head">
           <h3>
             알람 / 이벤트 <span class="ch-kpi">{{ alarmsExt.length }}건</span>
@@ -661,66 +1026,165 @@
               <option>MED</option>
               <option>INFO</option>
             </select>
+            <button class="pnl-act"><i class="bi bi-bell-slash"></i> 음소거</button>
+            <button class="pnl-act"><i class="bi bi-download"></i> CSV</button>
           </div>
         </div>
-        <div class="pnl-summary">
+
+        <!-- 심각도별 KPI 7박스 -->
+        <div class="pnl-summary nd-kpi nd-kpi-7">
           <div class="ps-box rd">
             <div class="ps-l">CRIT</div>
             <div class="ps-v">3</div>
+            <div class="ps-sub">즉시 대응 필요</div>
           </div>
           <div class="ps-box yl">
             <div class="ps-l">HIGH</div>
             <div class="ps-v">5</div>
+            <div class="ps-sub">SLA 위반 2</div>
           </div>
           <div class="ps-box yl">
             <div class="ps-l">MED</div>
             <div class="ps-v">8</div>
+            <div class="ps-sub">정상 범위</div>
           </div>
           <div class="ps-box">
             <div class="ps-l">INFO</div>
             <div class="ps-v">12</div>
+            <div class="ps-sub">자동 처리</div>
           </div>
           <div class="ps-box gr">
             <div class="ps-l">해결됨 24h</div>
             <div class="ps-v">17</div>
+            <div class="ps-sub">자동 73%</div>
           </div>
           <div class="ps-box">
-            <div class="ps-l">평균 응답시간</div>
+            <div class="ps-l">평균 응답</div>
             <div class="ps-v">4.2<span>분</span></div>
+            <div class="ps-sub">전일 -1.1분</div>
+          </div>
+          <div class="ps-box rd">
+            <div class="ps-l">SLA 위반</div>
+            <div class="ps-v">2</div>
+            <div class="ps-sub">15분 초과</div>
           </div>
         </div>
-        <table class="pnl-tbl">
-          <thead>
-            <tr>
-              <th>발생</th>
-              <th>심각도</th>
-              <th>구분</th>
-              <th>장비</th>
-              <th>메시지</th>
-              <th>담당자</th>
-              <th>상태</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="a in filteredAlarmExt" :key="a.id">
-              <td class="mono">{{ a.time }}</td>
-              <td>
-                <span class="stat" :class="a.tone">{{ a.sev }}</span>
-              </td>
-              <td>{{ a.cat }}</td>
-              <td class="mono">{{ a.dev }}</td>
-              <td>{{ a.msg }}</td>
-              <td>{{ a.who }}</td>
-              <td>
-                <span class="stat" :class="a.handled ? 'ok' : 'wn'">{{
-                  a.handled ? "처리됨" : "진행중"
-                }}</span>
-              </td>
-              <td><i class="bi bi-chevron-right" style="opacity: 0.5"></i></td>
-            </tr>
-          </tbody>
-        </table>
+
+        <!-- 카테고리별 분포 -->
+        <div class="nd-block">
+          <div class="nd-h">
+            <h4>카테고리별 분포 (24h)</h4>
+            <span class="nd-h-cnt">총 {{ alarmsExt.length }}건</span>
+          </div>
+          <div class="cd-zones">
+            <div class="cdz" v-for="c in alarmCats" :key="c.name">
+              <div class="cdz-h">
+                <span class="cdz-n">{{ c.name }}</span>
+                <span class="cdz-c"
+                  ><strong>{{ c.crit + c.high + c.med + c.info }}</strong
+                  ><em>건</em></span
+                >
+              </div>
+              <div class="cdz-bar">
+                <span class="rd" :style="{ flex: c.crit }"></span>
+                <span class="yl" :style="{ flex: c.high }"></span>
+                <span class="yl" :style="{ flex: c.med, opacity: 0.6 }"></span>
+                <span style="flex: 1; background: #c9d4e3" v-if="c.info"></span>
+              </div>
+              <div class="cdz-leg">
+                <span><span class="ns-d rd"></span>{{ c.crit }}</span>
+                <span><span class="ns-d yl"></span>{{ c.high + c.med }}</span>
+                <span style="color: #6b7a92">{{ c.info }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SLA 위반 진행 중 알람 (강조) -->
+        <div class="nd-block">
+          <div class="nd-h">
+            <h4>SLA 위반 / 진행 중 알람</h4>
+            <span class="nd-h-cnt rd-txt">즉시 대응 필요</span>
+          </div>
+          <table class="pnl-tbl nd-tbl">
+            <thead>
+              <tr>
+                <th>발생</th>
+                <th>심각도</th>
+                <th>장비</th>
+                <th>메시지</th>
+                <th>경과</th>
+                <th>SLA</th>
+                <th>담당자</th>
+                <th>조치</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="bad">
+                <td class="mono">14:24:17</td>
+                <td><span class="stat no">CRIT</span></td>
+                <td class="mono">NSN-N-0023</td>
+                <td>RTSP 스트림 응답 없음 (timeout 30s)</td>
+                <td class="mono rd-txt"><strong>8분 1초</strong></td>
+                <td class="mono rd-txt">초과 0:08</td>
+                <td>김기사</td>
+                <td><button class="pnl-act sm">처리</button></td>
+              </tr>
+              <tr class="bad">
+                <td class="mono">14:11:42</td>
+                <td><span class="stat wn">HIGH</span></td>
+                <td class="mono">ocr-srv-02</td>
+                <td>디스크 사용량 78% 경고</td>
+                <td class="mono rd-txt"><strong>20분 36초</strong></td>
+                <td class="mono rd-txt">초과 5:36</td>
+                <td>—</td>
+                <td><button class="pnl-act sm">배정</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 전체 알람 표 -->
+        <div class="nd-block">
+          <div class="nd-h">
+            <h4>전체 알람 목록</h4>
+            <span class="nd-h-cnt"
+              >{{ filteredAlarmExt.length }} / {{ alarmsExt.length }}건</span
+            >
+          </div>
+          <table class="pnl-tbl nd-tbl">
+            <thead>
+              <tr>
+                <th>발생</th>
+                <th>심각도</th>
+                <th>구분</th>
+                <th>장비</th>
+                <th>메시지</th>
+                <th>담당자</th>
+                <th>상태</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="a in filteredAlarmExt" :key="a.id">
+                <td class="mono">{{ a.time }}</td>
+                <td>
+                  <span class="stat" :class="a.tone">{{ a.sev }}</span>
+                </td>
+                <td>{{ a.cat }}</td>
+                <td class="mono">{{ a.dev }}</td>
+                <td>{{ a.msg }}</td>
+                <td>{{ a.who }}</td>
+                <td>
+                  <span class="stat" :class="a.handled ? 'ok' : 'wn'">{{
+                    a.handled ? "처리됨" : "진행중"
+                  }}</span>
+                </td>
+                <td><i class="bi bi-chevron-right" style="opacity: 0.5"></i></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section v-if="tab === 'check'" class="card pnl">
@@ -750,7 +1214,7 @@
           </div>
           <div class="ps-box">
             <div class="ps-l">다음 점검</div>
-            <div class="ps-v" style="font-size: 14px">05-19 02:00</div>
+            <div class="ps-v" style="font-size: 17px">05-19 02:00</div>
           </div>
         </div>
         <table class="pnl-tbl">
@@ -781,105 +1245,447 @@
         </table>
       </section>
 
-      <section v-if="tab === 'fault'" class="card pnl">
+      <section v-if="tab === 'fault'" class="card pnl net-detail">
         <div class="pnl-head">
           <h3>장애 관리 <span class="ch-kpi rd">진행 1 · 처리중 2 · 완료 5</span></h3>
+          <div class="pnl-tools">
+            <button class="pnl-act">
+              <i class="bi bi-plus-circle"></i> 장애 신규 등록
+            </button>
+            <button class="pnl-act"><i class="bi bi-download"></i> CSV</button>
+          </div>
         </div>
-        <div class="pnl-summary">
+
+        <!-- KPI 8박스 (MTTR/MTBF 포함) -->
+        <div class="pnl-summary nd-kpi nd-kpi-8">
           <div class="ps-box rd">
             <div class="ps-l">진행 중</div>
             <div class="ps-v">1</div>
+            <div class="ps-sub">CAM-M-002</div>
           </div>
           <div class="ps-box yl">
             <div class="ps-l">처리 중</div>
             <div class="ps-v">2</div>
+            <div class="ps-sub">담당자 배정</div>
           </div>
           <div class="ps-box gr">
             <div class="ps-l">금일 복구</div>
             <div class="ps-v">5</div>
+            <div class="ps-sub">자동 3, 수동 2</div>
           </div>
           <div class="ps-box">
-            <div class="ps-l">평균 복구시간</div>
+            <div class="ps-l">MTTR</div>
             <div class="ps-v">18<span>분</span></div>
+            <div class="ps-sub">평균 복구</div>
           </div>
           <div class="ps-box">
             <div class="ps-l">최장 지연</div>
             <div class="ps-v">2<span>h 14m</span></div>
+            <div class="ps-sub">CAM-M-002</div>
+          </div>
+          <div class="ps-box">
+            <div class="ps-l">MTBF</div>
+            <div class="ps-v">7.2<span>일</span></div>
+            <div class="ps-sub">장애 간 평균</div>
           </div>
           <div class="ps-box">
             <div class="ps-l">자동 복구율</div>
             <div class="ps-v">73<span>%</span></div>
+            <div class="ps-sub">최근 7일</div>
+          </div>
+          <div class="ps-box">
+            <div class="ps-l">미해결 SLA</div>
+            <div class="ps-v">1</div>
+            <div class="ps-sub">15분 초과</div>
           </div>
         </div>
-        <table class="pnl-tbl">
-          <thead>
-            <tr>
-              <th>장애 ID</th>
-              <th>발생 시각</th>
-              <th>장비</th>
-              <th>증상</th>
-              <th>심각도</th>
-              <th>담당자</th>
-              <th>경과</th>
-              <th>상태</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="f in faults" :key="f.id">
-              <td class="mono">{{ f.id }}</td>
-              <td class="mono">{{ f.time }}</td>
-              <td class="mono">{{ f.dev }}</td>
-              <td>{{ f.symp }}</td>
-              <td>
-                <span class="stat" :class="f.tone">{{ f.sev }}</span>
-              </td>
-              <td>{{ f.who }}</td>
-              <td class="mono">{{ f.elapsed }}</td>
-              <td>
-                <span class="stat" :class="f.stTone">{{ f.st }}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+
+        <!-- 현재 진행 중인 장애 (큰 강조 카드) -->
+        <div class="nd-block">
+          <div class="nd-h">
+            <h4>현재 진행 중 장애</h4>
+            <span class="nd-h-cnt rd-txt">우선 대응 필요</span>
+          </div>
+          <div class="fl-cur">
+            <div class="flc-h">
+              <div class="flc-id">
+                <span class="stat no">CRIT</span>
+                <strong>FLT-2025-0517-014</strong>
+                <span class="flc-dev">CAM-M-002 (마포대로)</span>
+              </div>
+              <div class="flc-time">
+                <span class="flc-l">경과</span>
+                <strong class="rd-txt">8분 1초</strong>
+              </div>
+            </div>
+            <div class="flc-body">
+              <div class="flc-row"><span>발생 시각</span><strong>14:24:17</strong></div>
+              <div class="flc-row">
+                <span>증상</span><strong>RTSP 스트림 응답 없음 (timeout 30s)</strong>
+              </div>
+              <div class="flc-row">
+                <span>예상 원인</span><strong>광케이블 단선 (NSN-N-0023 연동)</strong>
+              </div>
+              <div class="flc-row">
+                <span>영향 범위</span><strong>마포대교 2개 차로 영상 수집 중단</strong>
+              </div>
+              <div class="flc-row">
+                <span>담당자</span><strong>김기사 (현장 출동 중, 도착 예정 14:45)</strong>
+              </div>
+              <div class="flc-row">
+                <span>SLA 마감</span><strong class="rd-txt">14:39 (5분 후 초과)</strong>
+              </div>
+            </div>
+            <div class="flc-progress">
+              <div class="flc-step done"><span>1</span>알람 발생</div>
+              <div class="flc-step done"><span>2</span>담당자 배정</div>
+              <div class="flc-step on"><span>3</span>현장 출동</div>
+              <div class="flc-step"><span>4</span>원인 식별</div>
+              <div class="flc-step"><span>5</span>복구 작업</div>
+              <div class="flc-step"><span>6</span>완료 확인</div>
+            </div>
+            <div class="flc-acts">
+              <button class="pnl-act"><i class="bi bi-share"></i> 담당자 변경</button>
+              <button class="pnl-act">
+                <i class="bi bi-arrow-clockwise"></i> 재시도
+              </button>
+              <button class="pnl-act">
+                <i class="bi bi-clipboard-data"></i> 작업 로그
+              </button>
+              <button class="pnl-act">
+                <i class="bi bi-check2-circle"></i> 복구 완료
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 장애 유형 분포 -->
+        <div class="nd-block">
+          <div class="nd-h">
+            <h4>장애 유형 분포 (최근 7일)</h4>
+            <span class="nd-h-cnt">총 21건</span>
+          </div>
+          <div class="cd-zones">
+            <div class="cdz" v-for="t in faultTypes" :key="t.name">
+              <div class="cdz-h">
+                <span class="cdz-n">{{ t.name }}</span>
+                <span class="cdz-c"
+                  ><strong>{{ t.count }}</strong
+                  ><em>건</em></span
+                >
+              </div>
+              <div class="cdz-bar">
+                <span class="rd" :style="{ flex: t.ongoing }"></span>
+                <span class="gr" :style="{ flex: t.count - t.ongoing }"></span>
+              </div>
+              <div class="cdz-leg">
+                <span><span class="ns-d rd"></span>{{ t.ongoing }}</span>
+                <span><span class="ns-d gr"></span>{{ t.count - t.ongoing }} 복구</span>
+                <span style="color: #6b7a92">{{ t.mttr }}분</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 전체 장애 목록 -->
+        <div class="nd-block">
+          <div class="nd-h">
+            <h4>전체 장애 목록</h4>
+            <span class="nd-h-cnt">{{ faults.length }}건</span>
+          </div>
+          <table class="pnl-tbl nd-tbl">
+            <thead>
+              <tr>
+                <th>장애 ID</th>
+                <th>발생 시각</th>
+                <th>장비</th>
+                <th>증상</th>
+                <th>심각도</th>
+                <th>담당자</th>
+                <th>경과</th>
+                <th>상태</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="f in faults" :key="f.id">
+                <td class="mono">{{ f.id }}</td>
+                <td class="mono">{{ f.time }}</td>
+                <td class="mono">{{ f.dev }}</td>
+                <td>{{ f.symp }}</td>
+                <td>
+                  <span class="stat" :class="f.tone">{{ f.sev }}</span>
+                </td>
+                <td>{{ f.who }}</td>
+                <td
+                  class="mono"
+                  :class="
+                    f.stTone === 'no' ? 'rd-txt' : f.stTone === 'wn' ? 'yl-txt' : ''
+                  "
+                >
+                  {{ f.elapsed }}
+                </td>
+                <td>
+                  <span class="stat" :class="f.stTone">{{ f.st }}</span>
+                </td>
+                <td><button class="pnl-act sm">상세</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
         <div v-if="faultMsg" class="set-msg">{{ faultMsg }}</div>
       </section>
 
-      <section v-if="tab === 'reports'" class="card pnl">
-        <h3>장비 보고서</h3>
-        <div class="rep-rows">
-          <div v-for="r in reportRows" :key="r.t" class="rep-r">
-            <i class="bi bi-file-earmark-text"></i>
-            <div>
-              <strong>{{ r.t }}</strong
-              ><span>{{ r.d }}</span>
-            </div>
-            <button class="bt-dl"><i class="bi bi-download"></i></button>
-          </div>
+      <section v-if="tab === 'reports'" class="card pnl net-detail">
+        <div class="pnl-head">
+          <h3>
+            장비 보고서 <span class="ch-kpi">{{ reportRows.length }}개 보고서</span>
+          </h3>
         </div>
+        <div class="nd-block">
+          <table class="pnl-tbl nd-tbl">
+            <thead>
+              <tr>
+                <th>보고서명</th>
+                <th>설명</th>
+                <th>기간</th>
+                <th>크기</th>
+                <th>형식</th>
+                <th>다운로드</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in reportRows" :key="r.id">
+                <td>
+                  <i class="bi bi-file-earmark-text" style="color: #2563eb"></i>
+                  <strong>{{ r.t }}</strong>
+                </td>
+                <td>{{ r.d }}</td>
+                <td class="mono">{{ r.period }}</td>
+                <td class="mono">{{ r.size }}</td>
+                <td class="mono">{{ r.fmt }}</td>
+                <td>
+                  <button class="pnl-act sm" @click="downloadReport(r)">
+                    <i class="bi bi-download"></i> 다운로드
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-if="faultMsg" class="set-msg">{{ faultMsg }}</div>
       </section>
 
-      <section v-if="tab === 'settings'" class="card pnl">
-        <h3>설정</h3>
-        <div class="set-row">
-          <label>자동 재연결 시도</label
-          ><input type="checkbox" v-model="setAutoReconnect" />
+      <section v-if="tab === 'settings'" class="card pnl net-detail">
+        <div class="pnl-head">
+          <h3>설정</h3>
+          <div class="pnl-tools">
+            <button class="pnl-act" @click="resetSet">
+              <i class="bi bi-arrow-counterclockwise"></i> 기본값 복원
+            </button>
+            <button class="pnl-act"><i class="bi bi-download"></i> 설정 내보내기</button>
+          </div>
         </div>
-        <div class="set-row">
-          <label>지연 경고 임계값 (ms)</label
-          ><input type="number" v-model.number="setLatThreshold" min="50" max="1000" />
+
+        <!-- 1. 모니터링 / 알림 임계값 -->
+        <div class="nd-block">
+          <div class="nd-h"><h4>모니터링 / 알림 임계값</h4></div>
+          <div class="set-grid">
+            <div class="set-it">
+              <label>지연 경고 임계 (ms)</label>
+              <input type="number" v-model.number="setLatThreshold" min="50" max="1000" />
+              <span class="set-h">200 이상 시 HIGH 알람</span>
+            </div>
+            <div class="set-it">
+              <label>지연 위험 임계 (ms)</label>
+              <input type="number" v-model.number="setLatCritical" min="100" max="2000" />
+              <span class="set-h">초과 시 CRIT 알람</span>
+            </div>
+            <div class="set-it">
+              <label>패킷 손실 임계 (%)</label>
+              <input
+                type="number"
+                v-model.number="setLossThreshold"
+                min="0"
+                max="100"
+                step="0.1"
+              />
+              <span class="set-h">초과 시 HIGH 알람</span>
+            </div>
+            <div class="set-it">
+              <label>CPU 임계 (%)</label>
+              <input type="number" v-model.number="setCpuThreshold" min="50" max="100" />
+              <span class="set-h">초과 시 서버 경고</span>
+            </div>
+            <div class="set-it">
+              <label>메모리 임계 (%)</label>
+              <input type="number" v-model.number="setMemThreshold" min="50" max="100" />
+              <span class="set-h">초과 시 서버 경고</span>
+            </div>
+            <div class="set-it">
+              <label>디스크 임계 (%)</label>
+              <input type="number" v-model.number="setDiskThreshold" min="60" max="100" />
+              <span class="set-h">초과 시 서버 경고</span>
+            </div>
+          </div>
         </div>
-        <div class="set-row">
-          <label>알림 채널</label>
-          <select v-model="setChannel">
-            <option>이메일</option>
-            <option>SMS</option>
-            <option>슬랙</option>
-          </select>
+
+        <!-- 2. 알림 / 통보 -->
+        <div class="nd-block">
+          <div class="nd-h"><h4>알림 / 통보</h4></div>
+          <div class="set-grid">
+            <div class="set-it">
+              <label>주 알림 채널</label>
+              <select v-model="setChannel">
+                <option>이메일</option>
+                <option>SMS</option>
+                <option>슬랙</option>
+                <option>카카오워크</option>
+              </select>
+              <span class="set-h">{{ setChannelTarget }}</span>
+            </div>
+            <div class="set-it">
+              <label>중복 알림 억제 (분)</label>
+              <input type="number" v-model.number="setDedup" min="1" max="60" />
+              <span class="set-h">동일 알람 재발송 차단</span>
+            </div>
+            <div class="set-it set-toggle">
+              <label>야간 모드 (22:00~07:00)</label>
+              <input type="checkbox" v-model="setNightMode" />
+              <span class="set-h">CRIT만 알림, 나머지 보류</span>
+            </div>
+            <div class="set-it set-toggle">
+              <label>이메일 일일 요약</label>
+              <input type="checkbox" v-model="setDailyDigest" />
+              <span class="set-h">매일 08:00 발송</span>
+            </div>
+            <div class="set-it set-toggle">
+              <label>SMS 긴급 통보 (CRIT)</label>
+              <input type="checkbox" v-model="setSmsCrit" />
+              <span class="set-h">담당자 + 백업 담당자</span>
+            </div>
+            <div class="set-it set-toggle">
+              <label>슬랙 자동 전달</label>
+              <input type="checkbox" v-model="setSlackForward" />
+              <span class="set-h">#ops-alarm 채널</span>
+            </div>
+          </div>
         </div>
-        <button class="btn-save" @click="saveSet">
-          <i class="bi bi-check2"></i> 저장
-        </button>
-        <div v-if="setMsg" class="set-msg">{{ setMsg }}</div>
+
+        <!-- 3. 자동 처리 -->
+        <div class="nd-block">
+          <div class="nd-h"><h4>자동 처리</h4></div>
+          <div class="set-grid">
+            <div class="set-it set-toggle">
+              <label>자동 재연결 시도</label>
+              <input type="checkbox" v-model="setAutoReconnect" />
+              <span class="set-h">RTSP timeout 시 자동 재접속</span>
+            </div>
+            <div class="set-it">
+              <label>재연결 재시도 (회)</label>
+              <input type="number" v-model.number="setRetryCount" min="1" max="10" />
+              <span class="set-h">실패 시 알람 발생</span>
+            </div>
+            <div class="set-it">
+              <label>재연결 간격 (초)</label>
+              <input type="number" v-model.number="setRetryInterval" min="5" max="300" />
+              <span class="set-h">재시도 사이 대기</span>
+            </div>
+            <div class="set-it set-toggle">
+              <label>장애 자동 등록</label>
+              <input type="checkbox" v-model="setAutoFault" />
+              <span class="set-h">CRIT 알람 → 장애 티켓</span>
+            </div>
+            <div class="set-it set-toggle">
+              <label>로그 자동 로테이트</label>
+              <input type="checkbox" v-model="setAutoRotate" />
+              <span class="set-h">매일 02:00, 30일 보존</span>
+            </div>
+            <div class="set-it set-toggle">
+              <label>이상 시 자동 격리</label>
+              <input type="checkbox" v-model="setQuarantine" />
+              <span class="set-h">패킷 손실 50% 초과 시</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. 점검 / 백업 -->
+        <div class="nd-block">
+          <div class="nd-h"><h4>점검 / 백업</h4></div>
+          <div class="set-grid">
+            <div class="set-it">
+              <label>정기 점검 주기</label>
+              <select v-model="setCheckCycle">
+                <option>매주</option>
+                <option>격주</option>
+                <option>매월</option>
+              </select>
+              <span class="set-h">자동 일정 생성</span>
+            </div>
+            <div class="set-it">
+              <label>점검 시간대</label>
+              <select v-model="setCheckTime">
+                <option>02:00 ~ 04:00</option>
+                <option>03:00 ~ 05:00</option>
+                <option>04:00 ~ 06:00</option>
+              </select>
+              <span class="set-h">새벽 트래픽 최저 시간</span>
+            </div>
+            <div class="set-it">
+              <label>백업 보존 기간 (일)</label>
+              <input type="number" v-model.number="setBackupDays" min="7" max="365" />
+              <span class="set-h">초과분 자동 삭제</span>
+            </div>
+            <div class="set-it set-toggle">
+              <label>자동 백업</label>
+              <input type="checkbox" v-model="setAutoBackup" />
+              <span class="set-h">매일 03:00 풀백업</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. 보안 / 권한 -->
+        <div class="nd-block">
+          <div class="nd-h"><h4>보안 / 권한</h4></div>
+          <div class="set-grid">
+            <div class="set-it set-toggle">
+              <label>2단계 인증 (MFA)</label>
+              <input type="checkbox" v-model="setMfa" />
+              <span class="set-h">관리자 계정 강제</span>
+            </div>
+            <div class="set-it">
+              <label>세션 만료 (분)</label>
+              <input
+                type="number"
+                v-model.number="setSessionTimeout"
+                min="10"
+                max="480"
+              />
+              <span class="set-h">미사용 자동 로그아웃</span>
+            </div>
+            <div class="set-it">
+              <label>로그인 시도 제한</label>
+              <input type="number" v-model.number="setLoginAttempts" min="3" max="10" />
+              <span class="set-h">초과 시 계정 잠금</span>
+            </div>
+            <div class="set-it set-toggle">
+              <label>감사 로그 기록</label>
+              <input type="checkbox" v-model="setAuditLog" />
+              <span class="set-h">모든 관리자 액션 기록</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 저장 액션 -->
+        <div class="set-actions">
+          <button class="btn-save" @click="saveSet">
+            <i class="bi bi-check2"></i> 변경 사항 저장
+          </button>
+          <span v-if="setMsg" class="set-msg" style="margin: 0 0 0 12px">{{
+            setMsg
+          }}</span>
+        </div>
       </section>
     </div>
     <!-- ============ 카메라 상세 모달 ============ -->
@@ -948,15 +1754,36 @@
       <div class="cam-modal alarm-modal" @click.stop>
         <div class="cm-h">
           <div class="cm-title">
-            <i :class="alarmModal.kind === 'recovered' ? 'bi bi-check-circle-fill'
-                     : alarmModal.kind === 'info' ? 'bi bi-info-circle-fill'
-                     : 'bi bi-exclamation-triangle-fill'"
-               :style="{color: alarmModal.kind === 'recovered' ? '#059669'
-                              : alarmModal.kind === 'info' ? '#2563eb' : '#dc2626'}"></i>
+            <i
+              :class="
+                alarmModal.kind === 'recovered'
+                  ? 'bi bi-check-circle-fill'
+                  : alarmModal.kind === 'info'
+                  ? 'bi bi-info-circle-fill'
+                  : 'bi bi-exclamation-triangle-fill'
+              "
+              :style="{
+                color:
+                  alarmModal.kind === 'recovered'
+                    ? '#059669'
+                    : alarmModal.kind === 'info'
+                    ? '#2563eb'
+                    : '#dc2626',
+              }"
+            ></i>
             <span>알람 상세</span>
-            <span class="stat" :class="alarmModal.sev.toLowerCase() === 'crit' ? 'no'
-                                      : alarmModal.sev.toLowerCase() === 'high' || alarmModal.sev.toLowerCase() === 'med' ? 'wn'
-                                      : 'ok'">{{ alarmModal.sev }}</span>
+            <span
+              class="stat"
+              :class="
+                alarmModal.sev.toLowerCase() === 'crit'
+                  ? 'no'
+                  : alarmModal.sev.toLowerCase() === 'high' ||
+                    alarmModal.sev.toLowerCase() === 'med'
+                  ? 'wn'
+                  : 'ok'
+              "
+              >{{ alarmModal.sev }}</span
+            >
           </div>
           <button class="cm-x" @click="alarmModal = null" aria-label="닫기">
             <i class="bi bi-x-lg"></i>
@@ -964,29 +1791,164 @@
         </div>
         <div class="am-body">
           <div class="am-msg">{{ alarmModal.msg }}</div>
-          <div class="cm-row"><span>발생 시각</span><strong>{{ alarmModal.time }}</strong></div>
-          <div class="cm-row"><span>장비</span><strong>{{ alarmModal.dev }}</strong></div>
-          <div class="cm-row"><span>심각도</span><strong>{{ alarmModal.sev }}</strong></div>
-          <div class="cm-row"><span>담당자</span><strong>{{ alarmModal.who }}</strong></div>
-          <div class="cm-row"><span>유형</span><strong>{{
-            alarmModal.kind === 'recovered' ? '복구'
-            : alarmModal.kind === 'info' ? '정보' : '이벤트' }}</strong></div>
+          <div class="cm-row">
+            <span>발생 시각</span><strong>{{ alarmModal.time }}</strong>
+          </div>
+          <div class="cm-row">
+            <span>경과 시간 (SLA)</span>
+            <strong class="am-sla" :class="slaClass(alarmModal)">
+              <i class="bi bi-stopwatch"></i> {{ slaText(alarmModal) }}
+            </strong>
+          </div>
+          <div class="cm-row">
+            <span>장비</span><strong>{{ alarmModal.dev }}</strong>
+          </div>
+          <div class="cm-row">
+            <span>심각도</span><strong>{{ alarmModal.sev }}</strong>
+          </div>
+          <div class="cm-row">
+            <span>담당자</span><strong>{{ alarmModal.who }}</strong>
+          </div>
+          <div class="cm-row">
+            <span>유형</span
+            ><strong>{{
+              alarmModal.kind === "recovered"
+                ? "복구"
+                : alarmModal.kind === "info"
+                ? "정보"
+                : "이벤트"
+            }}</strong>
+          </div>
           <div class="cm-actions">
-            <button class="ab bl"><i class="bi bi-arrow-right-circle"></i> 처리 시작</button>
+            <button class="ab bl">
+              <i class="bi bi-arrow-right-circle"></i> 처리 시작
+            </button>
             <button class="ab gy"><i class="bi bi-share"></i> 담당자 변경</button>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- ═══ 네트워크 장비 상세 모달 ═══ -->
+    <div v-if="netModal" class="cam-modal-bg" @click="netModal = null">
+      <div class="cam-modal alarm-modal" @click.stop>
+        <div class="cm-h">
+          <div class="cm-title">
+            <i
+              class="bi bi-hdd-network-fill"
+              :style="{
+                color:
+                  netModal.tone === 'gr'
+                    ? '#047857'
+                    : netModal.tone === 'yl'
+                    ? '#b45309'
+                    : netModal.tone === 'or'
+                    ? '#c2410c'
+                    : '#dc2626',
+              }"
+            ></i>
+            <span>네트워크 장비 상세</span>
+            <span class="stat" :class="netStatTone(netModal.tone)">{{
+              netLabel(netModal.tone)
+            }}</span>
+          </div>
+          <button class="cm-x" @click="netModal = null" aria-label="닫기">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <div class="am-body">
+          <div class="am-msg">{{ netModal.id }}</div>
+          <div class="cm-row">
+            <span>장비 ID</span><strong>{{ netModal.id }}</strong>
+          </div>
+          <div class="cm-row">
+            <span>현재 RTT</span><strong>{{ netModal.ms }} ms</strong>
+          </div>
+          <div class="cm-row">
+            <span>상태</span>
+            <strong
+              >{{ netLabel(netModal.tone)
+              }}{{ netModal.ms > 200 ? " (임계 200ms 초과)" : "" }}</strong
+            >
+          </div>
+          <div class="cm-row">
+            <span>패킷 손실</span>
+            <strong>{{
+              netModal.tone === "rd" ? "100%" : netModal.tone === "or" ? "12%" : "0%"
+            }}</strong>
+          </div>
+          <div class="cm-row">
+            <span>업타임</span>
+            <strong>{{
+              netModal.tone === "rd"
+                ? "0% (오프라인)"
+                : netModal.tone === "or"
+                ? "98.4%"
+                : "99.97%"
+            }}</strong>
+          </div>
+          <div class="cm-row">
+            <span>마지막 응답</span>
+            <strong>{{
+              netModal.tone === "rd"
+                ? "12분 전"
+                : netModal.tone === "or"
+                ? "8초 전"
+                : "< 1초 전"
+            }}</strong>
+          </div>
+          <div class="cm-row">
+            <span>구역</span>
+            <strong>{{
+              netModal.id.startsWith("CAM-K")
+                ? "강변북로"
+                : netModal.id.startsWith("CAM-O")
+                ? "올림픽대로"
+                : netModal.id.startsWith("CAM-J")
+                ? "내부순환"
+                : netModal.id.startsWith("CAM-D")
+                ? "동부간선"
+                : netModal.id.startsWith("CAM-G")
+                ? "강남대로"
+                : netModal.id.startsWith("CAM-M")
+                ? "마포대교"
+                : netModal.id.startsWith("CAM-N")
+                ? "내부순환"
+                : netModal.id.startsWith("EDGE")
+                ? "Edge 라우터"
+                : netModal.id.startsWith("CORE")
+                ? "Core 백본"
+                : netModal.id.startsWith("ocr")
+                ? "OCR 서버 팜"
+                : netModal.id.startsWith("NSN")
+                ? "한남TG 광케이블"
+                : "—"
+            }}</strong>
+          </div>
+          <div class="cm-actions">
+            <button class="ab bl"><i class="bi bi-arrow-clockwise"></i> 재연결</button>
+            <button class="ab gy"><i class="bi bi-graph-up"></i> 24h 그래프</button>
+            <button
+              class="ab gy"
+              @click="
+                tab = 'net';
+                netModal = null;
+              "
+            >
+              <i class="bi bi-arrow-right-circle"></i> 전체 보기
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
+import echarts from "@/composables/echartsSetup";
 import { RouterLink } from "vue-router";
 import DeptSwitcher from "@/components/dashboard/DeptSwitcher.vue";
-import SideWeather from "@/components/dashboard/SideWeather.vue";
 
 const tab = ref("status");
 const autoRefresh = ref(true);
@@ -1006,7 +1968,9 @@ function openCam(c) {
 
 // 알람 상세 모달
 const alarmModal = ref(null);
-function openAlarm(a) { alarmModal.value = a; }
+function openAlarm(a) {
+  alarmModal.value = a;
+}
 const camQuery = ref("");
 const camSt = ref("all");
 const filteredCams = computed(() => {
@@ -1031,6 +1995,381 @@ if (typeof window !== "undefined") {
 }
 
 const tlFilter = ref("ALL");
+const netZone = ref("all");
+const netRange = ref("1h");
+const sideOpen = ref(true);
+const srvRange = ref("1h");
+const srvServices = Object.freeze([
+  {
+    name: "nginx",
+    host: "ocr-srv-01",
+    port: 443,
+    pid: 1234,
+    ver: "1.24.0",
+    rt: "12ms",
+    uptime: "37일 2h",
+    lastRestart: "2025-04-12 03:00",
+    stat: "RUNNING",
+    statTone: "ok",
+    tone: "gr",
+  },
+  {
+    name: "ocr-engine",
+    host: "ocr-srv-01",
+    port: 8080,
+    pid: 1842,
+    ver: "v3.2.1",
+    rt: "48ms",
+    uptime: "37일 2h",
+    lastRestart: "2025-04-12 03:05",
+    stat: "RUNNING",
+    statTone: "ok",
+    tone: "gr",
+  },
+  {
+    name: "redis",
+    host: "ocr-srv-01",
+    port: 6379,
+    pid: 1956,
+    ver: "7.2.4",
+    rt: "2ms",
+    uptime: "37일 2h",
+    lastRestart: "2025-04-12 03:00",
+    stat: "RUNNING",
+    statTone: "ok",
+    tone: "gr",
+  },
+]);
+const netModal = ref(null);
+
+// ─── ECharts (서버 게이지 + 네트워크 막대) ───
+const netChartEl = ref(null);
+let netChart = null;
+const srvCharts = new Map();
+
+function srvGaugeOption(b) {
+  const val = parseFloat(String(b.v).replace(/[^\d.]/g, "")) || b.bar || 0;
+  const tone = b.tone || "gr";
+  const gradMap = {
+    gr: ["#6ee7b7", "#047857"],
+    yl: ["#fde68a", "#b45309"],
+    rd: ["#fca5a5", "#b91c1c"],
+  };
+  const [c1, c2] = gradMap[tone] || gradMap.gr;
+  const isSlash = String(b.v).includes("/");
+  return {
+    series: [
+      {
+        type: "gauge",
+        startAngle: 90,
+        endAngle: -270,
+        radius: "92%",
+        pointer: { show: false },
+        progress: {
+          show: true,
+          overlap: false,
+          roundCap: true,
+          clip: false,
+          width: 12,
+          itemStyle: {
+            color: {
+              type: "linear",
+              x: 0,
+              y: 0,
+              x2: 1,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: c1 },
+                { offset: 1, color: c2 },
+              ],
+            },
+            shadowColor: c2 + "66",
+            shadowBlur: 12,
+            shadowOffsetY: 0,
+          },
+        },
+        axisLine: {
+          lineStyle: {
+            width: 12,
+            color: [[1, "#eff3f8"]],
+            shadowColor: "rgba(12,31,64,0.08)",
+            shadowBlur: 4,
+            shadowOffsetY: 2,
+          },
+        },
+        splitLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { show: false },
+        anchor: { show: false },
+        data: [{ value: val }],
+        title: { show: false },
+        detail: {
+          valueAnimation: true,
+          offsetCenter: [0, "0%"],
+          fontSize: 26,
+          fontWeight: 800,
+          fontFamily: "IBM Plex Mono, monospace",
+          color: "#0c1f40",
+          formatter: () => (isSlash ? b.v : val.toFixed(val % 1 ? 1 : 0) + "%"),
+        },
+        animationDuration: 1400,
+        animationEasing: "cubicOut",
+      },
+    ],
+  };
+}
+
+function setSrvChart(el, b) {
+  if (!el) return;
+  // 컨테이너 사이즈가 0이면 다음 프레임에 재시도
+  const tryInit = () => {
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    if (w === 0 || h === 0) {
+      requestAnimationFrame(tryInit);
+      return;
+    }
+    if (!srvCharts.has(el)) {
+      const ch = echarts.init(el, null, { renderer: "canvas" });
+      ch.setOption(srvGaugeOption(b));
+      srvCharts.set(el, ch);
+      // 컨테이너 사이즈 변경 감지
+      const ro = new ResizeObserver(() => {
+        ch.resize();
+      });
+      ro.observe(el);
+    } else {
+      srvCharts.get(el).setOption(srvGaugeOption(b));
+      srvCharts.get(el).resize();
+    }
+  };
+  nextTick(tryInit);
+}
+
+function initNetChart() {
+  if (!netChartEl.value) return;
+  const el = netChartEl.value;
+  if (el.clientWidth === 0 || el.clientHeight === 0) {
+    requestAnimationFrame(initNetChart);
+    return;
+  }
+  if (!netChart) {
+    netChart = echarts.init(el, null, { renderer: "canvas" });
+    const ro = new ResizeObserver(() => netChart && netChart.resize());
+    ro.observe(el);
+    // 막대 클릭 → 구역 상세 모달
+    netChart.on("click", "series", (params) => {
+      const z = netZones.find((n) => n.name === params.name);
+      if (z) netModal.value = { id: z.name, ms: z.ms, tone: z.tone };
+    });
+    // 막대 위 hover 시 cursor pointer
+    netChart.getZr().on("mousemove", (ev) => {
+      const target = ev.target;
+      el.style.cursor = target ? "pointer" : "default";
+    });
+  }
+  const zones = netZones || [];
+  const toneGrad = {
+    gr: ["#34d399", "#047857"],
+    yl: ["#fbbf24", "#b45309"],
+    or: ["#fb923c", "#c2410c"],
+    rd: ["#f87171", "#b91c1c"],
+  };
+  netChart.setOption({
+    grid: { left: 44, right: 14, top: 32, bottom: 44 },
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: "rgba(12,31,64,0.95)",
+      borderWidth: 0,
+      padding: [8, 12],
+      textStyle: {
+        color: "#ffffff",
+        fontSize: 13,
+        fontFamily: "Inter, Pretendard, sans-serif",
+      },
+      axisPointer: {
+        type: "shadow",
+        shadowStyle: { color: "rgba(37,99,235,0.08)" },
+      },
+      formatter: (p) => {
+        const d = p[0];
+        const t = (zones.find((z) => z.name === d.name) || {}).tone || "gr";
+        const label =
+          t === "rd" ? "장애" : t === "or" ? "경고" : t === "yl" ? "지연" : "정상";
+        return `<div style="font-weight:800;font-size:13px;margin-bottom:4px">${d.name}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:800">${d.value}<span style="font-size:11px;opacity:.7;margin-left:2px">ms</span></div>
+                <div style="font-size:11px;opacity:.85;margin-top:2px">상태 · ${label}</div>`;
+      },
+    },
+    xAxis: {
+      type: "category",
+      data: zones.map((z) => z.name),
+      axisLine: { lineStyle: { color: "#c9d4e3" } },
+      axisLabel: {
+        color: "#0c1f40",
+        fontSize: 13.5,
+        fontWeight: 700,
+        fontFamily: "Inter, Pretendard, sans-serif",
+        interval: 0,
+        margin: 10,
+      },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: "value",
+      max: 300,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: {
+        color: "#6b7a92",
+        fontSize: 12.5,
+        fontFamily: "IBM Plex Mono, monospace",
+        formatter: "{value}",
+      },
+      splitLine: { lineStyle: { color: "#e7edf6", type: "dashed" } },
+    },
+    series: [
+      {
+        type: "bar",
+        z: 1,
+        data: zones.map((z) => ({
+          value: z.ms,
+          itemStyle: {
+            color: {
+              type: "linear",
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: (toneGrad[z.tone] || toneGrad.gr)[0] },
+                { offset: 1, color: (toneGrad[z.tone] || toneGrad.gr)[1] },
+              ],
+            },
+            borderRadius: [6, 6, 0, 0],
+            shadowColor: (toneGrad[z.tone] || toneGrad.gr)[1] + "55",
+            shadowBlur: 10,
+            shadowOffsetY: 2,
+          },
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 18,
+              shadowOffsetY: 0,
+            },
+          },
+        })),
+        barWidth: "60%",
+        markLine: {
+          silent: true,
+          symbol: "none",
+          lineStyle: { type: "dashed", color: "#b91c1c", width: 1.4, opacity: 0.75 },
+          data: [
+            {
+              yAxis: 200,
+              label: {
+                show: true,
+                color: "#b91c1c",
+                fontSize: 11.5,
+                fontWeight: 700,
+                formatter: "임계 200ms",
+                position: "insideStartTop",
+              },
+            },
+          ],
+        },
+        label: {
+          show: true,
+          position: "top",
+          color: "#0c1f40",
+          fontSize: 13.5,
+          fontWeight: 800,
+          fontFamily: "IBM Plex Mono, monospace",
+          formatter: "{c}",
+        },
+        animationDuration: 1200,
+        animationEasing: "cubicOut",
+        animationDelay: (i) => i * 80,
+      },
+    ],
+  });
+}
+
+function resizeAllCharts() {
+  if (netChart) netChart.resize();
+  srvCharts.forEach((c) => c.resize());
+}
+
+onMounted(() => {
+  nextTick(() => {
+    initNetChart();
+    window.addEventListener("resize", resizeAllCharts);
+  });
+});
+
+// tab이 status로 돌아올 때 차트 재초기화 (v-if로 DOM이 새로 마운트되므로)
+watch(tab, (v) => {
+  if (v === "status") {
+    if (netChart) { netChart.dispose(); netChart = null; }
+    srvCharts.forEach((c) => c.dispose());
+    srvCharts.clear();
+    nextTick(() => initNetChart());
+  }
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", resizeAllCharts);
+  if (netChart) {
+    netChart.dispose();
+    netChart = null;
+  }
+  srvCharts.forEach((c) => c.dispose());
+  srvCharts.clear();
+});
+watch(
+  () => netModal.value,
+  () => nextTick(resizeAllCharts)
+);
+
+function netLabel(t) {
+  return t === "gr" ? "정상" : t === "yl" ? "지연" : t === "or" ? "경고" : "장애";
+}
+function netStatTone(t) {
+  return t === "gr" ? "ok" : t === "yl" || t === "or" ? "wn" : "no";
+}
+// 알람 카테고리별 분포 (24h)
+const alarmCats = Object.freeze([
+  { name: "네트워크", crit: 1, high: 2, med: 1, info: 3 },
+  { name: "카메라", crit: 1, high: 2, med: 2, info: 4 },
+  { name: "서버", crit: 0, high: 1, med: 3, info: 2 },
+]);
+
+// 장애 유형 분포 (최근 7일)
+const faultTypes = Object.freeze([
+  { name: "네트워크 단선", count: 6, ongoing: 1, mttr: 24 },
+  { name: "카메라 오프라인", count: 5, ongoing: 0, mttr: 12 },
+  { name: "서버 리소스", count: 4, ongoing: 0, mttr: 8 },
+]);
+
+// 카메라 위치별 분포 (cams 탭용)
+const camZones = Object.freeze([
+  { name: "강변북로", ok: 5, warn: 0, bad: 0 },
+  { name: "올림픽대로", ok: 4, warn: 0, bad: 0 },
+  { name: "내부순환", ok: 3, warn: 1, bad: 0 },
+]);
+
+// 구역별 평균 지연 (대시보드 요약 막대용)
+const netZones = Object.freeze([
+  { name: "강변북로", ms: 86, tone: "gr" },
+  { name: "올림픽", ms: 92, tone: "gr" },
+  { name: "내부순환", ms: 124, tone: "yl" },
+]);
+
+// 25개 노드 헬스 그리드 (대시보드 요약용)
+const netGrid = Object.freeze([
+  { id: "CAM-K-014", ms: 78, tone: "gr" },
+  { id: "CAM-K-015", ms: 82, tone: "gr" },
+  { id: "CAM-O-011", ms: 91, tone: "gr" },
+]);
+
 const netPaths = Object.freeze([
   {
     from: "GBN-S-0032",
@@ -1058,51 +2397,6 @@ const netPaths = Object.freeze([
     loss: 100,
     st: "장애",
     tone: "no",
-  },
-  {
-    from: "GBS-E-0055",
-    to: "ocr-srv-02",
-    lat: 19.4,
-    avg: 20.1,
-    loss: 0.0,
-    st: "정상",
-    tone: "ok",
-  },
-  {
-    from: "DBG-N-0060",
-    to: "ocr-srv-01",
-    lat: 18.9,
-    avg: 19.7,
-    loss: 0.0,
-    st: "정상",
-    tone: "ok",
-  },
-  {
-    from: "GBG-S-0077",
-    to: "ocr-srv-02",
-    lat: 286,
-    avg: 142.3,
-    loss: 1.8,
-    st: "지연",
-    tone: "wn",
-  },
-  {
-    from: "BBG-E-0088",
-    to: "ocr-srv-01",
-    lat: 102,
-    avg: 98.4,
-    loss: 0.0,
-    st: "정상",
-    tone: "ok",
-  },
-  {
-    from: "SBG-S-0099",
-    to: "ocr-srv-02",
-    lat: 109,
-    avg: 105.2,
-    loss: 0.0,
-    st: "정상",
-    tone: "ok",
   },
 ]);
 
@@ -1140,61 +2434,6 @@ const alarmsExt = Object.freeze([
     msg: "디스크 사용량 78% 경고",
     who: "—",
     handled: false,
-  },
-  {
-    id: 4,
-    time: "13:55:18",
-    sev: "INFO",
-    tone: "ok",
-    cat: "복구",
-    dev: "CAM-IC-0011",
-    msg: "연결 복구 (재기동 후 정상)",
-    who: "이대리",
-    handled: true,
-  },
-  {
-    id: 5,
-    time: "13:30:01",
-    sev: "INFO",
-    tone: "ok",
-    cat: "시스템",
-    dev: "NET-CORE-1",
-    msg: "라우팅 테이블 재구성 완료",
-    who: "—",
-    handled: true,
-  },
-  {
-    id: 6,
-    time: "12:48:22",
-    sev: "MED",
-    tone: "wn",
-    cat: "카메라",
-    dev: "GBN-S-0032",
-    msg: "이미지 노이즈 임계치 초과 (자동필터)",
-    who: "자동",
-    handled: true,
-  },
-  {
-    id: 7,
-    time: "11:15:09",
-    sev: "INFO",
-    tone: "ok",
-    cat: "복구",
-    dev: "OLP-W-0041",
-    msg: "전원 차단 후 복구",
-    who: "박과장",
-    handled: true,
-  },
-  {
-    id: 8,
-    time: "10:32:11",
-    sev: "CRIT",
-    tone: "no",
-    cat: "보안",
-    dev: "FW-EDGE-1",
-    msg: "비정상 패킷 다수 감지 (차단 처리)",
-    who: "보안팀",
-    handled: true,
   },
 ]);
 const filteredAlarmExt = computed(() =>
@@ -1235,61 +2474,6 @@ const checksExt = Object.freeze([
     st: "예정",
     tone: "wait",
   },
-  {
-    id: 4,
-    date: "2026-05-23 02:30",
-    type: "임시",
-    dev: "NSN-N-0023",
-    who: "김기사",
-    dur: "20분",
-    scope: "카메라 1대",
-    st: "예정",
-    tone: "wait",
-  },
-  {
-    id: 5,
-    date: "2026-05-17 02:00",
-    type: "정기",
-    dev: "search-srv",
-    who: "이대리",
-    dur: "35분",
-    scope: "검색 일시 중단",
-    st: "완료",
-    tone: "ok",
-  },
-  {
-    id: 6,
-    date: "2026-05-15 03:00",
-    type: "정기",
-    dev: "ocr-srv-02",
-    who: "김기사",
-    dur: "30분",
-    scope: "Standby 점검",
-    st: "완료",
-    tone: "ok",
-  },
-  {
-    id: 7,
-    date: "2026-05-14 02:00",
-    type: "임시",
-    dev: "BBG-E-0088",
-    who: "박과장",
-    dur: "15분",
-    scope: "카메라 1대",
-    st: "완료",
-    tone: "ok",
-  },
-  {
-    id: 8,
-    date: "2026-05-13 23:00",
-    type: "긴급",
-    dev: "FW-EDGE-1",
-    who: "보안팀",
-    dur: "50분",
-    scope: "외부 트래픽 5분 차단",
-    st: "지연",
-    tone: "wn",
-  },
 ]);
 
 const faults = Object.freeze([
@@ -1329,66 +2513,6 @@ const faults = Object.freeze([
     st: "처리 중",
     stTone: "wn",
   },
-  {
-    id: "FLT-2026-00339",
-    time: "06:55:20",
-    dev: "OLP-W-0041",
-    symp: "전원 차단",
-    sev: "HIGH",
-    tone: "wn",
-    who: "박과장",
-    elapsed: "—",
-    st: "복구 완료",
-    stTone: "ok",
-  },
-  {
-    id: "FLT-2026-00338",
-    time: "05:02:48",
-    dev: "CAM-IC-0011",
-    symp: "신호 단절",
-    sev: "MED",
-    tone: "wn",
-    who: "김기사",
-    elapsed: "—",
-    st: "복구 완료",
-    stTone: "ok",
-  },
-  {
-    id: "FLT-2026-00337",
-    time: "04:30:12",
-    dev: "FW-EDGE-1",
-    symp: "비정상 패킷 감지",
-    sev: "CRIT",
-    tone: "no",
-    who: "보안팀",
-    elapsed: "—",
-    st: "복구 완료",
-    stTone: "ok",
-  },
-  {
-    id: "FLT-2026-00336",
-    time: "02:14:09",
-    dev: "DB-PRIMARY",
-    symp: "슬로 쿼리 다수",
-    sev: "MED",
-    tone: "wn",
-    who: "이대리",
-    elapsed: "—",
-    st: "복구 완료",
-    stTone: "ok",
-  },
-  {
-    id: "FLT-2026-00335",
-    time: "01:08:44",
-    dev: "NET-CORE-1",
-    symp: "라우팅 플랩",
-    sev: "HIGH",
-    tone: "wn",
-    who: "박과장",
-    elapsed: "—",
-    st: "복구 완료",
-    stTone: "ok",
-  },
 ]);
 
 const alarmsTimeline = Object.freeze([
@@ -1419,43 +2543,51 @@ const alarmsTimeline = Object.freeze([
     msg: "디스크 사용량 78% 경고",
     who: "—",
   },
-  {
-    id: 4,
-    time: "13:55:18",
-    kind: "recovered",
-    sev: "-",
-    dev: "CAM-IC-0011",
-    msg: "연결 복구 (재기동 후 정상)",
-    who: "이대리",
-  },
-  {
-    id: 5,
-    time: "13:30:01",
-    kind: "info",
-    sev: "-",
-    dev: "NET-CORE-1",
-    msg: "라우팅 테이블 재구성 완료",
-    who: "—",
-  },
-  {
-    id: 6,
-    time: "12:48:22",
-    kind: "event",
-    sev: "MED",
-    dev: "GBN-S-0032",
-    msg: "이미지 노이즈 임계치 초과 (자동필터)",
-    who: "자동",
-  },
-  {
-    id: 7,
-    time: "11:15:09",
-    kind: "recovered",
-    sev: "-",
-    dev: "OLP-W-0041",
-    msg: "전원 차단 후 복구",
-    who: "박과장",
-  },
 ]);
+// 시연용 현재 시각 (헤더 14:32:18 기준) — 1초마다 tick
+const nowSec = ref(14 * 3600 + 32 * 60 + 18);
+let nowTimer = null;
+onMounted(() => {
+  nowTimer = setInterval(() => {
+    nowSec.value += 1;
+  }, 1000);
+});
+onBeforeUnmount(() => {
+  if (nowTimer) clearInterval(nowTimer);
+});
+
+function alarmSec(t) {
+  const [h, m, s] = t.split(":").map(Number);
+  return h * 3600 + m * 60 + s;
+}
+function formatElapsed(sec) {
+  if (sec < 60) return `${sec}초`;
+  if (sec < 3600) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return s === 0 ? `${m}분` : `${m}분 ${s}초`;
+  }
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return `${h}시간 ${m}분`;
+}
+function slaTone(sec) {
+  if (sec < 5 * 60) return "warn";
+  if (sec < 15 * 60) return "high";
+  return "crit";
+}
+function slaText(a) {
+  const elapsed = nowSec.value - alarmSec(a.time);
+  if (elapsed < 0) return "—";
+  return formatElapsed(elapsed);
+}
+function slaClass(a) {
+  if (a.kind !== "event") return "resolved";
+  const elapsed = nowSec.value - alarmSec(a.time);
+  if (elapsed < 0) return "";
+  return slaTone(elapsed);
+}
+
 const filteredAlarms = computed(() => {
   if (tlFilter.value === "ALL") return alarmsTimeline;
   if (tlFilter.value === "INFO")
@@ -1502,51 +2634,6 @@ const cams = Object.freeze([
     ts: "10:24:17",
     id: "NSN-N-0023",
   },
-  {
-    name: "서울TG_4번부스_A1",
-    loc: "경부 13K+450",
-    st: "정상",
-    stTone: "ok",
-    lat: 112,
-    ts: "10:32:16",
-    id: "GBS-E-0055",
-  },
-  {
-    name: "수락산_분기_D3",
-    loc: "동부간선 22K+700",
-    st: "정상",
-    stTone: "ok",
-    lat: 88,
-    ts: "10:32:09",
-    id: "DBG-N-0060",
-  },
-  {
-    name: "잠원IC_본선_B2",
-    loc: "경부 02K+050",
-    st: "지연",
-    stTone: "wn",
-    lat: 286,
-    ts: "10:31:42",
-    id: "GBG-S-0077",
-  },
-  {
-    name: "월계분기점_C1",
-    loc: "북부간선 06K+300",
-    st: "정상",
-    stTone: "ok",
-    lat: 102,
-    ts: "10:31:55",
-    id: "BBG-E-0088",
-  },
-  {
-    name: "금천IC_본선_A3",
-    loc: "서부간선 11K+900",
-    st: "정상",
-    stTone: "ok",
-    lat: 109,
-    ts: "10:32:01",
-    id: "SBG-S-0099",
-  },
 ]);
 
 const servers = Object.freeze([
@@ -1560,19 +2647,6 @@ const servers = Object.freeze([
       { l: "CPU", v: "34.2%", bar: 34, color: "#6fa581", tone: "" },
       { l: "메모리", v: "43.7%", bar: 44, color: "#6fa581", tone: "" },
       { l: "디스크", v: "38.1%", bar: 38, color: "#6fa581", tone: "" },
-      { l: "서비스", v: "5/5", bar: 100, color: "#6fa581", tone: "" },
-    ],
-  },
-  {
-    name: "ocr-srv-02",
-    tag: "Standby",
-    ip: "10.20.10.12",
-    st: "정상",
-    stTone: "ok",
-    bars: [
-      { l: "CPU", v: "21.5%", bar: 22, color: "#6fa581", tone: "" },
-      { l: "메모리", v: "40.9%", bar: 41, color: "#6fa581", tone: "" },
-      { l: "디스크", v: "34.6%", bar: 35, color: "#6fa581", tone: "" },
       { l: "서비스", v: "5/5", bar: 100, color: "#6fa581", tone: "" },
     ],
   },
@@ -1616,14 +2690,6 @@ const alarms = Object.freeze([
     tone: "wn",
     msg: "지연 286ms 초과",
   },
-  {
-    id: 4,
-    time: "09:30:48",
-    dev: "NET-CORE-1",
-    sev: "정보",
-    tone: "ok",
-    msg: "경로 재구성 완료",
-  },
 ]);
 const checks = Object.freeze([
   {
@@ -1655,15 +2721,252 @@ const checks = Object.freeze([
   },
 ]);
 const reportRows = Object.freeze([
-  { t: "장비 가동률 보고서", d: "2026-05-17 생성" },
-  { t: "장애 발생 이력", d: "최근 30일 누적" },
-  { t: "네트워크 지연 분석", d: "주간 분석 보고서" },
+  {
+    id: "cams",
+    t: "장비 가동률 보고서",
+    d: "카메라 25대 24시간 가동률·OCR 신뢰도",
+    period: "2026-05-17",
+    size: "1.8MB",
+    fmt: "CSV",
+  },
+  {
+    id: "faults",
+    t: "장애 발생 이력",
+    d: "최근 30일 장애 21건 · MTTR·MTBF 분석",
+    period: "2026-04-17 ~ 2026-05-17",
+    size: "3.2MB",
+    fmt: "CSV",
+  },
+  {
+    id: "net",
+    t: "네트워크 지연 분석",
+    d: "경로 25개 RTT·패킷손실·업타임 주간 추이",
+    period: "2026-05-11 ~ 2026-05-17",
+    size: "2.4MB",
+    fmt: "CSV",
+  },
 ]);
+
+// CSV 생성 + 다운로드 트리거
+function buildCsv(rows) {
+  return rows
+    .map((r) =>
+      r
+        .map((v) => {
+          const s = String(v ?? "");
+          return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        })
+        .join(",")
+    )
+    .join("\n");
+}
+
+function downloadCsv(filename, rows) {
+  const csv = "﻿" + buildCsv(rows); // UTF-8 BOM (한글 Excel 호환)
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+
+function downloadReport(r) {
+  const today = new Date().toISOString().slice(0, 10);
+  let rows = [];
+  let filename = `${r.id}_${today}.csv`;
+
+  if (r.id === "cams") {
+    rows = [
+      [
+        "장비ID",
+        "카메라명",
+        "위치",
+        "상태",
+        "지연(ms)",
+        "가동률(%)",
+        "OCR 신뢰도(%)",
+        "마지막 응답",
+      ],
+    ];
+    cams.forEach((c, i) => {
+      rows.push([
+        c.id,
+        c.name,
+        c.loc,
+        c.st,
+        c.lat,
+        c.st === "장애" ? 0 : (95 + (i % 5)).toFixed(1),
+        c.st === "장애" ? "-" : 88 + (i % 11),
+        c.ts,
+      ]);
+    });
+  } else if (r.id === "faults") {
+    rows = [["장애ID", "발생시각", "장비", "증상", "심각도", "담당자", "경과", "상태"]];
+    faults.forEach((f) =>
+      rows.push([f.id, f.time, f.dev, f.symp, f.sev, f.who, f.elapsed, f.st])
+    );
+  } else if (r.id === "net") {
+    rows = [
+      [
+        "경로ID",
+        "출발",
+        "도착",
+        "현재RTT",
+        "24h평균(ms)",
+        "최대(ms)",
+        "패킷손실(%)",
+        "업타임(%)",
+        "마지막응답",
+        "상태",
+      ],
+    ];
+    netPaths.forEach((p, i) => {
+      rows.push([
+        `PATH-${String(i + 1).padStart(3, "0")}`,
+        p.from,
+        p.to,
+        p.lat,
+        p.avg,
+        Math.round(p.avg * 1.6),
+        p.loss,
+        p.tone === "bad" ? "0.0" : p.tone === "warn" ? "98.4" : "99.97",
+        p.tone === "bad" ? "12분 전" : p.tone === "warn" ? "8초 전" : "< 1초 전",
+        p.st,
+      ]);
+    });
+  } else if (r.id === "alarms") {
+    rows = [["발생시각", "심각도", "구분", "장비", "메시지", "담당자", "상태"]];
+    alarmsExt.forEach((a) =>
+      rows.push([
+        a.time,
+        a.sev,
+        a.cat,
+        a.dev,
+        a.msg,
+        a.who,
+        a.handled ? "처리됨" : "진행중",
+      ])
+    );
+  } else if (r.id === "srv") {
+    rows = [
+      [
+        "서버명",
+        "IP",
+        "상태",
+        "가동일수",
+        "CPU(%)",
+        "메모리(%)",
+        "디스크(%)",
+        "온도(°C)",
+      ],
+    ];
+    servers.forEach((s, i) => {
+      const cpu = s.bars.find((b) => b.l === "CPU")?.bar ?? "-";
+      const mem = s.bars.find((b) => b.l === "메모리")?.bar ?? "-";
+      const disk = s.bars.find((b) => b.l === "디스크")?.bar ?? "-";
+      rows.push([
+        s.name,
+        s.ip,
+        s.st,
+        [37, 37, 12][i],
+        cpu,
+        mem,
+        disk,
+        ["58", "52", "64"][i],
+      ]);
+    });
+  }
+
+  downloadCsv(filename, rows);
+  faultMsg.value = `${r.t} 다운로드 완료 — ${filename}`;
+  setTimeout(() => {
+    faultMsg.value = "";
+  }, 2500);
+}
 const faultMsg = ref("");
-const setAutoReconnect = ref(true);
+// 모니터링 / 알림 임계값
 const setLatThreshold = ref(200);
+const setLatCritical = ref(500);
+const setLossThreshold = ref(5);
+const setCpuThreshold = ref(85);
+const setMemThreshold = ref(85);
+const setDiskThreshold = ref(80);
+
+// 알림 / 통보
 const setChannel = ref("이메일");
+const setDedup = ref(10);
+const setNightMode = ref(true);
+const setDailyDigest = ref(true);
+const setSmsCrit = ref(true);
+const setSlackForward = ref(true);
+
+const channelTargets = {
+  이메일: "ops@trafficas.kr",
+  SMS: "010-****-1234 외 3명",
+  슬랙: "#ops-alarm",
+  카카오워크: "운영팀 그룹",
+};
+const setChannelTarget = computed(() => channelTargets[setChannel.value] || "");
+
+// 자동 처리
+const setAutoReconnect = ref(true);
+const setRetryCount = ref(3);
+const setRetryInterval = ref(30);
+const setAutoFault = ref(true);
+const setAutoRotate = ref(true);
+const setQuarantine = ref(false);
+
+// 점검 / 백업
+const setCheckCycle = ref("매주");
+const setCheckTime = ref("02:00 ~ 04:00");
+const setBackupDays = ref(30);
+const setAutoBackup = ref(true);
+
+// 보안 / 권한
+const setMfa = ref(true);
+const setSessionTimeout = ref(60);
+const setLoginAttempts = ref(5);
+const setAuditLog = ref(true);
+
 const setMsg = ref("");
+
+function resetSet() {
+  setLatThreshold.value = 200;
+  setLatCritical.value = 500;
+  setLossThreshold.value = 5;
+  setCpuThreshold.value = 85;
+  setMemThreshold.value = 85;
+  setDiskThreshold.value = 80;
+  setChannel.value = "이메일";
+  setDedup.value = 10;
+  setNightMode.value = true;
+  setDailyDigest.value = true;
+  setSmsCrit.value = true;
+  setSlackForward.value = true;
+  setAutoReconnect.value = true;
+  setRetryCount.value = 3;
+  setRetryInterval.value = 30;
+  setAutoFault.value = true;
+  setAutoRotate.value = true;
+  setQuarantine.value = false;
+  setCheckCycle.value = "매주";
+  setCheckTime.value = "02:00 ~ 04:00";
+  setBackupDays.value = 30;
+  setAutoBackup.value = true;
+  setMfa.value = true;
+  setSessionTimeout.value = 60;
+  setLoginAttempts.value = 5;
+  setAuditLog.value = true;
+  setMsg.value = "기본값으로 복원 완료";
+  setTimeout(() => {
+    setMsg.value = "";
+  }, 2000);
+}
+
 function saveSet() {
   setMsg.value = "설정 저장 완료";
   setTimeout(() => {
@@ -1686,7 +2989,7 @@ function saveSet() {
 .snav-bdg {
   background: #ef4444;
   color: #fff;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 100px;
@@ -1694,7 +2997,7 @@ function saveSet() {
   text-align: center;
 }
 .side-foot {
-  font-size: 10px;
+  font-size: 13px;
   opacity: 0.35;
   padding: 6px;
   line-height: 1.5;
@@ -1708,154 +3011,6 @@ function saveSet() {
   min-width: 0;
 }
 
-.kpi-row {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr) auto;
-  gap: 12px;
-}
-.kpi {
-  background: #0f1d34;
-  border: 1px solid #1f3055;
-  border-radius: 10px;
-  padding: 14px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.k-ic {
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  flex-shrink: 0;
-}
-.k-ic.gr {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-}
-.k-ic.rd {
-  background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
-}
-.k-ic.bl {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-}
-.k-ic.pl {
-  background: rgba(139, 92, 246, 0.15);
-  color: #a78bfa;
-}
-.k-ic.pk {
-  background: rgba(236, 72, 153, 0.15);
-  color: #f472b6;
-}
-.k-body {
-  flex: 1;
-  min-width: 0;
-}
-.k-lab {
-  font-size: 11.5px;
-  opacity: 0.75;
-}
-.k-val {
-  font-size: 22px;
-  font-weight: 800;
-}
-.k-val.rd {
-  color: #f87171;
-}
-.k-val .warn {
-  color: #fbbf24;
-}
-.k-u {
-  font-size: 12px;
-  font-weight: 500;
-  opacity: 0.65;
-  margin-left: 2px;
-}
-.k-tag {
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 4px;
-  margin-left: 4px;
-}
-.k-tag.yl {
-  background: rgba(251, 191, 36, 0.18);
-  color: #fbbf24;
-}
-.k-link,
-.k-side {
-  font-size: 11.5px;
-  opacity: 0.55;
-  cursor: pointer;
-}
-.k-side {
-  font-size: 12px;
-  font-weight: 700;
-  color: #34d399;
-  opacity: 1;
-}
-.kpi-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  justify-content: center;
-  font-size: 11px;
-  padding: 0 10px;
-}
-.km-t {
-  opacity: 0.65;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.km-r {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid #1f3055;
-  padding: 4px 10px;
-  border-radius: 6px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-}
-.sw {
-  display: inline-block;
-  width: 26px;
-  height: 14px;
-  background: #34d399;
-  border-radius: 8px;
-  position: relative;
-}
-.sw-d {
-  position: absolute;
-  right: 1px;
-  top: 1px;
-  width: 12px;
-  height: 12px;
-  background: #fff;
-  border-radius: 50%;
-}
-
-.grid-mid {
-  display: grid;
-  grid-template-columns: 1.7fr 1fr;
-  gap: 14px;
-  align-items: stretch;
-}
-.grid-mid > .card {
-  display: flex;
-  flex-direction: column;
-}
-.grid-bot {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 14px;
-}
 .card {
   background: #0f1d34;
   border: 1px solid #1f3055;
@@ -1863,7 +3018,7 @@ function saveSet() {
   padding: 14px;
 }
 .card h3 {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   margin: 0;
 }
@@ -1875,7 +3030,7 @@ function saveSet() {
 }
 .ch-link {
   color: rgba(228, 238, 255, 0.55);
-  font-size: 11.5px;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -1889,7 +3044,7 @@ function saveSet() {
 .cf {
   padding: 3px 10px;
   border-radius: 100px;
-  font-size: 11px;
+  font-size: 13.5px;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid #1f3055;
@@ -1921,13 +3076,13 @@ function saveSet() {
   color: #e4eeff;
   padding: 4px 8px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 13.5px;
 }
 
 .cam-tbl {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11.5px;
+  font-size: 13px;
 }
 .cam-tbl th,
 .cam-tbl td {
@@ -1938,7 +3093,7 @@ function saveSet() {
 .cam-tbl th {
   font-weight: 600;
   opacity: 0.55;
-  font-size: 10.5px;
+  font-size: 13px;
 }
 .cam-tbl tr.bad {
   background: rgba(239, 68, 68, 0.05);
@@ -1947,51 +3102,19 @@ function saveSet() {
   color: #fca5a5;
 }
 .cam-tbl .mono {
-  font-family: "JetBrains Mono", monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
 }
 .cf {
   cursor: pointer;
   padding: 4px 10px;
   border-radius: 5px;
-  font-size: 11px;
+  font-size: 13.5px;
   font-weight: 600;
   background: rgba(255, 255, 255, 0.03);
 }
 .cf.on {
   background: rgba(96, 165, 250, 0.18);
   color: #60a5fa;
-}
-.act-col {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.act-col i {
-  cursor: pointer;
-  opacity: 0.55;
-}
-.act-col i:hover {
-  opacity: 1;
-  color: #60a5fa;
-}
-.dev-empty {
-  text-align: center;
-  opacity: 0.5;
-  padding: 16px 0;
-}
-
-.srv-tbl-card {
-  display: flex;
-  flex-direction: column;
-}
-.srv-tbl-card .srv-tbl {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-  flex: 1;
-}
-.srv-tbl-card .srv-tbl tbody tr {
-  height: 100%;
 }
 .cam-card {
   display: flex;
@@ -2004,29 +3127,10 @@ function saveSet() {
   margin-top: auto;
   padding-top: 12px;
 }
-.srv-tbl th,
-.srv-tbl td {
-  padding: 9px 8px;
-  text-align: left;
-  border-bottom: 1px solid #1a2a45;
-}
-.srv-tbl th {
-  font-weight: 600;
-  opacity: 0.55;
-  font-size: 11px;
-}
-.srv-tbl .mono {
-  font-family: "JetBrains Mono", monospace;
-}
-.srv-tbl .sn-tag {
-  font-size: 10.5px;
-  opacity: 0.55;
-  font-weight: 400;
-}
 .stat {
   padding: 1px 8px;
   border-radius: 100px;
-  font-size: 10.5px;
+  font-size: 13px;
   font-weight: 700;
 }
 .stat.ok {
@@ -2047,7 +3151,7 @@ function saveSet() {
   justify-content: space-between;
   align-items: center;
   padding-top: 12px;
-  font-size: 11px;
+  font-size: 13.5px;
   opacity: 0.65;
 }
 .pg-row {
@@ -2061,7 +3165,7 @@ function saveSet() {
   width: 24px;
   height: 24px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 13px;
   cursor: pointer;
 }
 .pg-row button.on {
@@ -2078,13 +3182,17 @@ function saveSet() {
   flex-shrink: 0;
 }
 .srv {
-  padding: 10px 0;
-  border-bottom: 1px solid #1a2a45;
-  flex: 1; /* 카드 높이를 3등분 */
+  padding: 16px 0;
+  border-bottom: 1px solid #c9d4e3;
+  flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
   min-height: 0;
+  gap: 12px;
+}
+.srv + .srv {
+  margin-top: 8px;
 }
 .srv:last-of-type {
   border-bottom: 0;
@@ -2093,7 +3201,29 @@ function saveSet() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+.srv-h .srv-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+.srv-h .sn-t {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.srv-h .sn-ip {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.srv-h .stat {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .srv-name {
   display: flex;
@@ -2101,23 +3231,23 @@ function saveSet() {
   align-items: center;
 }
 .srv-name > i {
-  font-size: 18px;
+  font-size: 13.5px;
   color: #60a5fa;
 }
 .sn-t {
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 700;
 }
 .sn-tag {
-  font-size: 10.5px;
+  font-size: 13px;
   opacity: 0.55;
   font-weight: 400;
   margin-left: 4px;
 }
 .sn-ip {
-  font-size: 10.5px;
+  font-size: 13px;
   opacity: 0.55;
-  font-family: "JetBrains Mono", monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
 }
 .srv-bars {
   display: grid;
@@ -2125,18 +3255,180 @@ function saveSet() {
   gap: 8px;
 }
 .srv-b {
-  font-size: 10.5px;
+  font-size: 13px;
 }
 .srv-lab {
   opacity: 0.65;
 }
 .srv-val {
   font-weight: 700;
-  font-size: 12px;
+  font-size: 13px;
   margin: 2px 0 4px;
 }
 .srv-val.yl {
   color: #fbbf24;
+}
+
+/* 서버 게이지 - 원형 progress */
+/* 서버 게이지 (ECharts) */
+.srv-gauges {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(80px, 1fr));
+  gap: 8px 12px;
+  align-items: center;
+  justify-items: center;
+  padding: 8px 4px;
+  min-width: 0;
+}
+.srv-g {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+.srv-g-wrap {
+  width: 120px;
+  height: 120px;
+  flex-shrink: 0;
+  position: relative;
+  filter: drop-shadow(0 4px 12px rgba(12, 31, 64, 0.08));
+}
+.srv-g-lab {
+  font-size: 13px;
+  color: #0c1f40;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+/* 네트워크 ECharts */
+.net-echart {
+  flex: 1;
+  width: 100%;
+  min-height: 120px;
+  min-width: 0;
+}
+
+/* ★ 반응형 - 창 최소화 시 폰트/레이아웃 깨짐 방지 */
+.main-grid > .card,
+.main-grid > .bot-row > .card,
+.main-grid > .col3-stack > .card {
+  min-width: 0;
+}
+.ch h3 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ch {
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+.ch-kpi {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.cam-filter {
+  flex-wrap: wrap;
+  gap: 6px 4px;
+  min-width: 0;
+}
+.cam-filter .cf {
+  flex-shrink: 0;
+}
+.cf-r {
+  flex-basis: 100%;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+.cf-r input {
+  flex: 1; min-width: 0;
+}
+.srv-h, .ch {
+  min-width: 0;
+}
+.srv-name {
+  min-width: 0; overflow: hidden;
+}
+.sn-t, .sn-ip {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ── 노트북 / 작은 화면 / 최소화 시 자연스러운 페이지 스크롤 허용 ── */
+@media (max-width: 1600px) {
+  .srv-gauges { gap: 8px 10px; }
+  .srv-g-wrap { width: 100px; height: 100px; }
+  .main-grid .ch h3 { font-size: 14.5px !important; }
+}
+
+@media (max-width: 1440px) {
+  /* 노트북 일반 — 강제 1뷰포트 락 풀고 자연 스크롤 */
+  .ops-shell, .ops-shell :deep(.main) {
+    height: auto !important;
+    min-height: 100vh;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .main-grid {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    grid-template-rows: auto auto !important;
+  }
+  .main-grid > .card,
+  .main-grid > .bot-row > .card,
+  .main-grid > .col3-stack > .card {
+    overflow: visible !important;
+    min-height: 240px;
+  }
+  .col3-stack { overflow: visible !important; }
+  .col3-stack .timeline-card { max-height: none !important; }
+  .srv-g-wrap { width: 96px; height: 96px; }
+  .srv-gauges { padding: 6px 4px; }
+  .net-echart { min-height: 160px; }
+}
+
+@media (max-width: 1200px) {
+  /* 사이드바 좁아진 환경 — 메인 그리드 2컬럼 + 장애 가로배치 */
+  .main-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .srv-card { grid-column: 1 !important; grid-row: 1 !important; }
+  .cam-card { grid-column: 2 !important; grid-row: 1 !important; }
+  .fail-card { grid-column: 1 / -1 !important; grid-row: 2 !important; }
+  .bot-row {
+    grid-column: 1 / -1 !important; grid-row: 3 !important;
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .ch h3 { font-size: 14px !important; }
+  .srv-g-wrap { width: 90px; height: 90px; }
+}
+
+@media (max-width: 900px) {
+  .main-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .srv-card,
+  .cam-card,
+  .fail-card,
+  .bot-row {
+    grid-column: 1 !important;
+  }
+  .bot-row {
+    grid-template-columns: 1fr !important;
+  }
+  .srv-gauges {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 .bar {
   height: 4px;
@@ -2153,7 +3445,7 @@ function saveSet() {
 .b-rd {
   background: rgba(239, 68, 68, 0.18);
   color: #f87171;
-  font-size: 10.5px;
+  font-size: 13px;
   font-weight: 700;
   padding: 1px 8px;
   border-radius: 4px;
@@ -2174,7 +3466,7 @@ function saveSet() {
 .fl-tag {
   background: rgba(239, 68, 68, 0.18);
   color: #f87171;
-  font-size: 10.5px;
+  font-size: 13px;
   padding: 1px 6px;
   border-radius: 3px;
   margin-left: 6px;
@@ -2183,7 +3475,7 @@ function saveSet() {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 13px;
   margin-bottom: 12px;
 }
 .fl-row {
@@ -2194,7 +3486,7 @@ function saveSet() {
   opacity: 0.65;
 }
 .card h4 {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   margin: 10px 0 6px;
 }
@@ -2202,17 +3494,17 @@ function saveSet() {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 11px;
+  font-size: 13.5px;
   padding-left: 4px;
   margin-bottom: 4px;
 }
 .hst-t {
   color: #60a5fa;
-  font-family: "JetBrains Mono", monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
   margin-right: 6px;
 }
 .rec-p {
-  font-size: 11px;
+  font-size: 13.5px;
   opacity: 0.75;
   line-height: 1.5;
   margin: 0 0 10px;
@@ -2226,7 +3518,7 @@ function saveSet() {
 .ab {
   padding: 8px;
   border-radius: 5px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   border: 0;
   cursor: pointer;
@@ -2254,7 +3546,7 @@ function saveSet() {
   grid-template-columns: 50px 1fr auto;
   gap: 6px;
   align-items: center;
-  font-size: 11.5px;
+  font-size: 13px;
   margin-top: 6px;
 }
 .resp-row span,
@@ -2267,7 +3559,7 @@ function saveSet() {
   color: #e4eeff;
   padding: 4px 8px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 13.5px;
 }
 .ab-sm {
   background: rgba(255, 255, 255, 0.06);
@@ -2275,511 +3567,8 @@ function saveSet() {
   color: #e4eeff;
   padding: 3px 8px;
   border-radius: 4px;
-  font-size: 10.5px;
-  cursor: pointer;
-}
-
-.net-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.nb {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid #1a2a45;
-  border-radius: 6px;
-  padding: 10px;
-}
-.nb-l {
-  font-size: 11px;
-  opacity: 0.75;
-  margin-bottom: 4px;
-}
-.nb-v {
-  font-size: 18px;
-  font-weight: 800;
-  margin-bottom: 4px;
-}
-.nb-v .u {
-  font-size: 11px;
-  opacity: 0.65;
-  font-weight: 500;
-}
-.ns {
-  width: 100%;
-  height: 24px;
-}
-.bar-line {
-  height: 4px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 4px;
-  overflow: hidden;
-  margin-top: 8px;
-}
-.bar-line span {
-  display: block;
-  height: 100%;
-  border-radius: 4px;
-}
-
-.topo-legend {
-  display: flex;
-  gap: 10px;
-  font-size: 11px;
-  margin-bottom: 8px;
-}
-.dt {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 4px;
-}
-.dt.gr {
-  background: #34d399;
-}
-.dt.yl {
-  background: #fbbf24;
-}
-.dt.rd {
-  background: #ef4444;
-}
-.topo-svg {
-  width: 100%;
-  height: 240px;
-}
-
-.stat-bar {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 14px 18px;
-  background: #0f1d34;
-  border: 1px solid #1f3055;
-  border-radius: 10px;
-  flex-wrap: wrap;
-}
-.sb-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-right: 18px;
-  border-right: 1px solid #1a2a45;
   font-size: 13px;
-}
-.sb-item:last-of-type {
-  border-right: 0;
-}
-.sb-item i {
-  font-size: 17px;
-}
-.sb-l {
-  opacity: 0.75;
-}
-.sb-item strong {
-  font-size: 17px;
-  font-weight: 800;
-}
-.sb-item strong.yl {
-  color: #fbbf24;
-}
-.sb-item strong.rd {
-  color: #f87171;
-}
-.sb-u {
-  font-size: 11px;
-  font-weight: 500;
-  opacity: 0.6;
-  margin-left: 2px;
-}
-.sb-spacer {
-  flex: 1;
-}
-.sb-ts {
-  font-size: 11.5px;
-  opacity: 0.6;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.sb-ts::before {
-  content: "○";
-  opacity: 0.5;
-}
-.sb-refresh {
-  background: #3b82f6;
-  color: #fff;
-  border: 0;
-  padding: 8px 14px;
-  border-radius: 6px;
-  font-size: 12.5px;
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.row-summary {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr 0.85fr;
-  gap: 12px;
-  align-items: stretch;
-}
-.row-summary > .card {
-  display: flex;
-  flex-direction: column;
-}
-.row-summary .net-spark,
-.row-summary .fault-sum {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.row-summary .dn-grid {
-  flex: 1;
-  align-items: center;
-}
-.row-summary .fault-sum .fs-btn {
-  margin-top: auto;
-}
-.dn-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-.dn-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-.dn-h {
-  font-size: 12px;
-  font-weight: 600;
-  opacity: 0.85;
-}
-.dn-wrap {
-  position: relative;
-  width: 160px;
-  height: 160px;
-}
-.dn-wrap .donut {
-  width: 100%;
-  height: 100%;
-}
-.dn-c {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-.dn-v {
-  font-size: 26px;
-  font-weight: 800;
-}
-.dn-s {
-  font-size: 11.5px;
-  opacity: 0.75;
-  margin-top: 2px;
-}
-.dn-leg {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 11.5px;
-  opacity: 0.85;
-}
-.dn-leg > div {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  justify-content: space-between;
-}
-.lg {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-.lg.gr {
-  background: #34d399;
-}
-.lg.yl {
-  background: #fbbf24;
-}
-.lg.rd {
-  background: #ef4444;
-}
-.lg.gy {
-  background: #6b7280;
-}
-.dn-leg > div > span:first-child {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-}
-.dn-leg > div > span:first-child::after {
-  content: "";
-}
-.dn-leg strong {
-  font-weight: 700;
-}
-
-.net-spark {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.ns-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
-  gap: 10px;
-}
-.ns-row:last-of-type {
-  border-bottom: 0;
-}
-.ns-l {
-  font-size: 12px;
-  opacity: 0.75;
-  margin-bottom: 4px;
-}
-.ns-v {
-  font-size: 18px;
-  font-weight: 800;
-}
-.ns-v.gr {
-  color: #34d399;
-}
-.ns-v span {
-  font-size: 11px;
-  font-weight: 500;
-  opacity: 0.65;
-  margin-left: 2px;
-}
-.ns-sp {
-  width: 100px;
-  height: 30px;
-}
-
-.fault-sum h3 {
-  margin-bottom: 14px;
-}
-.fs-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid #1a2a45;
-  font-size: 12.5px;
-}
-.fs-row > i {
-  font-size: 16px;
-}
-.fs-row > span {
-  flex: 1;
-}
-.fs-row strong {
-  font-weight: 800;
-}
-.fs-row strong.rd {
-  color: #f87171;
-}
-.fs-row strong.yl {
-  color: #fbbf24;
-}
-.fs-row strong.gr {
-  color: #34d399;
-}
-.fs-btn {
-  width: 100%;
-  background: #3b82f6;
-  color: #fff;
-  border: 0;
-  padding: 9px;
-  border-radius: 6px;
-  margin-top: 12px;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-/* 토폴로지(좌, 큰) + 나머지 4개 (우, 2x2) */
-.grid-bot-new {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 12px;
-  align-items: stretch;
-}
-.grid-bot-new > .card {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.topo-new {
-  grid-row: 1 / span 2;
-  grid-column: 1;
-}
-.topo-svg-new {
-  width: 100%;
-  height: 100%;
-  min-height: 320px;
-  display: block;
-  flex: 1;
-}
-.lat-detail .pnl-tbl.small th,
-.lat-detail .pnl-tbl.small td {
-  padding: 6px 8px;
-  font-size: 11.5px;
-}
-.lat-btn {
-  width: 100%;
-  background: #3b82f6;
-  color: #fff;
-  border: 0;
-  padding: 8px;
-  border-radius: 5px;
-  margin-top: 10px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.flt-queue,
-.check-sched,
-.recent-evt {
-  padding: 14px;
-}
-.ch {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-.ch-link {
-  font-size: 11px;
-  color: #60a5fa;
-  cursor: pointer;
-}
-.fq-row {
-  display: grid;
-  grid-template-columns: 18px 1fr auto auto;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid #1a2a45;
-  align-items: center;
-  font-size: 12px;
-}
-.fq-row > i {
-  color: #f87171;
-}
-.fq-t {
-  font-size: 12px;
-  font-weight: 600;
-}
-.fq-id {
-  font-size: 10.5px;
-  opacity: 0.55;
-  font-family: "JetBrains Mono", monospace;
-}
-.fq-time {
-  font-size: 10.5px;
-  opacity: 0.65;
-  font-family: "JetBrains Mono", monospace;
-}
-.fq-tag {
-  background: rgba(239, 68, 68, 0.18);
-  color: #f87171;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 4px;
-}
-
-.cs-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 4px;
-  padding: 8px 0;
-  border-bottom: 1px solid #1a2a45;
-  align-items: center;
-}
-.cs-t {
-  font-size: 11.5px;
-  font-weight: 600;
-  grid-column: 1;
-}
-.cs-d {
-  font-size: 11px;
-  opacity: 0.7;
-  grid-column: 1;
-}
-.cs-tag {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  background: rgba(96, 165, 250, 0.18);
-  color: #60a5fa;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-.re-row {
-  display: grid;
-  grid-template-columns: 10px 60px 36px 1fr;
-  gap: 8px;
-  padding: 7px 0;
-  border-bottom: 1px solid #1a2a45;
-  align-items: center;
-  font-size: 11.5px;
-}
-.re-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-.re-dot.rd {
-  background: #ef4444;
-}
-.re-dot.yl {
-  background: #fbbf24;
-}
-.re-dot.gr {
-  background: #34d399;
-}
-.re-time {
-  opacity: 0.7;
-  font-size: 10.5px;
-}
-.re-sev {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 3px;
-  text-align: center;
-}
-.re-sev.rd {
-  background: rgba(239, 68, 68, 0.18);
-  color: #f87171;
-}
-.re-sev.yl {
-  background: rgba(245, 158, 11, 0.2);
-  color: #fbbf24;
-}
-.re-sev.gr {
-  background: rgba(16, 185, 129, 0.18);
-  color: #34d399;
-}
-.re-msg {
-  opacity: 0.85;
 }
 
 /* ============================================================
@@ -2792,10 +3581,124 @@ function saveSet() {
    - 배경 #f1f5fb / 카드 흰색 / 텍스트 #0c1f40 / 액센트 #2563eb
    ============================================================ */
 .ops-shell {
-  font-size: 15.5px;
+  font-size: 13px;
   line-height: 1.55;
   background: #d6deeb !important;
   color: #0c1f40 !important;
+  height: 100vh;
+  overflow: hidden;
+  font-family: "Inter", "Pretendard Variable", Pretendard, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-feature-settings: "tnum" 1, "cv11" 1, "ss01" 1;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.ops-shell *,
+.ops-shell :deep(*) {
+  font-family: inherit;
+}
+/* 숫자/ID — 깔끔한 IBM Plex Mono */
+.ops-shell [class*="mono"],
+.ops-shell .mono,
+.ops-shell :deep(.mono),
+.ops-shell :deep([class*="mono"]) {
+  font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace !important;
+}
+.ops-shell :deep(.main) {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 사이드바 접기/펼치기 */
+.ops-shell .side-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ops-shell .side-toggle {
+  width: 28px;
+  height: 28px;
+  background: #ffffff;
+  border: 1px solid #c9d4e3;
+  color: #4a5b78;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  font-size: 13.5px;
+  flex-shrink: 0;
+}
+.ops-shell .side-toggle:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.ops-shell.side-collapsed :deep(.side) {
+  width: 56px !important;
+  padding: 18px 8px !important;
+}
+.ops-shell.side-collapsed :deep(.side-top) {
+  justify-content: center;
+}
+.ops-shell.side-collapsed :deep(.snav-i) {
+  justify-content: center;
+  padding: 12px 4px !important;
+}
+.ops-shell.side-collapsed :deep(.snav-i .snav-lab) {
+  display: none;
+}
+.ops-shell.side-collapsed :deep(.snav-i i) {
+  font-size: 22px !important;
+}
+.ops-shell.side-collapsed :deep(.snav-ic) {
+  width: 28px !important;
+}
+
+/* 아이콘 + 알람 뱃지 */
+.ops-shell :deep(.snav-ic) {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+/* 펼친 모드 - 뱃지는 행 우측에 숫자 표시 */
+.ops-shell :deep(.snav-i .snav-bdg) {
+  margin-left: auto !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding: 0 6px !important;
+  background: #dc2626 !important;
+  color: #fff !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  border-radius: 100px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1;
+}
+
+/* 접힌 모드 - 아이콘 우상단 작은 빨간 점 (깜빡임) */
+.ops-shell.side-collapsed :deep(.snav-bdg-dot) {
+  position: absolute !important;
+  top: -2px !important;
+  right: -3px !important;
+  width: 8px !important;
+  height: 8px !important;
+  background: #dc2626 !important;
+  border: 1.5px solid #e3e9f2 !important;
+  border-radius: 50% !important;
+  animation: nsPulse 1.4s ease-in-out infinite;
 }
 .ops-shell :deep(.side) {
   background: #e3e9f2 !important; /* 톤 다운 */
@@ -2835,7 +3738,7 @@ function saveSet() {
 .ops-shell :deep(.top h1) {
   color: #0c1f40 !important;
   margin: 0;
-  font-size: 22px !important;
+  font-size: 13.5px !important;
   font-weight: 700 !important;
 }
 .ops-shell :deep(.t-sub) {
@@ -2844,7 +3747,7 @@ function saveSet() {
 .ops-shell :deep(.t-main) {
   color: #0c1f40 !important;
   text-decoration: none !important;
-  font-size: 22px !important;
+  font-size: 13.5px !important;
   font-weight: 700 !important;
   letter-spacing: -0.01em;
   cursor: pointer;
@@ -2891,7 +3794,7 @@ function saveSet() {
 .ops-shell :deep(.ds-h) {
   color: #0c1f40 !important;
   font-weight: 700 !important;
-  font-size: 12px !important;
+  font-size: 13px !important;
 }
 .ops-shell :deep(.ds-i) {
   color: #0c1f40 !important;
@@ -2905,25 +3808,25 @@ function saveSet() {
 }
 .ops-shell :deep(.ds-i > i:first-child) {
   color: #2563eb !important;
-  font-size: 17px !important;
+  font-size: 13px !important;
 }
 .ops-shell :deep(.ds-t) {
   color: #0c1f40 !important;
   font-weight: 700 !important;
-  font-size: 14.5px !important;
+  font-size: 13px !important;
 }
 .ops-shell :deep(.ds-s) {
   color: #0c1f40 !important;
   opacity: 0.8 !important;
-  font-size: 12.5px !important;
+  font-size: 13.5px !important;
 }
 .ops-shell :deep(.ds-arr) {
   color: #0c1f40 !important;
   opacity: 0.55 !important;
-  font-size: 12px !important;
+  font-size: 13px !important;
 }
 .ops-shell :deep(.ds-cur) {
-  font-size: 11px !important;
+  font-size: 13.5px !important;
   padding: 3px 8px !important;
 }
 .ops-shell :deep(.ds-cur) {
@@ -2943,16 +3846,16 @@ function saveSet() {
   box-shadow: 0 1px 2px rgba(12, 31, 64, 0.08) !important;
 }
 .ops-shell :deep(.card h3) {
-  font-size: 15.5px;
+  font-size: 13px;
   font-weight: 700;
   margin: 0 0 10px;
   color: #0c1f40;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #c9d4e3;
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 .ops-shell :deep(.ch) {
-  padding-bottom: 8px;
-  border-bottom: 1px solid #e3e9f2;
+  padding-bottom: 0;
+  border-bottom: 0;
   margin-bottom: 10px;
 }
 .ops-shell :deep(.ch h3) {
@@ -2967,7 +3870,7 @@ function saveSet() {
   font-feature-settings: "tnum" 1;
 } /* 실무: 표 안 숫자 너비 균일 */
 .ops-shell :deep(.brand) {
-  font-size: 16px;
+  font-size: 13px;
 }
 .ops-shell :deep(.brand .dot) {
   box-shadow: none;
@@ -2978,13 +3881,16 @@ function saveSet() {
   color: #7ea4d8;
 }
 .ops-shell :deep(.snav-i) {
-  font-size: 14px;
-  padding: 9px 11px;
+  font-size: 16px !important;
+  padding: 11px 12px !important;
   border-radius: 2px;
   transition: none;
 }
 .ops-shell :deep(.snav-i i) {
-  font-size: 15px;
+  font-size: 17px !important;
+}
+.ops-shell :deep(.snav-i .snav-lab) {
+  font-size: 16px !important;
 }
 .ops-shell :deep(.snav-i.on) {
   background: rgba(120, 160, 210, 0.14);
@@ -2998,17 +3904,17 @@ function saveSet() {
   background: #b94545;
   font-weight: 600;
   padding: 1px 6px;
-  font-size: 11.5px;
+  font-size: 13px;
   border-radius: 2px;
   min-width: 18px;
 }
 .ops-shell :deep(.top h1) {
-  font-size: 18px;
+  font-size: 13.5px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 .ops-shell :deep(.t-sub) {
-  font-size: 14px;
+  font-size: 13.5px;
   margin-left: 8px;
   opacity: 0.75;
 }
@@ -3024,13 +3930,13 @@ function saveSet() {
   padding: 0;
 }
 .ops-shell :deep(.t-bell i) {
-  font-size: 14px;
+  font-size: 13.5px;
 }
 .ops-shell :deep(.bdg) {
   background: #b94545;
   min-width: 15px;
   height: 15px;
-  font-size: 9.5px;
+  font-size: 13px;
   border-radius: 2px;
   top: -3px;
   right: -3px;
@@ -3052,401 +3958,22 @@ function saveSet() {
   transition: none !important;
 } /* AI 부드러움 제거 */
 
-/* 상단 통계 바 */
-.stat-bar {
-  padding: 12px 16px !important;
-  border-radius: 3px !important;
-  gap: 20px !important;
-}
-.sb-item {
-  padding-right: 16px !important;
-  gap: 8px !important;
-  font-size: 12.5px;
-}
-.sb-item i {
-  font-size: 15px !important;
-}
-.sb-item strong {
-  font-size: 17px !important;
-  font-weight: 700;
-  font-family: "JetBrains Mono", monospace;
-}
-.sb-u {
-  font-size: 11px !important;
-}
-.sb-ts {
-  font-size: 11.5px;
-  font-family: "JetBrains Mono", monospace;
-}
-.sb-refresh {
-  background: #2a4a78 !important;
-  padding: 6px 12px !important;
-  border-radius: 2px !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-}
-.sb-refresh i {
-  font-size: 12px;
-}
-
-/* 그리드 gap */
-.row-summary,
-.grid-mid,
-.grid-bot-new {
-  gap: 10px !important;
-}
-.main {
-  gap: 10px !important;
-}
-
-/* 도넛 */
-.dn-h {
-  font-size: 12px !important;
-  opacity: 0.75;
-}
-.dn-v {
-  font-size: 22px !important;
-  font-family: "JetBrains Mono", monospace;
-}
-.dn-s {
-  font-size: 11px !important;
-}
-.dn-leg {
-  font-size: 11.5px !important;
-  gap: 4px !important;
-}
-.dn-leg strong {
-  font-family: "JetBrains Mono", monospace;
-  font-weight: 600;
-}
-.dn-wrap {
-  width: 120px !important;
-  height: 120px !important;
-}
-.lg {
-  width: 9px !important;
-  height: 9px !important;
-  border-radius: 0 !important;
-}
-
-/* 네트워크 sparkline */
-.ns-row {
-  padding: 7px 0 !important;
-}
-.ns-l {
-  font-size: 12px !important;
-  opacity: 0.75;
-  margin-bottom: 3px !important;
-}
-.ns-v {
-  font-size: 17px !important;
-  font-family: "JetBrains Mono", monospace;
-}
-.ns-v.gr {
-  color: #6fa581;
-}
-.ns-v span {
-  font-size: 11px !important;
-}
-.ns-sp {
-  width: 90px !important;
-  height: 26px !important;
-}
-
-/* 장애 요약 */
-.fs-row {
-  padding: 9px 0 !important;
-  font-size: 13px !important;
-}
-.fs-row i {
-  font-size: 15px !important;
-}
-.fs-row strong {
-  font-family: "JetBrains Mono", monospace;
-  font-weight: 600;
-  font-size: 13px;
-}
-.fs-row strong.rd {
-  color: #d97070;
-}
-.fs-row strong.yl {
-  color: #d4a652;
-}
-.fs-row strong.gr {
-  color: #6fa581;
-}
-.fs-btn {
-  background: #2a4a78 !important;
-  border-radius: 2px !important;
-  padding: 8px !important;
-  font-size: 12.5px !important;
-  font-weight: 500 !important;
-  margin-top: 10px !important;
-}
-
-/* 장비 상태 목록 */
-.cam-filter {
-  font-size: 13px;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-.cf {
-  padding: 5px 11px !important;
-  border-radius: 2px !important;
-  font-size: 12.5px !important;
-  font-weight: 500 !important;
-}
-.cf.on {
-  background: rgba(120, 160, 210, 0.22) !important;
-  color: #c4d8f5 !important;
-}
-.cf-r input,
-.cf-r select {
-  background: #06101e;
-  border: 1px solid #1f3055;
-  color: #d4dbe7;
-  padding: 5px 10px;
-  border-radius: 2px;
-  font-size: 12.5px;
-}
-
-.cam-tbl {
-  font-size: 14.5px !important;
-}
-.cam-tbl th {
-  padding: 8px !important;
-  font-size: 13px !important;
-  opacity: 0.85;
-  font-weight: 700;
-}
-.cam-tbl td {
-  padding: 8px !important;
-  font-size: 14px;
-}
-.cam-tbl tbody tr:nth-child(even) {
-  background: rgba(255, 255, 255, 0.015);
-} /* 격행 */
-.cam-tbl tr.bad {
-  background: rgba(185, 69, 69, 0.08);
-}
-.cam-tbl tr.bad td {
-  color: #d97070;
-}
-.cam-tbl tr.bad td.mono {
-  color: #d97070;
-}
-.cam-tbl .mono {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 12.5px;
-}
-.cam-tbl td > i {
-  font-size: 14px;
-  opacity: 0.65;
-}
-
-.act-col i {
-  font-size: 14px !important;
-}
-.cam-foot .pg-row button {
-  width: 26px;
-  height: 26px;
-  font-size: 12.5px;
-  border-radius: 2px;
-}
-.cam-foot .pg-row button.on {
-  background: #2a4a78;
-  border-color: #2a4a78;
-}
-
-/* 서버 상태 표 */
-.srv-tbl {
-  font-size: 14.5px !important;
-}
-.srv-tbl th {
-  padding: 8px !important;
-  font-size: 13px !important;
-  opacity: 0.85;
-  font-weight: 700;
-}
-.srv-tbl td {
-  padding: 8px !important;
-}
-.srv-tbl tbody tr:nth-child(even) {
-  background: rgba(255, 255, 255, 0.015);
-}
-.srv-tbl .mono {
-  font-size: 13.5px;
-}
-
-/* 상태 태그 — 채도 다운, 사각 */
-.ops-shell .stat,
-.ops-shell :deep(.stat) {
-  padding: 2px 7px !important;
-  border-radius: 2px !important;
-  font-size: 10.5px !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.02em;
-}
-.ops-shell .stat.ok,
-.ops-shell :deep(.stat.ok) {
-  background: rgba(111, 165, 129, 0.18);
-  color: #6fa581;
-}
-.ops-shell .stat.wn,
-.ops-shell :deep(.stat.wn) {
-  background: rgba(212, 166, 82, 0.18);
-  color: #d4a652;
-}
-.ops-shell .stat.no,
-.ops-shell :deep(.stat.no) {
-  background: rgba(217, 112, 112, 0.18);
-  color: #d97070;
-}
-
-/* 토폴로지 카드 */
-.topo-legend {
-  font-size: 11.5px !important;
-  gap: 10px !important;
-}
-.dt {
-  width: 8px !important;
-  height: 8px !important;
-  border-radius: 0 !important;
-}
-
-/* 지연 상세 */
-.pnl-tbl.small th {
-  padding: 5px 7px !important;
-  font-size: 11px !important;
-}
-.pnl-tbl.small td {
-  padding: 6px 7px !important;
-  font-size: 12px;
-}
-.lat-btn {
-  background: #2a4a78 !important;
-  border-radius: 2px !important;
-  padding: 7px !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-}
-
-/* 장애 큐 */
-.fq-row {
-  padding: 7px 0 !important;
-  font-size: 12.5px !important;
-}
-.fq-row i {
-  font-size: 13px !important;
-  color: #d97070;
-}
-.fq-t {
-  font-size: 13px !important;
-  font-weight: 600 !important;
-}
-.fq-id {
-  font-size: 11px !important;
-  font-family: "JetBrains Mono", monospace;
-}
-.fq-time {
-  font-size: 11px !important;
-  font-family: "JetBrains Mono", monospace;
-}
-.fq-tag {
-  background: rgba(217, 112, 112, 0.18) !important;
-  color: #d97070 !important;
-  border-radius: 2px !important;
-  font-size: 10px !important;
-  padding: 1px 6px !important;
-}
-
-/* 점검 일정 */
-.cs-row {
-  padding: 6px 0 !important;
-}
-.cs-t {
-  font-size: 12.5px !important;
-  font-weight: 600 !important;
-}
-.cs-d {
-  font-size: 11.5px !important;
-  opacity: 0.7;
-}
-.cs-tag {
-  background: rgba(120, 160, 210, 0.18) !important;
-  color: #7ea4d8 !important;
-  border-radius: 2px !important;
-  font-size: 10px !important;
-  padding: 1px 6px !important;
-}
-
-/* 최근 이벤트 */
-.re-row {
-  padding: 6px 0 !important;
-  font-size: 12px !important;
-  gap: 7px !important;
-}
-.re-dot {
-  width: 7px !important;
-  height: 7px !important;
-  border-radius: 0 !important;
-}
-.re-dot.rd {
-  background: #d97070 !important;
-}
-.re-dot.yl {
-  background: #d4a652 !important;
-}
-.re-dot.gr {
-  background: #6fa581 !important;
-}
-.re-time {
-  font-size: 11px !important;
-  font-family: "JetBrains Mono", monospace;
-}
-.re-sev {
-  font-size: 10px !important;
-  padding: 1px 5px !important;
-  border-radius: 2px !important;
-}
-.re-sev.rd {
-  background: rgba(217, 112, 112, 0.18);
-  color: #d97070;
-}
-.re-sev.yl {
-  background: rgba(212, 166, 82, 0.18);
-  color: #d4a652;
-}
-.re-sev.gr {
-  background: rgba(111, 165, 129, 0.18);
-  color: #6fa581;
-}
-.re-msg {
-  font-size: 11.5px;
-}
-
 /* ch-link */
 .ch-link {
-  font-size: 11px !important;
+  font-size: 13.5px !important;
   color: #7ea4d8 !important;
 }
 .ch h3 {
   letter-spacing: -0.01em;
 }
 .seg-sub {
-  font-size: 11px !important;
+  font-size: 13.5px !important;
   opacity: 0.55;
 }
 
 /* ============================================================
    ★ KPI 카드 (5개 + 자동 새로고침 토글)
    ============================================================ */
-.kpi-row {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr) 170px;
-  gap: 10px;
-}
-
 /* ★ 헤더 우측 — 시각 + 자동 새로고침 */
 .hdr-time {
   font-size: 13px;
@@ -3462,7 +3989,7 @@ function saveSet() {
   opacity: 0.8;
 }
 .hdr-time strong {
-  font-family: "JetBrains Mono", monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
   font-weight: 700;
   color: #0c1f40;
   margin-left: 2px;
@@ -3470,7 +3997,7 @@ function saveSet() {
 
 /* ★ 카드 헤더 분산 KPI — 칩 형태 X, 텍스트만 (AI 티 제거) */
 .ops-shell :deep(.ch-kpi) {
-  font-family: "JetBrains Mono", monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
   font-size: 13.5px;
   font-weight: 700;
   margin-left: 10px;
@@ -3513,8 +4040,8 @@ function saveSet() {
   border: 1px solid #c9d4e3;
   color: #0c1f40;
   padding: 2px 8px;
-  font-size: 11px;
-  font-family: "JetBrains Mono", monospace;
+  font-size: 13.5px;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
   cursor: pointer;
   border-radius: 2px;
   letter-spacing: 0.05em;
@@ -3528,18 +4055,81 @@ function saveSet() {
   flex: 1;
   display: flex;
   flex-direction: column;
-  font-family: "JetBrains Mono", monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+}
+.tl-th {
+  display: grid;
+  grid-template-columns: 76px 1fr 80px 14px;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 6px;
+  border-bottom: 2px solid #0c1f40;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4a5b78;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: #e3e9f2;
+}
+.tl-th > span {
+  text-align: center;
 }
 .tl-row {
   display: grid;
-  grid-template-columns: 76px 20px 56px 120px 1fr 80px 14px;
-  gap: 8px;
+  grid-template-columns: 76px 1fr 80px 14px;
+  gap: 10px;
   align-items: center;
-  padding: 6px 4px;
+  padding: 7px 6px;
   border-bottom: 1px solid #c9d4e3;
   font-size: 13.5px;
   color: #0c1f40;
   cursor: pointer;
+}
+.tl-row .tl-t,
+.tl-row .tl-msg,
+.tl-row .tl-who {
+  text-align: center;
+}
+
+/* 알람 모달 SLA 표시 */
+.am-sla {
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace !important;
+  padding: 3px 9px !important;
+  border-radius: 3px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 13px !important;
+}
+.am-sla i {
+  font-size: 13px;
+}
+.am-sla.warn {
+  background: rgba(180, 83, 9, 0.14);
+  color: #b45309;
+}
+.am-sla.high {
+  background: rgba(220, 38, 38, 0.14);
+  color: #b91c1c;
+}
+.am-sla.crit {
+  background: #dc2626;
+  color: #fff;
+}
+.am-sla.resolved {
+  background: rgba(5, 150, 105, 0.14);
+  color: #059669;
+}
+
+@keyframes slaPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.75;
+  }
 }
 .tl-row:hover {
   background: #ecf0f6;
@@ -3552,42 +4142,6 @@ function saveSet() {
   color: #0c1f40;
   font-size: 13px;
 }
-.tl-k {
-  text-align: center;
-  font-weight: 700;
-  font-size: 12px;
-  color: rgba(12, 31, 64, 0.7);
-}
-.tl-row.event .tl-k {
-  color: #dc2626;
-}
-.tl-row.recovered .tl-k {
-  color: #059669;
-}
-.tl-row.info .tl-k {
-  color: #2563eb;
-}
-.tl-sev {
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-align: center;
-  padding: 1px 0;
-}
-.tl-sev.crit {
-  color: #b91c1c;
-}
-.tl-sev.high {
-  color: #b45309;
-}
-.tl-sev.med {
-  color: #a16207;
-}
-.tl-id {
-  color: #0c1f40;
-  font-weight: 700;
-  font-size: 13px;
-}
 .tl-msg {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 13.5px;
@@ -3598,13 +4152,13 @@ function saveSet() {
 }
 .tl-who {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: #0c1f40;
   text-align: right;
 }
 .tl-arrow {
   color: rgba(12, 31, 64, 0.55);
-  font-size: 12px;
+  font-size: 13px;
 }
 .tl-empty {
   padding: 24px;
@@ -3617,140 +4171,8 @@ function saveSet() {
   justify-content: space-between;
   align-items: center;
   padding-top: 8px;
-  margin-top: 6px;
-  border-top: 1px solid #c9d4e3;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: #0c1f40;
-  font-family: "JetBrains Mono", monospace;
-}
-.kpi {
-  background: #f7f9fc;
-  border: 1px solid #c9d4e3;
-  border-radius: 4px;
-  padding: 12px 14px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  box-shadow: 0 1px 2px rgba(12, 31, 64, 0.06);
-}
-.kpi.rd {
-  background: #fbe8e8;
-  border-color: #f4a5a5;
-}
-.k-ic {
-  width: 36px;
-  height: 36px;
-  border-radius: 3px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  flex-shrink: 0;
-}
-.k-ic .bi {
-  font-size: 16px;
-}
-.kpi.gr .k-ic {
-  background: rgba(5, 150, 105, 0.12);
-  color: #059669;
-}
-.kpi.rd .k-ic {
-  background: rgba(220, 38, 38, 0.12);
-  color: #dc2626;
-}
-.kpi.bl .k-ic {
-  background: rgba(37, 99, 235, 0.1);
-  color: #2563eb;
-}
-.kpi.pl .k-ic {
-  background: rgba(124, 58, 237, 0.1);
-  color: #7c3aed;
-}
-.kpi.pk .k-ic {
-  background: rgba(220, 104, 3, 0.12);
-  color: #dc6803;
-}
-.k-body {
-  flex: 1;
-  min-width: 0;
-}
-.k-lab {
-  font-size: 12.5px;
-  color: #0c1f40;
-}
-.k-val {
-  font-size: 22px;
-  font-weight: 700;
-  font-family: "JetBrains Mono", monospace;
-  color: #0c1f40;
-  letter-spacing: -0.01em;
-  margin-top: 3px;
-}
-.kpi.rd .k-val {
-  color: #dc2626;
-}
-.k-u {
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(12, 31, 64, 0.92);
-  margin-left: 2px;
-  font-family: "Pretendard Variable", Pretendard, sans-serif;
-}
-.k-inline {
-  font-size: 13px;
-  font-weight: 600;
-  color: #059669;
-  margin-left: 8px;
-  font-family: "JetBrains Mono", monospace;
-  vertical-align: middle;
-}
-.kpi.rd .k-inline {
-  color: #dc2626;
-}
-.kpi.bl .k-inline {
-  color: #2563eb;
-}
-.kpi.pl .k-inline {
-  color: #7c3aed;
-}
-.kpi.pk .k-inline {
-  color: #dc6803;
-}
-.k-link {
-  font-size: 12px;
-  color: #2563eb;
-  cursor: pointer;
-  align-self: flex-start;
-}
-
-.kpi-meta {
-  background: #f7f9fc;
-  border: 1px solid #c9d4e3;
-  border-radius: 4px;
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 8px;
-  box-shadow: 0 1px 2px rgba(12, 31, 64, 0.06);
-}
-.km-t {
-  font-size: 11.5px;
-  color: #0c1f40;
-  line-height: 1.5;
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-}
-.km-t > i {
-  font-size: 12.5px;
-  padding-top: 1px;
-}
-.km-t strong {
-  font-family: "JetBrains Mono", monospace;
-  font-weight: 600;
-  color: #0c1f40;
-  font-size: 13px;
 }
 .km-toggle {
   display: inline-flex;
@@ -3761,7 +4183,7 @@ function saveSet() {
   color: #0c1f40;
   padding: 6px 10px;
   border-radius: 4px;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-family: inherit;
   cursor: pointer;
 }
@@ -3785,10 +4207,10 @@ function saveSet() {
   text-align: left;
 }
 .km-state {
-  font-size: 10.5px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.05em;
-  font-family: "JetBrains Mono", monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
   padding: 2px 6px;
   border-radius: 3px;
   background: #e8eff8;
@@ -3805,7 +4227,7 @@ function saveSet() {
 .b-rd {
   background: rgba(217, 112, 112, 0.18);
   color: #d97070;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
   padding: 1px 7px;
   border-radius: 2px;
@@ -3853,7 +4275,7 @@ function saveSet() {
   margin: 0;
 }
 .fail-card .ch i.bi-arrows-fullscreen {
-  font-size: 11px;
+  font-size: 13.5px;
   opacity: 0.5;
   cursor: pointer;
 }
@@ -3865,14 +4287,14 @@ function saveSet() {
   margin-bottom: 10px;
 }
 .fl-title {
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #fca5a5;
 }
 .fl-tag {
   background: rgba(217, 112, 112, 0.22);
   color: #d97070;
-  font-size: 10px;
+  font-size: 13px;
   padding: 1px 6px;
   border-radius: 2px;
   margin-left: 6px;
@@ -3881,7 +4303,7 @@ function saveSet() {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  font-size: 11.5px;
+  font-size: 13px;
   margin-bottom: 10px;
 }
 .fl-row {
@@ -3893,11 +4315,11 @@ function saveSet() {
 }
 .fl-row strong {
   font-weight: 600;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-size: 13.5px;
 }
 .fail-card h4 {
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 600;
   margin: 8px 0 5px;
   opacity: 0.85;
@@ -3906,17 +4328,17 @@ function saveSet() {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  font-size: 11px;
+  font-size: 13.5px;
   padding-left: 2px;
   margin-bottom: 3px;
 }
 .hst-t {
   color: #7ea4d8;
-  font-family: "JetBrains Mono", monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
   margin-right: 5px;
 }
 .rec-p {
-  font-size: 11px;
+  font-size: 13.5px;
   opacity: 0.75;
   line-height: 1.5;
   margin: 0 0 8px;
@@ -3930,7 +4352,7 @@ function saveSet() {
 .ab {
   padding: 7px;
   border-radius: 2px;
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 600;
   border: 0;
   cursor: pointer;
@@ -3959,12 +4381,11 @@ function saveSet() {
   align-items: center;
   gap: 6px;
   padding: 5px 0;
-  font-size: 11px;
+  font-size: 13.5px;
 }
 .resp-row span,
 .memo-row span {
   opacity: 0.6;
-  width: 50px;
   flex-shrink: 0;
 }
 .resp-row strong {
@@ -3978,7 +4399,7 @@ function saveSet() {
   color: #d4dbe7;
   padding: 4px 8px;
   border-radius: 2px;
-  font-size: 11px;
+  font-size: 13.5px;
   font-family: inherit;
 }
 .ab-sm {
@@ -3987,7 +4408,7 @@ function saveSet() {
   border: 1px solid rgba(120, 160, 210, 0.3);
   color: #7ea4d8;
   border-radius: 2px;
-  font-size: 10.5px;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -3996,122 +4417,1072 @@ function saveSet() {
    ============================================================ */
 .main-grid {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 0.95fr;
-  grid-template-rows: 1fr auto; /* 상단 늘어남, 하단은 콘텐츠만큼 */
+  grid-template-columns: 1.2fr 1fr 1fr;
+  grid-template-rows: 1.25fr 0.75fr;
   gap: 8px;
-  min-height: calc(100vh - 170px); /* 장애상세 풀세로 화면 꽉 */
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 .main-grid > .card,
-.main-grid > .bot-row > .card {
+.main-grid > .bot-row > .card,
+.main-grid > .col3-stack > .card {
   display: flex;
   flex-direction: column;
+  padding: 10px 12px !important;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+/* 카드 내부 표/리스트는 카드 안에서만 차지하고 오버플로 시 카드 안에 머무름 */
+.main-grid .cam-tbl,
+.main-grid .tl-list,
+.main-grid .srv,
+.main-grid .net-summary,
+.main-grid .nz-chart {
   min-height: 0;
 }
-.cam-card {
+.main-grid .cam-tbl tbody,
+.main-grid .tl-list {
+  overflow: hidden;
+}
+.main-grid .ch h3 {
+  font-size: 15.5px !important;
+}
+.main-grid .ch {
+  margin-bottom: 6px !important;
+}
+
+/* ── 알람 타임라인 컴팩트 (3행 더미에 딱 맞게) ── */
+.main-grid .timeline-card .tl-list { flex: 1; min-height: 0; overflow: hidden; margin-top: 0 !important; border-top: 0 !important; }
+.main-grid .timeline-card .tl-th,
+.main-grid .timeline-card .tl-row {
+  grid-template-columns: 64px 1fr 72px 12px !important;
+  gap: 6px !important;
+}
+.main-grid .timeline-card .tl-th {
+  margin-top: 0 !important;
+  border-top: 0 !important;
+}
+.main-grid .timeline-card .tl-th {
+  padding: 5px 8px !important;
+  font-size: 13px !important;
+  line-height: 1.3 !important;
+}
+.main-grid .timeline-card .tl-row {
+  padding: 7px 8px !important;
+  font-size: 14.5px !important;
+  line-height: 1.35 !important;
+}
+.main-grid .timeline-card .tl-row .tl-t,
+.main-grid .timeline-card .tl-row .tl-msg,
+.main-grid .timeline-card .tl-row .tl-who {
+  font-size: 14.5px !important;
+  line-height: 1.35 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.main-grid .timeline-card .tl-foot {
+  font-size: 13px !important;
+  padding: 5px 8px !important;
+}
+.main-grid .timeline-card .tl-filter button {
+  font-size: 13px !important;
+  padding: 2px 6px !important;
+}
+
+/* ── 카메라 카드 컴팩트 (가로 2칸 span이라 폭 여유) ── */
+.main-grid .cam-card .cam-tbl th,
+.main-grid .cam-card .cam-tbl td {
+  padding: 5px 8px !important;
+  font-size: 13.5px !important;
+  line-height: 1.3 !important;
+}
+.main-grid .cam-card .cam-filter {
+  margin-bottom: 4px !important;
+  gap: 4px !important;
+}
+.main-grid .cam-card .cf {
+  padding: 2px 8px !important;
+  font-size: 12px !important;
+}
+.main-grid .cam-card .cf-r input,
+.main-grid .cam-card .cf-r select {
+  padding: 2px 6px !important;
+  font-size: 12px !important;
+}
+.main-grid .cam-card .cam-foot {
+  font-size: 12px !important;
+  padding: 4px 6px !important;
+}
+.main-grid .cam-card .cam-foot button {
+  padding: 2px 6px !important;
+  font-size: 12px !important;
+}
+
+/* ── 장애상세 (row2 + 1.22fr 으로 공간 여유 있음) ── */
+.main-grid .fail-card .fl-head { padding: 8px 12px !important; margin-bottom: 8px !important; }
+.main-grid .fail-card .fl-rows { gap: 5px !important; margin-bottom: 10px !important; }
+.main-grid .fail-card .fl-row { font-size: 14.5px !important; padding: 2px 0 !important; line-height: 1.45 !important; }
+.main-grid .fail-card .fl-row span,
+.main-grid .fail-card .fl-row strong { font-size: 14.5px !important; line-height: 1.45 !important; }
+.main-grid .fail-card .fl-row span i { margin-right: 5px; color: #2563eb; opacity: 0.85; }
+.main-grid .fail-card h4 i { margin-right: 6px; color: #2563eb; }
+.main-grid .fail-card .hst > div { display: flex; align-items: center; gap: 6px; }
+.main-grid .fail-card .hst .hst-i { font-size: 7px; color: #dc2626; flex-shrink: 0; }
+.main-grid .fail-card .ab i { margin-right: 4px; font-size: 12px; }
+.main-grid .fail-card .resp-row span i,
+.main-grid .fail-card .memo-row span i { margin-right: 5px; color: #2563eb; opacity: 0.85; }
+.main-grid .fail-card h4 { font-size: 14.5px !important; margin: 8px 0 6px !important; }
+.main-grid .fail-card .hst { font-size: 14px !important; gap: 4px !important; line-height: 1.45 !important; }
+.main-grid .fail-card .hst > div { font-size: 14px !important; line-height: 1.45 !important; }
+.main-grid .fail-card .ab { padding: 8px 11px !important; font-size: 14px !important; line-height: 1.2 !important; }
+.main-grid .fail-card .act-row { gap: 5px !important; flex-wrap: wrap; }
+.main-grid .fail-card .resp-row,
+.main-grid .fail-card .memo-row { font-size: 14px !important; }
+.main-grid .fail-card .memo-row input { font-size: 14px !important; min-width: 0; }
+
+/* 카드 내부 — 폰트 크게 유지, 행 적당히 */
+.main-grid .cam-tbl th {
+  padding: 8px 8px !important;
+  font-size: 14.5px !important;
+}
+.main-grid .cam-tbl td {
+  padding: 8px 8px !important;
+  font-size: 14.5px !important;
+}
+.main-grid .tl-row {
+  padding: 8px 6px !important;
+  font-size: 14.5px !important;
+}
+.main-grid .tl-th {
+  padding: 6px 8px !important;
+  font-size: 14.5px !important;
+}
+
+/* 서버 카드 — 게이지 큼직하게 */
+.main-grid .srv-card .srv {
+  padding: 8px 0 !important;
+  gap: 10px !important;
+}
+.main-grid .srv-card .srv-gauges {
+  gap: 14px 20px !important;
+  padding: 14px 8px !important;
+}
+.main-grid .srv-card .srv-g-wrap {
+  width: 140px !important;
+  height: 140px !important;
+}
+.main-grid .srv-card .srv-g-lab {
+  font-size: 14px !important;
+}
+.main-grid .net-echart {
+  min-height: 210px !important;
+}
+.main-grid .srv-card .srv-bars {
+  gap: 8px !important;
+}
+.main-grid .srv-card .srv-b {
+  padding: 4px 0 !important;
+}
+.main-grid .srv-card .srv-icon {
+  width: 34px !important;
+  height: 34px !important;
+}
+.main-grid .srv-card .sn-t {
+  font-size: 14.5px !important;
+}
+.main-grid .srv-card .sn-ip {
+  font-size: 14px !important;
+}
+.main-grid .srv-card .srv-lab {
+  font-size: 14.5px !important;
+}
+.main-grid .srv-card .srv-val {
+  font-size: 14.5px !important;
+}
+
+/* 네트워크 요약 */
+.main-grid .net-summary {
+  gap: 10px !important;
+  padding: 4px !important;
+}
+.main-grid .ns-head {
+  padding: 4px 6px 8px !important;
+}
+.main-grid .ns-avg strong {
+  font-size: 14.5px !important;
+}
+.main-grid .ns-foot {
+  padding: 8px 4px 4px !important;
+  font-size: 14.5px !important;
+}
+
+/* 장애 상세 카드 */
+.main-grid .fail-card {
+  padding: 14px 16px !important;
+}
+.main-grid .fl-meta {
+  gap: 6px !important;
+}
+.main-grid .fl-meta-item {
+  padding: 6px 10px !important;
+  font-size: 13px !important;
+}
+
+/* ── 메인 그리드 배치 ──
+   [서버상태]   [네트워크지연]   [알람타임라인]
+   [카메라 (가로 2칸 span)]      [장애상세]
+*/
+.srv-card {
   grid-column: 1;
   grid-row: 1;
 }
-.srv-card {
+.net-card {
   grid-column: 2;
   grid-row: 1;
-}
-.fail-card {
-  grid-column: 3;
-  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
 }
 .bot-row {
-  grid-column: 1 / 3; /* 좌측 2 컬럼 영역을 차지 */
+  display: contents;
+}
+.bot-row .cam-card {
+  grid-column: 1 / span 2;
   grid-row: 2;
-  display: grid;
-  grid-template-columns: 3fr 7fr; /* 네트워크 3 : 토폴로지 7 */
+}
+/* 우측 컬럼 스택 — 알람타임라인(작게) + 장애상세(크게) */
+.col3-stack {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+  min-height: 0;
+  overflow: hidden;
+}
+.col3-stack .timeline-card {
+  flex: 0 0 auto;
+  max-height: 32%;
+}
+.col3-stack .fail-card {
+  flex: 1 1 auto;
   min-height: 0;
 }
 
-.net-grid {
+/* ★ 네트워크 지연 — heartbeat 라인 차트 (상세 탭에서만 사용) */
+.net-chart {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  grid-template-columns: 30px 1fr;
+  grid-template-rows: 1fr auto auto;
+  gap: 4px 8px;
+  min-height: 0;
+  flex: 1;
 }
-.nb-wide {
-  grid-column: 1 / -1;
-} /* 정상 구간 전체 폭 (이미지 매칭) */
-.net-card {
+.nc-y {
+  grid-column: 1;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 2px 0;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-size: 13px;
+  color: #4a5b78;
+  font-weight: 600;
 }
-.net-card .net-grid {
+.nc-svgwrap {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  background: #ffffff;
+  border: 1px solid #c9d4e3;
+  min-height: 140px;
+}
+.nc-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.nc-spike {
+  position: absolute;
+  top: 4px;
+  transform: translateX(-50%);
+  background: #dc2626;
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 2px;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+.nc-spike::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: #dc2626;
+  border-bottom: 0;
+}
+.nc-spike strong {
+  display: block;
+  font-weight: 800;
+}
+.nc-spike span {
+  display: block;
+  font-weight: 600;
+  opacity: 0.9;
+  font-size: 13px;
+  margin-top: 1px;
+}
+
+.nc-x {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-size: 13px;
+  color: #4a5b78;
+  font-weight: 600;
+}
+.nc-legend {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 6px 2px 0;
+  border-top: 1px solid #c9d4e3;
+  margin-top: 2px;
+  font-size: 13.5px;
+  color: #0c1f40;
+  font-weight: 600;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+}
+.nc-legend .lg-l {
+  display: inline-block;
+  width: 14px;
+  height: 2px;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+.nc-legend .lg-l.bl {
+  background: #2563eb;
+  height: 2px;
+}
+.nc-legend .lg-l.gr {
+  background: transparent;
+  border-top: 2px dashed #047857;
+  height: 0;
+  margin-top: 5px;
+}
+.nc-legend .lg-l.rd {
+  background: transparent;
+  border-top: 2px dashed #b91c1c;
+  height: 0;
+  margin-top: 5px;
+}
+.nc-legend .lg-l.sp {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #dc2626;
+  border: 1.5px solid #fff;
+  box-shadow: 0 0 0 1px #dc2626;
+  vertical-align: middle;
+}
+
+/* ★ 네트워크 요약 - 25셀 헬스 그리드 (산업 NOC 톤) */
+.net-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  padding: 4px 4px 0;
+}
+.ns-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 4px 4px 10px;
+  border-bottom: 1px solid #c9d4e3;
+}
+.ns-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ns-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.ns-dot.gr {
+  background: #047857;
+}
+.ns-dot.yl {
+  background: #b45309;
+  animation: nsPulse 2s ease-in-out infinite;
+}
+.ns-dot.rd {
+  background: #b91c1c;
+  animation: nsPulse 1.4s ease-in-out infinite;
+}
+@keyframes nsPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+.ns-st-label {
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0c1f40;
+  letter-spacing: 0.04em;
+}
+.ns-avg {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.ns-avg strong {
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0c1f40;
+  line-height: 1;
+}
+.ns-avg strong small {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5b78;
+  margin-left: 2px;
+}
+.ns-avg span {
+  font-size: 13.5px;
+  color: #4a5b78;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+}
+
+/* 구역별 평균 지연 세로 막대 (박스 fit) */
+.nz-chart {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  padding: 10px 8px 6px;
+  background: #f1f5fb;
+  border: 1px solid #c9d4e3;
+  flex: 1;
+  min-height: 140px;
+  align-items: stretch;
+}
+.nz-bar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.nz-bar:hover {
+  transform: translateY(-2px);
+}
+.nz-v {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0c1f40;
+  text-align: center;
+  margin-bottom: 4px;
+  letter-spacing: -0.02em;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  flex-shrink: 0;
+}
+.nz-v small {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5b78;
+  margin-left: 1px;
+}
+.nz-bar.gr .nz-v {
+  color: #047857;
+}
+.nz-bar.yl .nz-v {
+  color: #b45309;
+}
+.nz-bar.rd .nz-v {
+  color: #b91c1c;
+}
+.nz-fill {
+  width: 100%;
+  background: #047857;
+  margin-top: auto;
+  min-height: 6px;
+  border-top: 2px solid transparent;
+}
+.nz-bar.yl .nz-fill {
+  background: #b45309;
+}
+.nz-bar.or .nz-fill {
+  background: #c2410c;
+}
+.nz-bar.rd .nz-fill {
+  background: #b91c1c;
+  animation: nsPulse 1.4s ease-in-out infinite;
+}
+.nz-name {
+  margin-top: 5px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0c1f40;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+  letter-spacing: -0.01em;
+}
+
+.ns-foot {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 4px 4px;
+  border-top: 1px solid #c9d4e3;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-size: 13px;
+  color: #4a5b78;
+  font-weight: 600;
+}
+.ns-foot strong {
+  color: #0c1f40;
+  font-weight: 800;
+  margin-left: 4px;
+}
+.ns-d {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.ns-d.gr {
+  background: #047857;
+}
+.ns-d.yl {
+  background: #b45309;
+}
+.ns-d.rd {
+  background: #b91c1c;
+}
+
+/* ★ 네트워크 상세 탭 (전체 보기) */
+.net-detail .pnl-summary.nd-kpi {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.net-detail .ps-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: 1px solid #c9d4e3;
+}
+.net-detail .ps-box.gr {
+  border-top: 3px solid #047857;
+}
+.net-detail .ps-box.yl {
+  border-top: 3px solid #b45309;
+}
+.net-detail .ps-box.rd {
+  border-top: 3px solid #b91c1c;
+}
+.net-detail .ps-l {
+  font-size: 13px;
+  color: #4a5b78;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.net-detail .ps-v {
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-size: 26px;
+  font-weight: 800;
+  color: #0c1f40;
+  line-height: 1.1;
+}
+.net-detail .ps-v span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5b78;
+  margin-left: 2px;
+}
+.net-detail .ps-sub {
+  font-size: 13px;
+  color: #6b7a92;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin-top: 2px;
+}
+
+.nd-block {
+  margin-bottom: 22px;
+}
+.nd-block:last-child {
+  margin-bottom: 0;
+}
+.nd-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0 10px;
+  border-bottom: 2px solid #0c1f40;
+  margin-bottom: 12px;
+}
+.nd-h h4 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0c1f40;
+  letter-spacing: -0.01em;
+}
+.nd-h-r {
+  display: flex;
+  gap: 14px;
+  font-size: 13px;
+  color: #4a5b78;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.nd-h-cnt {
+  font-size: 13px;
+  color: #4a5b78;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.nd-chart {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  grid-template-rows: 1fr auto;
+  gap: 4px 8px;
+  min-height: 220px;
+}
+.nd-chart .nc-y {
+  grid-column: 1;
+  grid-row: 1;
+}
+.nd-chart .nc-svgwrap {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 220px;
+}
+.nd-chart .nc-x {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.nd-tbl th,
+.nd-tbl td {
+  padding: 8px 10px !important;
+  border-bottom: 1px solid #c9d4e3 !important;
+  font-size: 13.5px;
+  color: #0c1f40;
+}
+.nd-tbl th {
+  background: #e3e9f2;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4a5b78;
+  letter-spacing: -0.01em;
+  text-align: left;
+}
+.nd-tbl tbody tr:hover {
+  background: #f1f5fb;
+}
+.nd-tbl .rd-txt {
+  color: #b91c1c;
+  font-weight: 800;
+}
+.nd-tbl .yl-txt {
+  color: #b45309;
+  font-weight: 700;
+}
+
+.pnl-act {
+  background: #ffffff;
+  border: 1px solid #c9d4e3;
+  color: #0c1f40;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 2px;
+  cursor: pointer;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.pnl-act:hover {
+  background: #f1f5fb;
+  border-color: #2563eb;
+  color: #2563eb;
+}
+.pnl-act.sm {
+  padding: 3px 8px;
+  font-size: 13.5px;
+}
+
+/* ★ 카메라 페이지 - 위치별 분포 */
+.net-detail .pnl-summary.nd-kpi-7 {
+  grid-template-columns: repeat(7, 1fr);
+}
+.cd-zones {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+.cdz {
+  background: #ffffff;
+  border: 1px solid #c9d4e3;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
 }
-.nb {
-  background: #06101e;
-  border: 1px solid #1f3055;
-  border-radius: 2px;
-  padding: 7px 9px;
+.cdz-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
 }
-.nb-l {
-  font-size: 10.5px;
-  opacity: 0.65;
-  margin-bottom: 3px;
+.cdz-n {
+  font-size: 13px;
+  color: #0c1f40;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
-.nb-v {
-  font-size: 15px;
-  font-weight: 700;
-  font-family: "JetBrains Mono", monospace;
-  color: #c4d8f5;
-  margin-bottom: 3px;
+.cdz-c strong {
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0c1f40;
 }
-.ns {
-  width: 100%;
-  height: 18px;
+.cdz-c em {
+  font-style: normal;
+  font-size: 13px;
+  color: #4a5b78;
+  font-weight: 600;
+  margin-left: 2px;
 }
-.nb-v .u {
-  font-size: 10px;
-  opacity: 0.55;
-  font-weight: 500;
-  margin-left: 1px;
-  font-family: "Pretendard Variable", Pretendard, sans-serif;
-}
-.ns {
-  width: 100%;
-  height: 22px;
-}
-.bar-line {
-  height: 3px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 1px;
+.cdz-bar {
+  display: flex;
+  height: 6px;
+  background: #e3e9f2;
+  border: 1px solid #c9d4e3;
   overflow: hidden;
-  margin-top: 6px;
 }
-.bar-line span {
+.cdz-bar > span {
   display: block;
   height: 100%;
 }
-.topo-svg {
-  width: 100%;
-  height: 280px;
-  display: block;
-  overflow: visible;
+.cdz-bar > span.gr {
+  background: #047857;
 }
-.topo-card {
+.cdz-bar > span.yl {
+  background: #b45309;
+}
+.cdz-bar > span.rd {
+  background: #b91c1c;
+}
+.cdz-leg {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #4a5b78;
+  font-weight: 700;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+}
+.cdz-leg span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* KPI 7/8박스 그리드 */
+.net-detail .pnl-summary.nd-kpi-8 {
+  grid-template-columns: repeat(8, 1fr);
+}
+
+/* 진행 중 장애 큰 강조 카드 */
+.fl-cur {
+  background: #ffffff;
+  border: 1px solid #b91c1c;
+  border-left: 4px solid #b91c1c;
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
+  gap: 12px;
+}
+.flc-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1d1d1;
+}
+.flc-id {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.flc-id strong {
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0c1f40;
+}
+.flc-dev {
+  font-size: 13px;
+  color: #4a5b78;
+  font-weight: 700;
+}
+.flc-time {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.flc-l {
+  font-size: 13.5px;
+  color: #4a5b78;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+}
+.flc-time strong {
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+.flc-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 24px;
+}
+.flc-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px dashed #eef2f7;
+  font-size: 13.5px;
+  gap: 8px;
+}
+.flc-row span {
+  color: #4a5b78;
+  font-weight: 600;
+  font-size: 13px;
+  flex-shrink: 0;
+  letter-spacing: -0.01em;
+}
+.flc-row strong {
+  color: #0c1f40;
+  font-weight: 700;
+  text-align: right;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+
+/* 작업 진행 단계 */
+.flc-progress {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0;
+  padding: 10px 0;
+  border-top: 1px solid #c9d4e3;
+  border-bottom: 1px solid #c9d4e3;
+}
+.flc-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  position: relative;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #6b7a92;
+  letter-spacing: -0.01em;
+}
+.flc-step span {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e3e9f2;
+  color: #6b7a92;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13.5px;
+  font-weight: 800;
+  border: 1px solid #c9d4e3;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+}
+.flc-step::after {
+  content: "→";
+  position: absolute;
+  right: -4px;
+  color: #c9d4e3;
+  font-weight: 800;
+}
+.flc-step:last-child::after {
+  content: "";
+}
+.flc-step.done {
+  color: #047857;
+}
+.flc-step.done span {
+  background: #047857;
+  color: #fff;
+  border-color: #047857;
+}
+.flc-step.on {
+  color: #b91c1c;
+}
+.flc-step.on span {
+  background: #b91c1c;
+  color: #fff;
+  border-color: #b91c1c;
+  animation: nsPulse 1.5s ease-in-out infinite;
+}
+
+.flc-acts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ★ 설정 페이지 - 그리드 입력 (한글 가독성 Pretendard) */
+.set-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.set-it {
+  display: grid;
+  grid-template-columns: 1fr 100px;
+  grid-template-rows: auto auto;
+  gap: 4px 10px;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: 1px solid #c9d4e3;
+}
+.set-it label {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0c1f40;
+  align-self: center;
+  letter-spacing: -0.01em;
+}
+.set-it input[type="number"],
+.set-it select {
+  grid-column: 2;
+  grid-row: 1;
+  background: #f1f5fb;
+  border: 1px solid #c9d4e3;
+  color: #0c1f40;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 2px;
+  width: 100%;
+  font-weight: 700;
+}
+.set-it input[type="number"] {
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+}
+.set-it input[type="number"]:focus,
+.set-it select:focus {
+  outline: 1px solid #2563eb;
+  border-color: #2563eb;
+}
+.set-it .set-h {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  font-size: 13px;
+  color: #6b7a92;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+}
+
+.set-toggle {
+  grid-template-columns: 1fr auto;
+}
+.set-toggle label {
+  font-size: 13.5px;
+}
+.set-toggle input[type="checkbox"] {
+  grid-column: 2;
+  grid-row: 1;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #2563eb;
+}
+
+.set-actions {
+  display: flex;
+  align-items: center;
+  padding: 16px 0 4px;
+  border-top: 1px solid #c9d4e3;
+}
+.set-actions .btn-save {
+  background: #2563eb;
+  color: #fff;
+  border: 0;
+  padding: 11px 24px;
+  border-radius: 2px;
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.set-actions .btn-save:hover {
+  background: #1d4ed8;
 }
 
 .pnl {
   padding: 18px;
 }
 .pnl h3 {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   margin: 0 0 14px;
 }
 .pnl-tbl {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 .pnl-tbl th,
 .pnl-tbl td {
@@ -4122,15 +5493,15 @@ function saveSet() {
 .pnl-tbl th {
   font-weight: 600;
   opacity: 0.6;
-  font-size: 11.5px;
+  font-size: 13px;
 }
 .pnl-tbl .mono {
-  font-family: "JetBrains Mono", monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
 }
 .stat {
   padding: 2px 8px;
   border-radius: 100px;
-  font-size: 10.5px;
+  font-size: 13px;
   font-weight: 700;
 }
 .stat.ok {
@@ -4145,67 +5516,6 @@ function saveSet() {
   background: rgba(239, 68, 68, 0.18);
   color: #f87171;
 }
-.rep-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.rep-r {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: #06101e;
-  border: 1px solid #1f3055;
-  border-radius: 6px;
-}
-.rep-r > i {
-  font-size: 20px;
-  color: #60a5fa;
-}
-.rep-r > div {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.rep-r strong {
-  font-size: 13px;
-}
-.rep-r span {
-  font-size: 11px;
-  opacity: 0.6;
-}
-.bt-dl {
-  width: 32px;
-  height: 32px;
-  background: rgba(96, 165, 250, 0.12);
-  border: 0;
-  color: #60a5fa;
-  border-radius: 5px;
-  cursor: pointer;
-}
-.set-row {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid #1a2a45;
-  font-size: 13px;
-}
-.set-row input[type="number"],
-.set-row select {
-  background: #06101e;
-  border: 1px solid #1f3055;
-  color: #e4eeff;
-  padding: 6px 10px;
-  border-radius: 5px;
-  font-size: 12.5px;
-  max-width: 200px;
-}
-.set-row input[type="checkbox"] {
-  accent-color: #60a5fa;
-}
 .btn-save {
   margin-top: 14px;
   background: #3b82f6;
@@ -4213,7 +5523,7 @@ function saveSet() {
   border: 0;
   padding: 9px 16px;
   border-radius: 6px;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
@@ -4222,7 +5532,7 @@ function saveSet() {
 }
 .set-msg {
   margin-top: 10px;
-  font-size: 12px;
+  font-size: 13px;
   color: #34d399;
 }
 
@@ -4378,15 +5688,15 @@ function saveSet() {
 
 /* ★ 장애 상세 — 폰트 일괄 ↑ */
 .ops-shell .fail-card .fl-title {
-  font-size: 15px !important;
+  font-size: 13.5px !important;
   font-weight: 700 !important;
 }
 .ops-shell .fail-card .fl-tag {
-  font-size: 11.5px !important;
+  font-size: 13px !important;
   padding: 2px 8px !important;
 }
 .ops-shell .fail-card .b-rd {
-  font-size: 11.5px !important;
+  font-size: 13px !important;
   padding: 2px 8px !important;
 }
 .ops-shell .fail-card h4 {
@@ -4400,7 +5710,7 @@ function saveSet() {
   padding: 3px 0;
 }
 .ops-shell .fail-card .hst-t {
-  font-size: 12.5px !important;
+  font-size: 13.5px !important;
   font-weight: 700;
 }
 .ops-shell .fail-card .rec-p {
@@ -4421,7 +5731,7 @@ function saveSet() {
   font-weight: 700;
 }
 .ops-shell .fail-card .ab-sm {
-  font-size: 12px !important;
+  font-size: 13px !important;
   padding: 4px 10px !important;
 }
 .ops-shell .fail-card .memo-row input {
@@ -4431,17 +5741,17 @@ function saveSet() {
 
 /* ★ 서버 상태 — 폰트 일괄 ↑ */
 .ops-shell .srv-card .sn-t {
-  font-size: 14px !important;
+  font-size: 13.5px !important;
   font-weight: 700;
 }
 .ops-shell .srv-card .sn-tag {
-  font-size: 12px !important;
+  font-size: 13px !important;
 }
 .ops-shell .srv-card .sn-ip {
-  font-size: 12.5px !important;
+  font-size: 13.5px !important;
 }
 .ops-shell .srv-card .srv-name > i {
-  font-size: 20px !important;
+  font-size: 13px !important;
 }
 .srv-icon {
   width: 36px;
@@ -4450,15 +5760,15 @@ function saveSet() {
   filter: drop-shadow(0 2px 3px rgba(12, 31, 64, 0.18));
 }
 .ops-shell .srv-card .srv-lab {
-  font-size: 12px !important;
+  font-size: 13px !important;
   font-weight: 500;
 }
 .ops-shell .srv-card .srv-val {
-  font-size: 14px !important;
+  font-size: 13.5px !important;
   font-weight: 700;
 }
 .ops-shell .srv-card .stat {
-  font-size: 11.5px !important;
+  font-size: 13px !important;
   padding: 3px 9px !important;
 }
 .ops-shell .fail-card h4 {
@@ -4476,7 +5786,7 @@ function saveSet() {
 .ops-shell .ch-link {
   color: #2563eb !important;
   cursor: pointer;
-  font-size: 12.5px !important;
+  font-size: 13.5px !important;
   font-weight: 600;
   padding: 2px 4px;
   border-radius: 2px;
@@ -4493,7 +5803,7 @@ function saveSet() {
 }
 .ops-shell .pnl h3 {
   color: #0c1f40 !important;
-  font-size: 15.5px !important;
+  font-size: 13px !important;
   font-weight: 700 !important;
   padding-bottom: 8px;
   border-bottom: 1px solid #c9d4e3;
@@ -4535,7 +5845,7 @@ function saveSet() {
 .ops-shell .rep-r span {
   color: rgba(12, 31, 64, 0.78) !important;
   opacity: 1 !important;
-  font-size: 12.5px !important;
+  font-size: 13.5px !important;
 }
 .ops-shell .bt-dl {
   background: rgba(37, 99, 235, 0.12) !important;
@@ -4545,7 +5855,7 @@ function saveSet() {
 .ops-shell .set-row {
   color: #0c1f40 !important;
   border-bottom-color: #e3e9f2 !important;
-  font-size: 14px !important;
+  font-size: 13.5px !important;
 }
 .ops-shell .set-row input[type="number"],
 .ops-shell .set-row select {
@@ -4682,16 +5992,16 @@ function saveSet() {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 700;
   color: #0c1f40;
 }
 .cm-title i {
   color: #2563eb;
-  font-size: 18px;
+  font-size: 13.5px;
 }
 .cm-title .stat {
-  font-size: 11.5px !important;
+  font-size: 13px !important;
   padding: 3px 9px !important;
 }
 .cm-x {
@@ -4744,13 +6054,13 @@ function saveSet() {
   font-size: 13px;
 }
 .cm-stream-id {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 12px;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-size: 13px;
   color: rgba(255, 255, 255, 0.7);
 }
 .cm-stream-time {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-size: 13.5px;
   color: rgba(255, 255, 255, 0.45);
 }
 .cm-live {
@@ -4764,7 +6074,7 @@ function saveSet() {
   color: #fff;
   padding: 3px 10px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: 13.5px;
   font-weight: 700;
   letter-spacing: 0.05em;
 }
@@ -4788,7 +6098,7 @@ function saveSet() {
   color: #fff;
   padding: 3px 10px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: 13.5px;
   font-weight: 700;
 }
 
@@ -4811,17 +6121,8 @@ function saveSet() {
 .cm-row strong {
   color: #0c1f40;
   font-weight: 700;
-  font-family: "JetBrains Mono", monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
   font-size: 13px;
-}
-.cm-ok {
-  color: #059669 !important;
-}
-.cm-no {
-  color: #dc2626 !important;
-}
-.cm-wn {
-  color: #b45309 !important;
 }
 .cm-actions {
   display: grid;
@@ -4857,14 +6158,29 @@ function saveSet() {
 }
 
 /* ★ 알람 상세 모달 — 간결 */
-.alarm-modal { width: min(560px, 95vw); }
-.am-body { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
-.am-msg {
-  font-size: 15px; font-weight: 600; color: #0c1f40;
-  padding: 12px 14px; background: #f1f5fb;
-  border-left: 3px solid #2563eb; border-radius: 2px; line-height: 1.5;
+.alarm-modal {
+  width: min(560px, 95vw);
 }
-.alarm-modal .cm-actions { grid-template-columns: 1fr 1fr; margin-top: 6px; }
+.am-body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.am-msg {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0c1f40;
+  padding: 12px 14px;
+  background: #f1f5fb;
+  border-left: 3px solid #2563eb;
+  border-radius: 2px;
+  line-height: 1.5;
+}
+.alarm-modal .cm-actions {
+  grid-template-columns: 1fr 1fr;
+  margin-top: 6px;
+}
 
 /* ============================================================
    ★ 탭 패널 상세 — 헤더 / 요약 박스 / 표 / 푸터
@@ -4926,19 +6242,19 @@ function saveSet() {
   border-color: rgba(220, 38, 38, 0.3);
 }
 .ops-shell .ps-l {
-  font-size: 11.5px;
+  font-size: 13px;
   color: rgba(12, 31, 64, 0.9);
   margin-bottom: 4px;
 }
 .ops-shell .ps-v {
-  font-size: 22px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #0c1f40;
-  font-family: "JetBrains Mono", monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
   letter-spacing: -0.01em;
 }
 .ops-shell .ps-v span {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: rgba(12, 31, 64, 0.65);
   margin-left: 2px;
@@ -4961,7 +6277,7 @@ function saveSet() {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid #c9d4e3;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: rgba(12, 31, 64, 0.78);
 }
 .ops-shell .pnl-foot .pg-row {
@@ -4976,7 +6292,7 @@ function saveSet() {
   height: 28px;
   border-radius: 2px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
 }
 .ops-shell .pnl-foot .pg-row button.on {
   background: #2563eb;
@@ -5004,9 +6320,9 @@ function saveSet() {
   gap: 10px;
 }
 .ops-shell .srv-uptime {
-  font-size: 12px;
+  font-size: 13px;
   color: rgba(12, 31, 64, 0.78);
-  font-family: "JetBrains Mono", monospace;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
   padding: 3px 8px;
   border: 1px solid #c9d4e3;
   border-radius: 2px;
@@ -5018,7 +6334,7 @@ function saveSet() {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px dashed #c9d4e3;
-  font-size: 12px;
+  font-size: 13px;
   color: rgba(12, 31, 64, 0.85);
 }
 .ops-shell .srv-meta i {

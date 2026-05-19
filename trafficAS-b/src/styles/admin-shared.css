@@ -142,70 +142,9 @@
 .ops-shell .snav-i i,
 .sa-shell .snav-i i { width: 16px; font-size: 15px; }
 
-/* ───── 헤더 (모든 6개 공통) ───── */
-.admin-shell .top,
-.cc-shell .top,
-.ops-shell .top,
-.sa-shell .top,
-.an-shell .top,
-.rev-shell .top { display: flex; align-items: center; justify-content: space-between; }
+/* ───── 헤더 — 통일 스펙은 아래 (시설운영팀 기준) ───── */
 
-.admin-shell .top h1,
-.cc-shell .top h1,
-.ops-shell .top h1,
-.sa-shell .top h1,
-.an-shell .top h1,
-.rev-shell .top h1 { font-size: 18px; font-weight: 700; margin: 0; }
-
-.admin-shell .t-sub,
-.cc-shell .t-sub,
-.ops-shell .t-sub,
-.sa-shell .t-sub,
-.an-shell .t-sub,
-.rev-shell .t-sub { font-weight: 500; opacity: .8; margin-left: 6px; }
-
-.admin-shell .t-right,
-.cc-shell .t-right,
-.ops-shell .t-right,
-.sa-shell .t-right,
-.an-shell .t-right,
-.rev-shell .t-right { display: flex; align-items: center; gap: 10px; }
-
-.admin-shell .t-bell,
-.cc-shell .t-bell,
-.ops-shell .t-bell,
-.sa-shell .t-bell,
-.an-shell .t-bell,
-.rev-shell .t-bell {
-  position: relative; width: 32px; height: 32px; border-radius: 50%;
-  background: #0f1d34; border: 1px solid #1f3055;
-  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
-}
-
-.admin-shell .bdg,
-.cc-shell .bdg,
-.ops-shell .bdg,
-.sa-shell .bdg,
-.an-shell .bdg,
-.rev-shell .bdg {
-  position: absolute; top: -4px; right: -4px;
-  min-width: 16px; height: 16px; padding: 0 4px;
-  border-radius: 999px; background: #ef4444; color: #fff;
-  font-size: 10px; font-weight: 700;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-
-.admin-shell .t-user,
-.cc-shell .t-user,
-.ops-shell .t-user,
-.sa-shell .t-user,
-.an-shell .t-user,
-.rev-shell .t-user {
-  background: #0f1d34; border: 1px solid #1f3055;
-  border-radius: 6px; padding: 7px 12px;
-  font-size: 13px; display: inline-flex; align-items: center;
-  gap: 6px; cursor: pointer;
-}
+/* legacy t-bell / .bdg / t-user 다크 스타일 제거 — 시설운영팀 통일 헤더 사용 */
 
 /* ───── 카드 공통 ───── */
 .admin-shell .card,
@@ -599,11 +538,10 @@
 .rev-shell .pager button { background: #ffffff !important; border-color: #c9d4e3 !important; color: #0c1f40 !important; }
 .rev-shell .pager .pg.on { background: #2563eb !important; border-color: #2563eb !important; color: #fff !important; }
 
-/* 모든 카드 헤더 분리선 */
+/* 모든 카드 헤더 */
 .cc-shell .card h3, .ops-shell .card h3, .sa-shell .card h3, .admin-shell .card h3,
 .an-shell .card h3, .rev-shell .card h3, .bot-card h3 {
   color: #0c1f40 !important;
-  border-bottom: 1px solid #c9d4e3 !important;
 }
 
 /* Tag/Badge */
@@ -1283,6 +1221,30 @@
 }
 .sa-shell .set-msg { color: #059669 !important; font-size: 13px !important; font-weight: 700 !important; }
 
+/* 경영전략본부 - 권한 배지 + 권한 매트릭스 */
+.sa-shell .role-badge {
+  display: inline-block !important; padding: 2px 8px !important; border-radius: 4px !important;
+  font-size: 11px !important; font-weight: 800 !important; margin-right: 6px !important;
+  font-family: "JetBrains Mono", monospace !important;
+}
+.sa-shell .role-badge.super { background: rgba(124,58,237,.14) !important; color: #7c3aed !important; }
+.sa-shell .role-badge.admin { background: rgba(37,99,235,.14) !important; color: #2563eb !important; }
+.sa-shell .role-badge.user  { background: rgba(5,150,105,.14) !important; color: #059669 !important; }
+.sa-shell .role-badge.guest { background: rgba(107,122,146,.18) !important; color: #4a5b78 !important; }
+
+.sa-shell .perm-matrix th em {
+  display: block !important; font-size: 10.5px !important; font-style: normal !important;
+  color: #6b7a92 !important; font-weight: 600 !important; margin-top: 1px !important;
+}
+.sa-shell .perm-matrix th { text-align: center !important; }
+.sa-shell .pm-cell {
+  text-align: center !important;
+  font-family: "JetBrains Mono", monospace !important;
+  font-weight: 800 !important; font-size: 15px !important;
+  color: #c9d4e3 !important;
+}
+.sa-shell .pm-cell.on { color: #059669 !important; }
+
 /* ============================================================
    운영기획팀 (admin-shell) - 폰트 키우기 + 라이트 가독성 보정
    ============================================================ */
@@ -1410,6 +1372,34 @@
 .admin-shell .tbl-dept .up { color: #059669 !important; font-weight: 700 !important; }
 .admin-shell .tbl-dept .flat { color: #6b7a92 !important; }
 
+/* 절차/스텝 - 카드 내부 인라인 한 줄 변형 */
+.admin-shell .steps.inline.compact {
+  background: transparent !important; border: 0 !important;
+  margin-top: 8px !important; padding: 6px 0 0 !important;
+  border-top: 1px solid #d8dfe9 !important;
+  display: flex !important; align-items: center !important; gap: 10px !important; flex-wrap: wrap !important;
+}
+.admin-shell .steps.inline.compact .steps-h {
+  font-size: 11px !important; font-weight: 800 !important; color: #4a5b78 !important;
+  letter-spacing: .04em !important; text-transform: uppercase !important; margin: 0 !important;
+}
+.admin-shell .steps.inline.compact .steps-row {
+  display: inline-flex !important; align-items: center !important; gap: 4px !important; flex-wrap: wrap !important;
+}
+.admin-shell .steps.inline.compact .step {
+  display: inline-flex !important; align-items: baseline !important; gap: 3px !important;
+  background: transparent !important; border: 0 !important; padding: 0 !important;
+  font-size: 12px !important; color: #0c1f40 !important; font-weight: 600 !important;
+}
+.admin-shell .steps.inline.compact .step b {
+  color: #2563eb !important; font-weight: 800 !important;
+  font-family: "JetBrains Mono", monospace !important;
+}
+.admin-shell .steps.inline.compact .step-arrow {
+  color: #6b7a92 !important; font-size: 10px !important; position: static !important;
+  background: transparent !important; padding: 0 2px !important;
+}
+
 /* 절차/스텝 */
 .admin-shell .steps {
   background: #f1f5fb !important; border: 1px solid #c9d4e3 !important;
@@ -1494,6 +1484,229 @@
   margin-left: 4px !important;
 }
 .admin-shell .hdr-ts i { color: #2563eb !important; margin-left: 3px !important; }
+
+/* ============================================================
+   헤더 통일 (시설운영팀 기준)
+   모든 부서: 부서명만 + hdr-time + km-toggle + DeptSwitcher + t-user
+   ============================================================ */
+html .admin-shell .top,
+html .cc-shell .top,
+html .sa-shell .top,
+html .an-shell .top,
+html .rev-shell .top,
+html .ops-shell .top {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 14px 20px !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #b8c5d8 !important;
+}
+html .admin-shell .top h1,
+html .cc-shell .top h1,
+html .sa-shell .top h1,
+html .an-shell .top h1,
+html .rev-shell .top h1,
+html .ops-shell .top h1 {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: #0c1f40 !important;
+  letter-spacing: -0.01em !important;
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+html .admin-shell .top h1 .t-main,
+html .cc-shell .top h1 .t-main,
+html .sa-shell .top h1 .t-main,
+html .an-shell .top h1 .t-main,
+html .rev-shell .top h1 .t-main,
+html .ops-shell .top h1 .t-main {
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  color: #0c1f40 !important;
+  letter-spacing: -0.01em !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  display: inline-block !important;
+}
+html .admin-shell .top h1 .t-main:hover,
+html .cc-shell .top h1 .t-main:hover,
+html .sa-shell .top h1 .t-main:hover,
+html .an-shell .top h1 .t-main:hover,
+html .rev-shell .top h1 .t-main:hover,
+html .ops-shell .top h1 .t-main:hover {
+  color: #1d4ed8 !important;
+  text-decoration: none !important;
+}
+
+html .admin-shell .top .t-right,
+html .cc-shell .top .t-right,
+html .sa-shell .top .t-right,
+html .an-shell .top .t-right,
+html .rev-shell .top .t-right,
+html .ops-shell .top .t-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+/* 마지막 업데이트 시각 */
+html .admin-shell .hdr-time,
+html .cc-shell .hdr-time,
+html .sa-shell .hdr-time,
+html .an-shell .hdr-time,
+html .rev-shell .hdr-time,
+html .ops-shell .hdr-time {
+  font-size: 13px !important;
+  color: #0c1f40 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 0 6px !important;
+  white-space: nowrap !important;
+  font-weight: 500 !important;
+}
+html .admin-shell .hdr-time > i,
+html .cc-shell .hdr-time > i,
+html .sa-shell .hdr-time > i,
+html .an-shell .hdr-time > i,
+html .rev-shell .hdr-time > i,
+html .ops-shell .hdr-time > i {
+  font-size: 13px !important;
+  opacity: 0.8 !important;
+  color: #4a5b78 !important;
+}
+html .admin-shell .hdr-time strong,
+html .cc-shell .hdr-time strong,
+html .sa-shell .hdr-time strong,
+html .an-shell .hdr-time strong,
+html .rev-shell .hdr-time strong,
+html .ops-shell .hdr-time strong {
+  font-family: "JetBrains Mono", monospace !important;
+  font-weight: 700 !important;
+  color: #0c1f40 !important;
+  margin-left: 2px !important;
+}
+
+/* 자동 새로고침 토글 */
+html .admin-shell .km-toggle,
+html .cc-shell .km-toggle,
+html .sa-shell .km-toggle,
+html .an-shell .km-toggle,
+html .rev-shell .km-toggle,
+html .ops-shell .km-toggle {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  background: #f1f5fb !important;
+  border: 1px solid #dde8f4 !important;
+  color: #0c1f40 !important;
+  padding: 6px 10px !important;
+  border-radius: 4px !important;
+  font-size: 12.5px !important;
+  font-family: inherit !important;
+  cursor: pointer !important;
+}
+html .admin-shell .km-toggle.on,
+html .cc-shell .km-toggle.on,
+html .sa-shell .km-toggle.on,
+html .an-shell .km-toggle.on,
+html .rev-shell .km-toggle.on,
+html .ops-shell .km-toggle.on {
+  background: rgba(5,150,105,.08) !important;
+  border-color: rgba(5,150,105,.4) !important;
+  color: #0c1f40 !important;
+}
+html .admin-shell .km-dot,
+html .cc-shell .km-dot,
+html .sa-shell .km-dot,
+html .an-shell .km-dot,
+html .rev-shell .km-dot,
+html .ops-shell .km-dot {
+  width: 7px !important; height: 7px !important; border-radius: 50% !important;
+  background: #94a3b8 !important; flex-shrink: 0 !important;
+}
+html .admin-shell .km-toggle.on .km-dot,
+html .cc-shell .km-toggle.on .km-dot,
+html .sa-shell .km-toggle.on .km-dot,
+html .an-shell .km-toggle.on .km-dot,
+html .rev-shell .km-toggle.on .km-dot,
+html .ops-shell .km-toggle.on .km-dot {
+  background: #059669 !important;
+}
+html .admin-shell .km-lab,
+html .cc-shell .km-lab,
+html .sa-shell .km-lab,
+html .an-shell .km-lab,
+html .rev-shell .km-lab,
+html .ops-shell .km-lab { flex: 1 !important; text-align: left !important; }
+html .admin-shell .km-state,
+html .cc-shell .km-state,
+html .sa-shell .km-state,
+html .an-shell .km-state,
+html .rev-shell .km-state,
+html .ops-shell .km-state {
+  font-size: 10.5px !important; font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  font-family: "JetBrains Mono", monospace !important;
+  padding: 2px 6px !important; border-radius: 3px !important;
+  background: #e8eff8 !important; color: #0c1f40 !important;
+}
+html .admin-shell .km-toggle.on .km-state,
+html .cc-shell .km-toggle.on .km-state,
+html .sa-shell .km-toggle.on .km-state,
+html .an-shell .km-toggle.on .km-state,
+html .rev-shell .km-toggle.on .km-state,
+html .ops-shell .km-toggle.on .km-state {
+  background: rgba(5,150,105,.15) !important; color: #059669 !important;
+}
+
+/* t-user 통일 */
+html .admin-shell .t-user,
+html .cc-shell .t-user,
+html .sa-shell .t-user,
+html .an-shell .t-user,
+html .rev-shell .t-user,
+html .ops-shell .t-user {
+  display: inline-flex !important; align-items: center !important; gap: 6px !important;
+  background: #ffffff !important;
+  border: 1px solid #dde8f4 !important;
+  color: #0c1f40 !important;
+  font-size: 13.5px !important; font-weight: 600 !important;
+  padding: 6px 12px !important; border-radius: 4px !important;
+  cursor: pointer !important; white-space: nowrap !important;
+}
+html .admin-shell .t-user:hover,
+html .cc-shell .t-user:hover,
+html .sa-shell .t-user:hover,
+html .an-shell .t-user:hover,
+html .rev-shell .t-user:hover,
+html .ops-shell .t-user:hover { border-color: #2563eb !important; }
+
+/* 헤더 부서명 클릭 (모든 부서 공통) */
+html .admin-shell .t-main,
+html .cc-shell .t-main,
+html .sa-shell .t-main,
+html .an-shell .t-main,
+html .rev-shell .t-main,
+html .ops-shell .t-main {
+  cursor: pointer !important;
+  text-decoration: none !important;
+  transition: color 0.15s !important;
+  user-select: none !important;
+}
+html .admin-shell .t-main:hover,
+html .cc-shell .t-main:hover,
+html .sa-shell .t-main:hover,
+html .an-shell .t-main:hover,
+html .rev-shell .t-main:hover,
+html .ops-shell .t-main:hover {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+  text-underline-offset: 3px !important;
+}
 
 /* 성과 개요 - 컨트롤 행 + 통계 푸터 */
 .admin-shell .ctrl-row {
@@ -1647,17 +1860,102 @@
 .admin-shell .rr-st.ok   { background: rgba(5,150,105,.14) !important; color: #059669 !important; }
 .admin-shell .rr-st.appr { background: rgba(37,99,235,.14) !important; color: #2563eb !important; }
 
-/* 카드 자체 패딩 축소 + row 간격 축소 */
-.admin-shell .row2, .admin-shell .row3 { gap: 10px !important; }
-.admin-shell .main { gap: 12px !important; }
-.admin-shell .card { padding: 12px 14px !important; }
-.admin-shell .card h3 { margin-bottom: 8px !important; }
-.admin-shell .card-h { margin-bottom: 6px !important; }
-.admin-shell .bars { height: 150px !important; }
-.admin-shell .rep-grid { gap: 6px !important; margin-bottom: 8px !important; }
-.admin-shell .rep { padding: 10px !important; }
-.admin-shell .rep-actions { gap: 6px !important; }
-.admin-shell .rk-more { margin-top: 6px !important; padding: 7px !important; }
+/* 운영기획팀 전체 크기·폰트 업 */
+.admin-shell .row2, .admin-shell .row3 { gap: 14px !important; }
+.admin-shell .main { gap: 14px !important; padding: 20px 24px !important; }
+.admin-shell .card { padding: 16px 18px !important; }
+.admin-shell .card h3 { margin-bottom: 10px !important; font-size: 17px !important; font-weight: 800 !important; }
+.admin-shell .card-h { margin-bottom: 10px !important; }
+.admin-shell .top { padding: 16px 24px !important; }
+.admin-shell .top h1 { font-size: 22px !important; }
+.admin-shell .top h1 .t-main { font-size: 24px !important; }
+
+/* 성과 개요 */
+.admin-shell .bars { height: 160px !important; padding: 0 6px !important; }
+.admin-shell .bnum { font-size: 13px !important; font-weight: 800 !important; }
+.admin-shell .bday { font-size: 12px !important; font-weight: 600 !important; }
+.admin-shell .ctrl-row { margin-bottom: 10px !important; }
+.admin-shell .legend { margin-bottom: 8px !important; font-size: 13px !important; font-weight: 600 !important; }
+.admin-shell .perf-stats { margin-top: 14px !important; padding-top: 12px !important; }
+.admin-shell .ps-i { padding: 6px 12px !important; }
+.admin-shell .ps-v { font-size: 16px !important; }
+.admin-shell .ps-l { font-size: 13px !important; }
+.admin-shell .ps-e { font-size: 12px !important; }
+.admin-shell .tab { font-size: 13.5px !important; padding: 7px 14px !important; }
+.admin-shell .period-sel .ps { font-size: 13px !important; padding: 6px 14px !important; }
+
+/* 이벤트 처리 현황 */
+.admin-shell .donut-wrap { width: 140px !important; height: 140px !important; }
+.admin-shell .evt-body { grid-template-columns: 140px 1fr !important; gap: 14px !important; }
+.admin-shell .dc-val { font-size: 26px !important; }
+.admin-shell .dc-lab { font-size: 12.5px !important; }
+.admin-shell .dc-u { font-size: 13px !important; }
+.admin-shell .donut-legend.compact { font-size: 13px !important; }
+.admin-shell .donut-legend em { font-size: 12.5px !important; }
+.admin-shell .evt-meta-row { margin-top: 12px !important; padding-top: 10px !important; font-size: 13px !important; }
+.admin-shell .evt-types { margin-top: 12px !important; padding-top: 10px !important; }
+.admin-shell .et-i { padding: 4px 0 !important; }
+.admin-shell .et-bar { height: 8px !important; }
+.admin-shell .et-tag { font-size: 12px !important; padding: 3px 9px !important; }
+.admin-shell .et-i > strong { font-size: 13.5px !important; }
+
+/* 리스크 요약 */
+.admin-shell .risk .rk { padding: 10px 0 !important; }
+.admin-shell .risk .rk-t { font-size: 14px !important; }
+.admin-shell .risk .rk-d { font-size: 12.5px !important; margin-top: 3px !important; }
+.admin-shell .rk-bot { margin-top: 6px !important; }
+.admin-shell .rk-more { margin-top: 10px !important; padding: 9px !important; font-size: 13px !important; }
+.admin-shell .rsk-cnts { gap: 6px !important; }
+.admin-shell .rsk-c { padding: 3px 10px !important; font-size: 12.5px !important; }
+.admin-shell .rk-sev-tag { font-size: 11.5px !important; padding: 3px 9px !important; }
+.admin-shell .risk .rk-cnt { font-size: 13.5px !important; }
+.admin-shell .rk-act { font-size: 12.5px !important; }
+.admin-shell .rk-num { font-size: 13.5px !important; }
+
+/* 부서별 성과 비교 */
+.admin-shell .tbl-dept { font-size: 13.5px !important; }
+.admin-shell .tbl-dept th, .admin-shell .tbl-dept td { padding: 9px 10px !important; }
+.admin-shell .tbl-dept th { font-size: 12.5px !important; }
+.admin-shell .grade { font-size: 12.5px !important; padding: 4px 10px !important; }
+.admin-shell .steps.inline { margin-top: 14px !important; padding-top: 12px !important; }
+.admin-shell .steps.inline.compact { gap: 12px !important; }
+.admin-shell .steps.inline.compact .step { font-size: 13.5px !important; }
+.admin-shell .steps.inline.compact .steps-h { font-size: 12.5px !important; }
+
+/* 보고서 생성 */
+.admin-shell .rep-grid { gap: 8px !important; margin-bottom: 10px !important; }
+.admin-shell .rep { padding: 11px 13px !important; }
+.admin-shell .rep-h { font-size: 13.5px !important; margin-bottom: 4px !important; }
+.admin-shell .rep-d { font-size: 12.5px !important; }
+.admin-shell .rep-date { font-size: 12px !important; margin: 4px 0 8px !important; }
+.admin-shell .rep-btn { padding: 7px !important; font-size: 12.5px !important; }
+.admin-shell .rep-actions { gap: 8px !important; }
+.admin-shell .btn-pri, .admin-shell .btn-sec { padding: 9px !important; font-size: 13px !important; }
+.admin-shell .recent-rep { margin-top: 14px !important; padding-top: 12px !important; }
+.admin-shell .rr-h { margin-bottom: 8px !important; font-size: 13.5px !important; }
+.admin-shell .rr-list { gap: 6px !important; }
+.admin-shell .rr-i { padding: 8px 12px !important; gap: 12px !important; }
+.admin-shell .rr-i .rr-t { font-size: 13px !important; }
+.admin-shell .rr-i .rr-meta { font-size: 11.5px !important; }
+.admin-shell .rr-views { font-size: 12.5px !important; }
+.admin-shell .rr-st { font-size: 11.5px !important; padding: 3px 9px !important; }
+
+/* 사이드 KPI 패널 */
+.admin-shell .side-kpi { gap: 8px !important; }
+.admin-shell .sk-i { padding: 9px 11px !important; gap: 4px !important; }
+.admin-shell .sk-l { font-size: 12.5px !important; }
+.admin-shell .sk-v { font-size: 22px !important; }
+.admin-shell .sk-v small { font-size: 13px !important; }
+.admin-shell .sk-d { font-size: 12px !important; }
+.admin-shell .sk-bar { height: 3px !important; }
+.admin-shell .sk-foot { padding: 8px 4px 0 !important; font-size: 12px !important; }
+.admin-shell .sk-h { font-size: 12px !important; }
+
+/* hdr-kpis chips */
+.admin-shell .hk-l { font-size: 13px !important; }
+.admin-shell .hk-v { font-size: 19px !important; }
+.admin-shell .hk-d { font-size: 12.5px !important; }
+.admin-shell .hdr-ts { font-size: 13px !important; }
 
 /* 좌측 사이드바 KPI 패널 */
 .admin-shell .side { width: 220px !important; display: flex !important; flex-direction: column !important; }
@@ -1714,17 +2012,18 @@
 .cc-shell .side-weather,
 .ops-shell .side-weather,
 .an-shell .side-weather {
-  margin-top: 14px !important; padding: 12px !important;
-  background: #f1f5fb !important; border: 1px solid #c9d4e3 !important; border-radius: 8px !important;
-  display: flex !important; flex-direction: column !important; gap: 10px !important;
+  margin-top: 4px !important; padding: 8px !important;
+  background: #ffffff !important; border: 1px solid #b8c5d8 !important; border-radius: 2px !important;
+  display: flex !important; flex-direction: column !important; gap: 5px !important;
   color: #0c1f40 !important;
+  flex-shrink: 0 !important;
 }
 .cc-shell .sw-h, .ops-shell .sw-h, .an-shell .sw-h {
-  display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 6px !important;
+  display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 4px !important;
 }
 .cc-shell .sw-h > span, .ops-shell .sw-h > span, .an-shell .sw-h > span {
-  font-size: 11.5px !important; font-weight: 800 !important; color: #4a5b78 !important;
-  letter-spacing: .03em !important; text-transform: uppercase !important;
+  font-size: 12.5px !important; font-weight: 800 !important; color: #0c1f40 !important;
+  letter-spacing: -0.01em !important;
 }
 .cc-shell .sw-h > span i, .ops-shell .sw-h > span i, .an-shell .sw-h > span i { color: #2563eb !important; margin-right: 4px !important; }
 .cc-shell .sw-tabs, .ops-shell .sw-tabs, .an-shell .sw-tabs {
@@ -1732,99 +2031,109 @@
   background: #ffffff !important; border: 1px solid #c9d4e3 !important; border-radius: 4px !important; padding: 2px !important;
 }
 .cc-shell .sw-t, .ops-shell .sw-t, .an-shell .sw-t {
-  background: none !important; border: 0 !important; padding: 4px 0 !important;
-  font-size: 11px !important; font-weight: 700 !important; color: #4a5b78 !important;
+  background: none !important; border: 0 !important; padding: 5px 0 !important;
+  font-size: 12.5px !important; font-weight: 700 !important; color: #4a5b78 !important;
   cursor: pointer !important; border-radius: 3px !important; text-align: center !important;
+  letter-spacing: -0.01em !important;
 }
 .cc-shell .sw-t.on, .ops-shell .sw-t.on, .an-shell .sw-t.on {
   background: #2563eb !important; color: #fff !important;
 }
 
 .cc-shell .sw-main, .ops-shell .sw-main, .an-shell .sw-main {
-  display: flex !important; align-items: center !important; gap: 12px !important;
-  padding: 6px 4px !important;
+  display: flex !important; align-items: center !important; gap: 10px !important;
+  padding: 2px !important;
 }
-.cc-shell .sw-icon, .ops-shell .sw-icon, .an-shell .sw-icon { font-size: 38px !important; }
-.cc-shell .sw-c, .ops-shell .sw-c, .an-shell .sw-c { display: flex !important; flex-direction: column !important; gap: 2px !important; }
+.cc-shell .sw-icon, .ops-shell .sw-icon, .an-shell .sw-icon { font-size: 30px !important; }
+.cc-shell .sw-c, .ops-shell .sw-c, .an-shell .sw-c { display: flex !important; flex-direction: column !important; gap: 1px !important; }
 .cc-shell .sw-cond, .ops-shell .sw-cond, .an-shell .sw-cond {
   font-size: 12.5px !important; color: #4a5b78 !important; font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
 }
 .cc-shell .sw-temp, .ops-shell .sw-temp, .an-shell .sw-temp {
-  font-size: 26px !important; font-weight: 800 !important; color: #0c1f40 !important;
+  font-size: 22px !important; font-weight: 800 !important; color: #0c1f40 !important;
   font-family: "JetBrains Mono", monospace !important; line-height: 1 !important;
+  letter-spacing: -0.02em !important;
 }
 .cc-shell .sw-temp small, .ops-shell .sw-temp small, .an-shell .sw-temp small {
-  font-size: 14px !important; color: #4a5b78 !important; margin-left: 1px !important;
+  font-size: 12px !important; color: #4a5b78 !important; margin-left: 1px !important;
 }
 
 .cc-shell .sw-stats, .ops-shell .sw-stats, .an-shell .sw-stats {
-  display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 4px !important;
-  padding: 6px 0 !important; border-top: 1px solid #d8dfe9 !important; border-bottom: 1px solid #d8dfe9 !important;
+  display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 3px !important;
+  padding: 4px 0 !important; border-top: 1px solid #d8dfe9 !important; border-bottom: 1px solid #d8dfe9 !important;
 }
 .cc-shell .sw-st, .ops-shell .sw-st, .an-shell .sw-st {
-  display: flex !important; flex-direction: column !important; align-items: center !important; gap: 1px !important;
+  display: flex !important; flex-direction: column !important; align-items: center !important; gap: 0 !important;
 }
 .cc-shell .sw-st i, .ops-shell .sw-st i, .an-shell .sw-st i { color: #2563eb !important; font-size: 12px !important; }
 .cc-shell .sw-st span, .ops-shell .sw-st span, .an-shell .sw-st span {
-  font-size: 10px !important; color: #6b7a92 !important; font-weight: 600 !important;
+  font-size: 11px !important; color: #4a5b78 !important; font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
 }
 .cc-shell .sw-st strong, .ops-shell .sw-st strong, .an-shell .sw-st strong {
-  font-size: 11.5px !important; color: #0c1f40 !important; font-weight: 800 !important;
+  font-size: 12px !important; color: #0c1f40 !important; font-weight: 800 !important;
   font-family: "JetBrains Mono", monospace !important;
 }
 
 .cc-shell .sw-aq, .ops-shell .sw-aq, .an-shell .sw-aq {
-  display: flex !important; flex-direction: column !important; gap: 6px !important;
+  display: flex !important; flex-direction: column !important; gap: 4px !important;
 }
 .cc-shell .sw-aq-i, .ops-shell .sw-aq-i, .an-shell .sw-aq-i {
-  display: flex !important; flex-direction: column !important; gap: 2px !important;
+  display: grid !important; grid-template-columns: 80px 1fr auto !important;
+  gap: 6px !important; align-items: center !important;
 }
 .cc-shell .sw-aq-l, .ops-shell .sw-aq-l, .an-shell .sw-aq-l {
-  font-size: 10.5px !important; color: #4a5b78 !important; font-weight: 700 !important;
+  font-size: 11.5px !important; color: #0c1f40 !important; font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
 }
 .cc-shell .sw-aq-bar, .ops-shell .sw-aq-bar, .an-shell .sw-aq-bar {
-  display: block !important; height: 4px !important; background: #e7edf6 !important;
+  display: block !important; height: 5px !important; background: #e7edf6 !important;
   border-radius: 2px !important; overflow: hidden !important;
 }
 .cc-shell .sw-aq-bar > span, .ops-shell .sw-aq-bar > span, .an-shell .sw-aq-bar > span {
   display: block !important; height: 100% !important; border-radius: 2px !important;
 }
 .cc-shell .sw-aq-v, .ops-shell .sw-aq-v, .an-shell .sw-aq-v {
-  font-size: 11px !important; font-weight: 800 !important;
-  font-family: "JetBrains Mono", monospace !important;
+  font-size: 11.5px !important; font-weight: 800 !important;
+  font-family: "JetBrains Mono", monospace !important; text-align: right !important;
+  white-space: nowrap !important;
 }
 .cc-shell .sw-aq-v small, .ops-shell .sw-aq-v small, .an-shell .sw-aq-v small {
-  font-size: 9.5px !important; font-weight: 600 !important; margin: 0 2px !important;
+  font-size: 10px !important; font-weight: 600 !important; margin: 0 2px !important;
 }
 
 .cc-shell .sw-tip, .ops-shell .sw-tip, .an-shell .sw-tip {
-  display: flex !important; align-items: center !important; gap: 6px !important;
-  padding: 6px 8px !important; background: #ffffff !important;
-  border: 1px solid #c9d4e3 !important; border-radius: 5px !important;
-  font-size: 11px !important; color: #0c1f40 !important; font-weight: 700 !important; line-height: 1.4 !important;
+  display: flex !important; align-items: center !important; gap: 5px !important;
+  padding: 5px 8px !important; background: #ffffff !important;
+  border: 1px solid #c9d4e3 !important; border-radius: 4px !important;
+  font-size: 11.5px !important; color: #0c1f40 !important; font-weight: 700 !important; line-height: 1.3 !important;
+  letter-spacing: -0.01em !important;
 }
-.cc-shell .sw-tip i, .ops-shell .sw-tip i, .an-shell .sw-tip i { font-size: 14px !important; flex-shrink: 0 !important; }
+.cc-shell .sw-tip i, .ops-shell .sw-tip i, .an-shell .sw-tip i { font-size: 13px !important; flex-shrink: 0 !important; }
 
 .cc-shell .sw-tomo, .ops-shell .sw-tomo, .an-shell .sw-tomo {
-  display: grid !important; grid-template-columns: 32px 18px 1fr auto !important;
+  display: grid !important; grid-template-columns: 30px 18px 1fr auto !important;
   gap: 6px !important; align-items: center !important;
-  padding: 6px 4px 0 !important; border-top: 1px solid #d8dfe9 !important;
-  font-size: 11px !important;
+  padding: 5px 2px 0 !important; border-top: 1px solid #d8dfe9 !important;
+  font-size: 11.5px !important;
 }
 .cc-shell .sw-tomo-l, .ops-shell .sw-tomo-l, .an-shell .sw-tomo-l {
-  font-size: 11px !important; color: #4a5b78 !important; font-weight: 700 !important;
+  font-size: 11.5px !important; color: #4a5b78 !important; font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
 }
-.cc-shell .sw-tomo i, .ops-shell .sw-tomo i, .an-shell .sw-tomo i { font-size: 16px !important; }
+.cc-shell .sw-tomo i, .ops-shell .sw-tomo i, .an-shell .sw-tomo i { font-size: 15px !important; }
 .cc-shell .sw-tomo-t, .ops-shell .sw-tomo-t, .an-shell .sw-tomo-t {
   font-family: "JetBrains Mono", monospace !important; color: #0c1f40 !important; font-weight: 800 !important;
+  font-size: 12px !important;
 }
 .cc-shell .sw-tomo-r, .ops-shell .sw-tomo-r, .an-shell .sw-tomo-r {
-  font-family: "JetBrains Mono", monospace !important; color: #2563eb !important; font-weight: 700 !important;
-  font-size: 10.5px !important;
+  color: #2563eb !important; font-weight: 700 !important;
+  font-size: 11px !important; letter-spacing: -0.01em !important;
 }
 
 /* ============================================================
-   사이드바 전체 통일 (교통분석팀 .filter 기준 라이트 스타일)
+   사이드바 전체 통일 (시설운영팀 기준 - 산업/실무 톤)
    html 프리픽스로 specificity 강제 우선
    ============================================================ */
 html .cc-shell .side,
@@ -1833,76 +2142,125 @@ html .sa-shell .side,
 html .admin-shell .side,
 html .an-shell .filter {
   width: 220px !important;
-  background: #ffffff !important;
-  border-right: 1px solid #d8dfe9 !important;
-  padding: 18px 14px !important;
+  background: #e3e9f2 !important;
+  border-right: 1px solid #b8c5d8 !important;
+  padding: 14px 12px !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 16px !important;
+  gap: 12px !important;
   flex-shrink: 0 !important;
+  color: #0c1f40 !important;
+  position: sticky !important;
+  top: 0 !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
   overflow-y: auto !important;
+  align-self: flex-start !important;
 }
 
 /* 브랜드 */
 html .cc-shell .brand,
 html .ops-shell .brand,
 html .sa-shell .brand,
-html .admin-shell .brand {
-  display: inline-flex !important; align-items: center !important; gap: 8px !important;
-  font-size: 16px !important; font-weight: 800 !important; color: #0c1f40 !important;
+html .admin-shell .brand,
+html .an-shell .filter .brand {
+  display: inline-flex !important; align-items: center !important; gap: 10px !important;
+  font-size: 20px !important; font-weight: 800 !important; color: #0c1f40 !important;
   text-decoration: none !important;
   padding: 4px 4px 14px !important;
-  border-bottom: 1px solid #d8dfe9 !important;
 }
 html .cc-shell .brand .dot,
 html .ops-shell .brand .dot,
 html .sa-shell .brand .dot,
-html .admin-shell .brand .dot {
-  width: 7px !important; height: 7px !important; border-radius: 50% !important;
-  background: #2563eb !important; box-shadow: 0 0 8px #2563eb !important;
+html .admin-shell .brand .dot,
+html .an-shell .filter .brand .dot {
+  width: 8px !important; height: 8px !important; border-radius: 50% !important;
+  background: #2563eb !important; box-shadow: none !important;
 }
 html .cc-shell .brand em,
 html .ops-shell .brand em,
 html .sa-shell .brand em,
-html .admin-shell .brand em { color: #2563eb !important; font-style: normal !important; }
+html .admin-shell .brand em,
+html .an-shell .filter .brand em { color: #2563eb !important; font-style: normal !important; }
 
-/* nav 영역 */
+/* nav 영역 - 시설운영팀 산업 톤 */
 html .cc-shell .snav,
 html .ops-shell .snav,
 html .sa-shell .snav,
-html .admin-shell .snav {
-  display: flex !important; flex-direction: column !important; gap: 2px !important;
+html .admin-shell .snav,
+html .an-shell .filter .snav {
+  display: flex !important; flex-direction: column !important; gap: 1px !important;
   background: none !important; border: 0 !important; padding: 0 !important;
 }
 html .cc-shell .snav-i,
 html .ops-shell .snav-i,
 html .sa-shell .snav-i,
-html .admin-shell .snav-i {
+html .admin-shell .snav-i,
+html .an-shell .filter .snav-i {
   display: flex !important; align-items: center !important; gap: 10px !important;
-  padding: 9px 12px !important; border-radius: 6px !important;
-  color: #4a5b78 !important; opacity: 1 !important;
+  padding: 7px 11px !important; border-radius: 2px !important;
+  color: rgba(12,31,64,.92) !important; opacity: 1 !important;
   font-size: 13.5px !important; font-weight: 600 !important; text-align: left !important;
-  border: 0 !important; background: none !important; cursor: pointer !important;
-  font-family: inherit !important;
+  border: 0 !important; border-left: 3px solid transparent !important;
+  background: none !important; cursor: pointer !important;
+  font-family: inherit !important; transition: none !important;
 }
 html .cc-shell .snav-i:hover,
 html .ops-shell .snav-i:hover,
 html .sa-shell .snav-i:hover,
-html .admin-shell .snav-i:hover {
-  background: #eef3fb !important; color: #0c1f40 !important;
+html .admin-shell .snav-i:hover,
+html .an-shell .filter .snav-i:hover {
+  background: rgba(37,99,235,.06) !important; color: #0c1f40 !important;
 }
 html .cc-shell .snav-i.on,
 html .ops-shell .snav-i.on,
 html .sa-shell .snav-i.on,
-html .admin-shell .snav-i.on {
-  background: rgba(37,99,235,.12) !important; color: #2563eb !important; font-weight: 800 !important;
+html .admin-shell .snav-i.on,
+html .an-shell .filter .snav-i.on {
+  background: rgba(37,99,235,.1) !important; color: #2563eb !important;
+  border-left: 3px solid #2563eb !important; padding-left: 8px !important;
+  font-weight: 700 !important;
 }
 html .cc-shell .snav-i i,
 html .ops-shell .snav-i i,
 html .sa-shell .snav-i i,
-html .admin-shell .snav-i i { width: 16px !important; font-size: 15px !important; color: inherit !important; }
+html .admin-shell .snav-i i,
+html .an-shell .filter .snav-i i { width: 16px !important; font-size: 15px !important; color: inherit !important; }
 
-/* snav-bdg (시설운영팀 알림 카운트) */
+/* snav-bdg - 시설운영팀 빨간 정사각 라벨 */
+html .cc-shell .snav-bdg,
+html .ops-shell .snav-bdg,
+html .sa-shell .snav-bdg,
+html .admin-shell .snav-bdg,
+html .an-shell .filter .snav-bdg {
+  margin-left: auto !important;
+  background: #dc2626 !important; color: #fff !important;
+  font-size: 11.5px !important; font-weight: 600 !important;
+  padding: 1px 6px !important; min-width: 18px !important; height: 18px !important;
+  border-radius: 2px !important; text-align: center !important;
+  display: inline-flex !important; align-items: center !important; justify-content: center !important;
+}
+
+/* snav-lab */
+html .cc-shell .snav-lab,
+html .ops-shell .snav-lab,
+html .sa-shell .snav-lab,
+html .admin-shell .snav-lab,
+html .an-shell .filter .snav-lab { flex: 1 !important; color: inherit !important; }
+
+/* side-foot 통일 */
+html .cc-shell .side-foot,
+html .ops-shell .side-foot,
+html .sa-shell .side-foot,
+html .admin-shell .side-foot,
+html .an-shell .filter .side-foot {
+  margin-top: auto !important;
+  padding: 10px 6px 0 !important;
+  font-size: 11px !important; color: rgba(12,31,64,.6) !important; font-weight: 600 !important;
+  line-height: 1.6 !important;
+  border-top: 1px solid #b8c5d8 !important;
+}
+
 .ops-shell .snav-bdg {
   margin-left: auto !important; min-width: 18px !important; height: 18px !important;
   padding: 0 6px !important; background: #dc2626 !important; color: #fff !important;
@@ -1921,6 +2279,52 @@ html .admin-shell .snav-i i { width: 16px !important; font-size: 15px !important
 
 /* sub-list (an-shell filter 안 dashed border) */
 .an-shell .sub-list { border-left-color: #c9d4e3 !important; }
+
+/* 교통분석팀 사이드 핵심 지표 패널 */
+.an-shell .side-mk {
+  display: flex !important; flex-direction: column !important; gap: 6px !important;
+  padding-top: 8px !important; padding-bottom: 8px !important;
+  border-top: 1px solid #b8c5d8 !important;
+}
+.an-shell .smk-h {
+  font-size: 13px !important; font-weight: 800 !important; color: #0c1f40 !important;
+  letter-spacing: -0.01em !important; margin-bottom: 2px !important;
+}
+.an-shell .smk-i {
+  display: grid !important; grid-template-columns: 1fr auto !important; grid-template-rows: auto auto !important;
+  column-gap: 8px !important; row-gap: 1px !important; align-items: baseline !important;
+  background: #ffffff !important; border: 1px solid #c9d4e3 !important;
+  border-left: 3px solid #2563eb !important;
+  padding: 6px 9px !important;
+}
+.an-shell .smk-i.bl { border-left-color: #2563eb !important; }
+.an-shell .smk-i.rd { border-left-color: #dc2626 !important; }
+.an-shell .smk-i.or { border-left-color: #b45309 !important; }
+.an-shell .smk-i.gr { border-left-color: #047857 !important; }
+.an-shell .smk-l {
+  grid-column: 1; grid-row: 1;
+  font-size: 11.5px !important; color: #4a5b78 !important; font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+}
+.an-shell .smk-v {
+  grid-column: 1 / -1; grid-row: 2;
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace !important;
+  font-size: 18px !important; font-weight: 800 !important; color: #0c1f40 !important;
+  letter-spacing: -0.02em !important; line-height: 1.1 !important;
+}
+.an-shell .smk-v small {
+  font-size: 11px !important; font-weight: 600 !important; color: #4a5b78 !important;
+  margin-left: 2px !important;
+  font-family: "Inter", "Pretendard Variable", sans-serif !important;
+}
+.an-shell .smk-d {
+  grid-column: 2; grid-row: 1;
+  font-size: 11px !important; font-weight: 800 !important;
+  font-family: "IBM Plex Mono", monospace !important;
+}
+.an-shell .smk-d.dn { color: #dc2626 !important; }
+.an-shell .smk-d.up-r { color: #dc2626 !important; }
+.an-shell .smk-d.up { color: #047857 !important; }
 
 /* 교통분석팀 사이드바 - 운영기획팀 톤 통일 */
 html .an-shell .filter .brand {
@@ -2191,6 +2595,30 @@ html .ops-shell .snav-i .snav-bdg {
   font-size: 13.5px !important; font-weight: 700 !important;
 }
 .cc-shell .set-msg { color: #059669 !important; font-size: 13px !important; font-weight: 700 !important; }
+
+/* 관제 가이드 카드 (교통정보센터) */
+.cc-shell .guide-card .gd-list {
+  list-style: none !important; padding: 0 !important; margin: 0 !important;
+  display: flex !important; flex-direction: column !important; gap: 10px !important;
+}
+.cc-shell .guide-card .gd-list li {
+  display: grid !important; grid-template-columns: 26px 1fr !important; gap: 10px !important;
+  align-items: flex-start !important;
+}
+.cc-shell .guide-card .gd-n {
+  width: 24px !important; height: 24px !important; border-radius: 50% !important;
+  background: rgba(37,99,235,.14) !important; color: #2563eb !important;
+  font-size: 12px !important; font-weight: 800 !important;
+  display: inline-flex !important; align-items: center !important; justify-content: center !important;
+  font-family: "JetBrains Mono", monospace !important;
+}
+.cc-shell .guide-card .gd-list li > div { display: flex !important; flex-direction: column !important; gap: 2px !important; }
+.cc-shell .guide-card .gd-list strong {
+  color: #0c1f40 !important; font-size: 13px !important; font-weight: 800 !important;
+}
+.cc-shell .guide-card .gd-list span {
+  color: #4a5b78 !important; font-size: 12px !important; line-height: 1.5 !important; font-weight: 600 !important;
+}
 
 /* ============================================================
    단속관리팀 (rev-shell) - 폰트 키우기 + 라이트 가독성 보정
