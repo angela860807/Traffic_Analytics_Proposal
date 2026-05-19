@@ -41,6 +41,7 @@ class StreamEvent:
     started_monotonic: float
     frames: list[BufferedFrame] = field(default_factory=list)
     miss_count: int = 0
+    speed_measurement: SpeedMeasurementResult | None = None
     speed_violation: SpeedMeasurementResult | None = None
 
 
@@ -139,6 +140,9 @@ class StreamEventService:
         else:
             event.miss_count += 1
 
+        if speed_measurements:
+            event.speed_measurement = speed_measurements[0]
+
         if speed_violation is not None:
             event.speed_violation = speed_violation
 
@@ -168,7 +172,10 @@ class StreamEventService:
                 bboxes=frame.bboxes,
                 bbox_confidence_score=frame.confidence_score,
                 event_age_seconds=event_age_seconds,
-                speed_measurements=speed_measurements,
+                speed_measurements=self._build_event_speed_measurements(
+                    event,
+                    speed_measurements,
+                ),
                 speed_violation=event.speed_violation or speed_violation,
                 result=result,
             )
@@ -182,13 +189,27 @@ class StreamEventService:
             bboxes=frame.bboxes,
             bbox_confidence_score=frame.confidence_score,
             event_age_seconds=event_age_seconds,
-            speed_measurements=speed_measurements,
+            speed_measurements=self._build_event_speed_measurements(
+                event,
+                speed_measurements,
+            ),
             speed_violation=event.speed_violation or speed_violation,
         )
 
     def clear(self) -> None:
         self._events_by_camera.clear()
         self.speed_tracker.clear()
+
+    def _build_event_speed_measurements(
+        self,
+        event: StreamEvent,
+        current_measurements: list[SpeedMeasurementResult],
+    ) -> list[SpeedMeasurementResult]:
+        if current_measurements:
+            return current_measurements
+        if event.speed_measurement is not None:
+            return [event.speed_measurement]
+        return []
 
     def _build_track_inputs(
         self,

@@ -299,7 +299,7 @@ def make_speed_tracking_config() -> SpeedTrackingConfig:
 
 def test_speed_tracker_measures_violation_after_line_a_b_crossing() -> None:
     tracker = SpeedTracker(tracking_config=make_speed_tracking_config())
-    config = make_speed_camera_config(speed_limit_kmh=30.0)
+    config = make_speed_camera_config(speed_limit_kmh=20.0)
     captured_at = datetime(2026, 5, 19, 15, 20, 0)
 
     first = tracker.process_detections(
@@ -325,9 +325,42 @@ def test_speed_tracker_measures_violation_after_line_a_b_crossing() -> None:
     assert second == []
     assert len(third) == 1
     assert third[0].track_id == 1
-    assert third[0].measured_speed == 36.0
-    assert third[0].speed_limit == 30.0
+    assert third[0].measured_speed == 28.8
+    assert third[0].elapsed_seconds == 1.25
+    assert third[0].speed_limit == 20.0
     assert third[0].is_violation is True
+
+
+def test_speed_tracker_estimates_speed_when_track_starts_after_line_a() -> None:
+    tracker = SpeedTracker(tracking_config=make_speed_tracking_config())
+    config = make_speed_camera_config(speed_limit_kmh=20.0)
+    captured_at = datetime(2026, 5, 19, 15, 20, 0)
+
+    first = tracker.process_detections(
+        camera_code="CAM_001",
+        captured_at=captured_at,
+        detections=[VehicleTrackInput(bbox=(10, 10, 50, 30), confidence_score=0.9)],
+        camera_config=config,
+    )
+    second = tracker.process_detections(
+        camera_code="CAM_001",
+        captured_at=captured_at + timedelta(seconds=1),
+        detections=[VehicleTrackInput(bbox=(10, 30, 50, 50), confidence_score=0.9)],
+        camera_config=config,
+    )
+    third = tracker.process_detections(
+        camera_code="CAM_001",
+        captured_at=captured_at + timedelta(seconds=2),
+        detections=[VehicleTrackInput(bbox=(10, 50, 50, 70), confidence_score=0.9)],
+        camera_config=config,
+    )
+
+    assert first == []
+    assert second == []
+    assert len(third) == 1
+    assert third[0].measured_speed == 18.0
+    assert third[0].elapsed_seconds == 2.0
+    assert third[0].is_violation is False
 
 
 def test_speed_tracker_skips_when_camera_config_disabled() -> None:
@@ -857,11 +890,59 @@ def test_stream_frame_endpoint_returns_tracking(monkeypatch) -> None:
 def test_stream_frame_endpoint_sends_finalized_detection_to_backend(monkeypatch) -> None:
     detection_route.duplicate_detection_guard.clear()
 
+    sent_statuses = []
+
+    class FakeStreamService:
+        async def process_frame(self, *, camera_code, captured_at, content_type, image_bytes):
+            return StreamProcessingResult(
+                stream_status=STREAM_STATUS_FINALIZED,
+                camera_code=camera_code,
+                event_id="CAM_001-20260514143000-test",
+                frame_count=6,
+                result=make_recognized_detection(detected_at=captured_at),
+            )
+
+    async def record_backend_send(result, detection_status=None):
+        sent_statuses.append(detection_status)
+        return {"data": {"status": "FLOW_EVENT_CREATED"}}
+
+    monkeypatch.setattr(
+        detection_route,
+        "stream_detection_service",
+        FakeStreamService(),
+    )
+    monkeypatch.setattr(
+        detection_route.backend_client,
+        "send_detection",
+        record_backend_send,
+    )
+
+    response = client.post(
+        "/api/detections/stream-frame",
+        data={
+            "cameraCode": "CAM_001",
+            "capturedAt": "2026-05-14T14:30:00",
+        },
+        files={
+            "image": ("frame.jpg", make_test_image_bytes(), "image/jpeg"),
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["streamStatus"] == "FINALIZED"
+    assert body["analysisStatus"] == "FLOW_EVENT_CREATED"
+    assert body["data"]["plateNumber"] == "123A4567"
+    assert sent_statuses == [None]
+
+    detection_route.duplicate_detection_guard.clear()
+
 
 def test_stream_frame_endpoint_sends_speed_violation_when_flow_event_id_exists(
     monkeypatch,
 ) -> None:
     detection_route.duplicate_detection_guard.clear()
+
     speed_payloads = []
     captured_at = datetime(2026, 5, 14, 14, 30, 0)
     speed_violation = SpeedMeasurementResult(
@@ -936,52 +1017,55 @@ def test_stream_frame_endpoint_sends_speed_violation_when_flow_event_id_exists(
     assert speed_payloads[0].measured_speed == 72.35
 
     detection_route.duplicate_detection_guard.clear()
-    sent_statuses = []
 
-    class FakeStreamService:
-        async def process_frame(self, *, camera_code, captured_at, content_type, image_bytes):
-            return StreamProcessingResult(
-                stream_status=STREAM_STATUS_FINALIZED,
-                camera_code=camera_code,
-                event_id="CAM_001-20260514143000-test",
-                frame_count=6,
-                result=make_recognized_detection(detected_at=captured_at),
-            )
 
-    async def record_backend_send(result, detection_status=None):
-        sent_statuses.append(detection_status)
-        return {"data": {"status": "FLOW_EVENT_CREATED"}}
+def test_stream_event_service_keeps_non_violation_speed_until_finalized() -> None:
+    image_bytes = make_test_image_bytes()
 
-    monkeypatch.setattr(
-        detection_route,
-        "stream_detection_service",
-        FakeStreamService(),
+    class FakeInferenceService:
+        def detect_vehicle_bbox_from_image(self, image):
+            return VehicleDetection("VEHICLE", 0.93, (10, 0, 50, 10))
+
+        async def detect_from_image_bytes(
+            self,
+            *,
+            camera_code,
+            captured_at,
+            image_bytes,
+            vehicle_detection=None,
+        ):
+            return make_recognized_detection(detected_at=captured_at)
+
+    service = StreamEventService(
+        buffer=FrameBuffer(max_frames_per_camera=3),
+        inference_service=FakeInferenceService(),
+        speed_tracker=SpeedTracker(tracking_config=make_speed_tracking_config()),
     )
-    monkeypatch.setattr(
-        detection_route.backend_client,
-        "send_detection",
-        record_backend_send,
+    captured_at = datetime(2026, 5, 14, 14, 30, 0)
+    event = service._start_event("CAM_001", captured_at, 0.0)
+    measurement = SpeedMeasurementResult(
+        track_id=1,
+        measured_speed=36.0,
+        speed_limit=50.0,
+        distance_meters=10.0,
+        elapsed_seconds=1.0,
+        is_violation=False,
+        measured_at=captured_at,
+    )
+    event.speed_measurement = measurement
+
+    result = asyncio.run(
+        service.process_frame(
+            camera_code="CAM_001",
+            captured_at=captured_at + timedelta(seconds=10),
+            content_type="image/jpeg",
+            image_bytes=image_bytes,
+        )
     )
 
-    response = client.post(
-        "/api/detections/stream-frame",
-        data={
-            "cameraCode": "CAM_001",
-            "capturedAt": "2026-05-14T14:30:00",
-        },
-        files={
-            "image": ("frame.jpg", make_test_image_bytes(), "image/jpeg"),
-        },
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["streamStatus"] == "FINALIZED"
-    assert body["analysisStatus"] == "FLOW_EVENT_CREATED"
-    assert body["data"]["plateNumber"] == "123A4567"
-    assert sent_statuses == [None]
-
-    detection_route.duplicate_detection_guard.clear()
+    assert result.stream_status == STREAM_STATUS_FINALIZED
+    assert result.speed_measurements == [measurement]
+    assert result.speed_violation is None
 
 
 def test_backend_client_payload_includes_crop_and_ocr_image_fields(monkeypatch) -> None:
