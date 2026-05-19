@@ -1,11 +1,16 @@
 package com.example.traffic.controller;
 
 import com.example.traffic.common.enums.ViolationStatus;
+import com.example.traffic.dto.request.SpeedViolationCreateRequest;
 import com.example.traffic.dto.response.CommonResponse;
 import com.example.traffic.dto.response.SpeedViolationResponse;
+import com.example.traffic.etc.BusinessException;
 import com.example.traffic.service.SpeedViolationService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +23,19 @@ import java.util.List;
 public class SpeedViolationController {
 
     private final SpeedViolationService speedViolationService;
+
+    @Value("${app.api.internal-key}")
+    private String internalApiKey;
+
+    @PostMapping
+    public ResponseEntity<CommonResponse<SpeedViolationResponse>> createViolation(
+            @RequestHeader(value = "X-Internal-Api-Key", required = false) String apiKey,
+            @Valid @RequestBody SpeedViolationCreateRequest request) {
+        validateInternalApiKey(apiKey);
+
+        SpeedViolationResponse response = speedViolationService.createViolation(request);
+        return ResponseEntity.ok(CommonResponse.success(response, "Speed violation record saved."));
+    }
 
     @GetMapping("/vehicle/{vehicleId}")
     public ResponseEntity<CommonResponse<List<SpeedViolationResponse>>> getVehicleViolations(
@@ -54,5 +72,14 @@ public class SpeedViolationController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
         long count = speedViolationService.countViolationsBetween(start, end);
         return ResponseEntity.ok(count);
+    }
+
+    private void validateInternalApiKey(String apiKey) {
+        if (apiKey == null) {
+            throw new BusinessException("API Key is missing.", HttpStatus.UNAUTHORIZED);
+        }
+        if (!internalApiKey.equals(apiKey)) {
+            throw new BusinessException("Invalid API Key.", HttpStatus.FORBIDDEN);
+        }
     }
 }

@@ -7,6 +7,7 @@ import com.example.traffic.domain.DetectionLog;
 import com.example.traffic.domain.Vehicle;
 import com.example.traffic.dto.request.DetectionRequest;
 import com.example.traffic.dto.response.DetectionResponse;
+import com.example.traffic.dto.response.FlowEventResponse;
 import com.example.traffic.etc.BusinessException;
 import com.example.traffic.repository.CameraRepository;
 import com.example.traffic.repository.DetectionLogRepository;
@@ -52,12 +53,15 @@ public class DetectionLogService {
         DetectionAnalysisResult analysisResult =
                 detectionAnalysisResultService.saveAnalysisResult(savedLog, request, resultStatus);
 
+        Long flowEventId = null;
         if (resultStatus == DetectionLogStatus.FLOW_EVENT_CREATED) {
             Vehicle vehicle = vehicleService.getOrCreateVehicle(request.getPlateNumber());
-            vehicleFlowEventService.processFlowEvent(savedLog, analysisResult, vehicle);
+            FlowEventResponse flowEventResponse =
+                    vehicleFlowEventService.processFlowEvent(savedLog, analysisResult, vehicle);
+            flowEventId = flowEventResponse != null ? flowEventResponse.getFlowEventId() : null;
         }
 
-        return DetectionResponse.of(savedLog, analysisResult);
+        return DetectionResponse.of(savedLog, analysisResult, flowEventId);
     }
 
     private void validateDetectionRequest(DetectionRequest request) {
