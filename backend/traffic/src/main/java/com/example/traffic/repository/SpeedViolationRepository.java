@@ -11,6 +11,8 @@ import java.util.List;
 
 public interface SpeedViolationRepository extends JpaRepository<SpeedViolation, Long> {
 
+    boolean existsByFlowEvent_FlowEventId(Long flowEventId);
+
     List<SpeedViolation> findByVehicleOrderByViolatedAtDesc(Vehicle vehicle);
 
     List<SpeedViolation> findByCameraOrderByViolatedAtDesc(Camera camera);

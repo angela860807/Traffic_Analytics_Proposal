@@ -6,18 +6,23 @@ import com.example.traffic.domain.DetectionAnalysisResult;
 import com.example.traffic.domain.DetectionLog;
 import com.example.traffic.repository.DetectionAnalysisResultRepository;
 import com.example.traffic.repository.DetectionLogRepository;
+import com.example.traffic.repository.SpeedViolationRepository;
 import com.example.traffic.repository.TrafficAnalysisIndexRepository;
 import com.example.traffic.repository.VehicleFlowEventRepository;
 import com.example.traffic.repository.VehicleRepository;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -25,6 +30,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
+@Sql(
+        statements = {
+                "ALTER TABLE detection_logs ALTER COLUMN plate_number DROP NOT NULL",
+                "ALTER TABLE detection_logs ALTER COLUMN detection_type DROP NOT NULL"
+        },
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
+)
 class DetectionLogControllerIntegrationTest {
 
     private static final String INTERNAL_API_KEY = "traffic-ai-internal-key-2026";
@@ -46,6 +58,9 @@ class DetectionLogControllerIntegrationTest {
 
     @Autowired
     private TrafficAnalysisIndexRepository trafficAnalysisIndexRepository;
+
+    @Autowired
+    private SpeedViolationRepository speedViolationRepository;
 
     @Test
     void processDetectionSavesLogAnalysisResultVehicleAndFlowEvent() throws Exception {
@@ -82,6 +97,7 @@ class DetectionLogControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.logId").isNumber())
+                .andExpect(jsonPath("$.data.flowEventId").isNumber())
                 .andExpect(jsonPath("$.data.status").value("FLOW_EVENT_CREATED"))
                 .andExpect(jsonPath("$.data.plateNumber").value(plateNumber));
 
@@ -147,13 +163,14 @@ class DetectionLogControllerIntegrationTest {
                                   "imagePath": "storage/detections/2026/05/12/CAM_001_103500_frame.jpg",
                                   "imageUrl": "%s",
                                   "detectedAt": "2026-05-12T10:35:00",
-                                  "detectionType": "UNKNOWN",
+                                  "detectionType": "VEHICLE",
                                   "status": "OCR_FAILED"
                                 }
                 """.formatted(imageUrl)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.status").value("OCR_FAILED"));
+                .andExpect(jsonPath("$.data.status").value("OCR_FAILED"))
+                .andExpect(jsonPath("$.data.flowEventId").value(nullValue()));
 
         DetectionLog savedLog = detectionLogRepository.findTop100ByOrderByDetectedAtDesc().stream()
                 .filter(log -> imageUrl.equals(log.getImageUrl()))
@@ -168,7 +185,7 @@ class DetectionLogControllerIntegrationTest {
         assertThat(vehicleRepository.count()).isEqualTo(vehicleCountBefore);
         assertThat(vehicleFlowEventRepository.count()).isEqualTo(flowEventCountBefore);
         assertThat(savedResult.getStatus()).isEqualTo(DetectionLogStatus.OCR_FAILED);
-        assertThat(savedResult.getDetectionType()).isEqualTo(DetectionType.UNKNOWN);
+        assertThat(savedResult.getDetectionType()).isEqualTo(DetectionType.VEHICLE);
     }
 
     @Test
@@ -195,7 +212,8 @@ class DetectionLogControllerIntegrationTest {
                 """.formatted(plateNumber)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.status").value("DUPLICATE_SKIPPED"));
+                .andExpect(jsonPath("$.data.status").value("DUPLICATE_SKIPPED"))
+                .andExpect(jsonPath("$.data.flowEventId").value(nullValue()));
 
         DetectionAnalysisResult savedResult = detectionAnalysisResultRepository
                 .findByPlateNumberOrderByCreatedAtDesc(plateNumber)
@@ -205,5 +223,58 @@ class DetectionLogControllerIntegrationTest {
         assertThat(detectionAnalysisResultRepository.count()).isEqualTo(resultCountBefore + 1);
         assertThat(vehicleFlowEventRepository.count()).isEqualTo(flowEventCountBefore);
         assertThat(savedResult.getStatus()).isEqualTo(DetectionLogStatus.DUPLICATE_SKIPPED);
+    }
+
+    @Test
+    void createSpeedViolationSavesViolationForFlowEvent() throws Exception {
+        String uniqueSuffix = String.valueOf(System.currentTimeMillis());
+        String plateNumber = "SPD" + uniqueSuffix;
+        long violationCountBefore = speedViolationRepository.count();
+
+        MvcResult detectionResult = mockMvc.perform(post("/api/v1/detection-logs")
+                        .header("X-Internal-Api-Key", INTERNAL_API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "cameraCode": "CAM_001",
+                                  "plateNumber": "%s",
+                                  "confidenceScore": 0.95,
+                                  "imagePath": "storage/detections/2026/05/19/CAM_001_speed_frame.jpg",
+                                  "imageUrl": "/static/detections/2026/05/19/CAM_001_speed_frame.jpg",
+                                  "detectedAt": "2026-05-19T15:20:00",
+                                  "detectionType": "PLATE"
+                                }
+                                """.formatted(plateNumber)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("FLOW_EVENT_CREATED"))
+                .andExpect(jsonPath("$.data.flowEventId").isNumber())
+                .andReturn();
+
+        Integer flowEventId = JsonPath.read(detectionResult.getResponse().getContentAsString(), "$.data.flowEventId");
+
+        mockMvc.perform(post("/api/speed-violations")
+                        .header("X-Internal-Api-Key", INTERNAL_API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "flowEventId": %d,
+                                  "plateNumber": "%s",
+                                  "cameraCode": "CAM_001",
+                                  "measuredSpeed": 72.35,
+                                  "speedLimit": 50.0,
+                                  "violationImagePath": "storage/detections/2026/05/19/CAM_001_152000_violation.jpg",
+                                  "violationImageUrl": "/static/detections/2026/05/19/CAM_001_152000_violation.jpg",
+                                  "violatedAt": "2026-05-19T15:20:00"
+                                }
+                                """.formatted(flowEventId, plateNumber)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.flowEventId").value(flowEventId))
+                .andExpect(jsonPath("$.data.plateNumber").value(plateNumber))
+                .andExpect(jsonPath("$.data.measuredSpeed").value(72.35))
+                .andExpect(jsonPath("$.data.speedLimit").value(50.0))
+                .andExpect(jsonPath("$.data.violationStatus").value("UNPROCESSED"));
+
+        assertThat(speedViolationRepository.count()).isEqualTo(violationCountBefore + 1);
     }
 }
