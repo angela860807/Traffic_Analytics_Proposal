@@ -9,6 +9,7 @@ from app.schemas.detection import (
     RaspberryFrameRequest,
     StreamFrameResponse,
 )
+from app.schemas.speed import SpeedViolationCreateRequest
 from app.services.backend_client import BackendClient
 from app.services.duplicate_detection_guard import DuplicateDetectionGuard
 from app.services.inference_service import InferenceService
@@ -69,6 +70,25 @@ def extract_backend_analysis_status(
     return fallback
 
 
+def extract_backend_flow_event_id(
+    backend_response: dict | None,
+) -> int | None:
+    if not isinstance(backend_response, dict):
+        return None
+
+    data = backend_response.get("data")
+    if not isinstance(data, dict):
+        return None
+
+    flow_event_id = data.get("flowEventId")
+    if isinstance(flow_event_id, int):
+        return flow_event_id
+    if isinstance(flow_event_id, str) and flow_event_id.isdigit():
+        return int(flow_event_id)
+
+    return None
+
+
 def build_backend_success_response(
     result,
     backend_response: dict | None,
@@ -106,9 +126,47 @@ def build_stream_frame_response(
         ],
         bbox_confidence_score=stream_result.bbox_confidence_score,
         event_age_seconds=stream_result.event_age_seconds,
+        speed_measurements=stream_result.speed_measurements,
+        speed_violation=stream_result.speed_violation,
+        speed_violation_sent=stream_result.speed_violation_sent,
         analysis_status=analysis_status,
         data=stream_result.result,
     )
+
+
+async def send_speed_violation_if_ready(
+    *,
+    stream_result: StreamProcessingResult,
+    backend_response: dict | None,
+) -> None:
+    measurement = stream_result.speed_violation
+    result = stream_result.result
+
+    if measurement is None or result is None or not result.plate_number:
+        return
+
+    flow_event_id = extract_backend_flow_event_id(backend_response)
+    if flow_event_id is None:
+        logger.info(
+            "speed violation not sent because flowEventId is missing: cameraCode=%s plateNumber=%s speed=%.2f",
+            result.camera_code,
+            result.plate_number,
+            measurement.measured_speed,
+        )
+        return
+
+    request = SpeedViolationCreateRequest(
+        flow_event_id=flow_event_id,
+        plate_number=result.plate_number,
+        camera_code=result.camera_code,
+        measured_speed=measurement.measured_speed,
+        speed_limit=measurement.speed_limit,
+        violation_image_path=result.image_path,
+        violation_image_url=result.image_url,
+        violated_at=measurement.measured_at,
+    )
+    await backend_client.send_speed_violation(request)
+    stream_result.speed_violation_sent = True
 
 
 def build_spring_error_detail(exc: httpx.HTTPStatusError) -> str:
@@ -352,6 +410,10 @@ async def process_stream_frame(
 
         backend_response = await backend_client.send_detection(result)
         duplicate_detection_guard.remember(result)
+        await send_speed_violation_if_ready(
+            stream_result=stream_result,
+            backend_response=backend_response,
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

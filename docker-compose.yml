@@ -35,6 +35,7 @@ services:
     environment:
       SPRING_BACKEND_BASE_URL: http://spring-backend:8080
       SPRING_DETECTION_PATH: /api/v1/detection-logs
+      SPRING_SPEED_VIOLATION_PATH: /api/speed-violations
       BACKEND_INTERNAL_API_KEY: traffic-ai-internal-key-2026
       IMAGE_STORAGE_DIR: storage/detections
       MODEL_PATH: /app/models/best3.pt
@@ -53,6 +54,16 @@ services:
       MAX_EVENT_SECONDS: 4
       TOP_N_OCR_FRAMES: 1
       SAVE_EVENT_DEBUG: "false"
+      SPEED_DETECTION_ENABLED: "false"
+      SPEED_DEFAULT_DISTANCE_METERS: 10.0
+      SPEED_DEFAULT_LIMIT_KMH: 50.0
+      SPEED_DEFAULT_LINE_A: 320,360,960,360
+      SPEED_DEFAULT_LINE_B: 320,520,960,520
+      SPEED_CAMERA_CONFIGS_JSON: '[{"cameraCode":"CAM_001","lineA":[320,360,960,360],"lineB":[320,520,960,520],"distanceMeters":10.0,"speedLimitKmh":50.0,"enabled":true}]'
+      SPEED_TRACK_MAX_DISTANCE_PIXELS: 120.0
+      SPEED_TRACK_TTL_SECONDS: 2.0
+      SPEED_MIN_ELAPSED_SECONDS: 0.05
+      SPEED_MAX_REASONABLE_KMH: 220.0
     ports:
       - "8000:8000"
     volumes:

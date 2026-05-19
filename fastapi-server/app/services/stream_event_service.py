@@ -17,9 +17,11 @@ from app.core.config import (
     TOP_N_OCR_FRAMES,
 )
 from app.schemas.detection import DetectionResult
+from app.schemas.speed import SpeedMeasurementResult
 from app.services.frame_buffer import BufferedFrame, FrameBuffer, frame_buffer
 from app.services.image_decoder import ImageDecoder
 from app.services.inference_service import InferenceService
+from app.services.speed_tracker import SpeedTracker, VehicleTrackInput
 from app.services.vehicle_detector import VehicleDetection
 
 
@@ -39,6 +41,7 @@ class StreamEvent:
     started_monotonic: float
     frames: list[BufferedFrame] = field(default_factory=list)
     miss_count: int = 0
+    speed_violation: SpeedMeasurementResult | None = None
 
 
 @dataclass
@@ -51,6 +54,9 @@ class StreamProcessingResult:
     bboxes: list[tuple[int, int, int, int]] | None = None
     bbox_confidence_score: float = 0.0
     event_age_seconds: float = 0.0
+    speed_measurements: list[SpeedMeasurementResult] = field(default_factory=list)
+    speed_violation: SpeedMeasurementResult | None = None
+    speed_violation_sent: bool = False
     result: DetectionResult | None = None
 
 
@@ -61,10 +67,12 @@ class StreamEventService:
         buffer: FrameBuffer = frame_buffer,
         image_decoder: ImageDecoder | None = None,
         inference_service: InferenceService | None = None,
+        speed_tracker: SpeedTracker | None = None,
     ) -> None:
         self.buffer = buffer
         self.image_decoder = image_decoder or ImageDecoder()
         self.inference_service = inference_service or InferenceService()
+        self.speed_tracker = speed_tracker or SpeedTracker()
         self._events_by_camera: dict[str, StreamEvent] = {}
 
     async def process_frame(
@@ -79,6 +87,20 @@ class StreamEventService:
         image = self.image_decoder.decode_image_bytes(image_bytes)
         detection = self.inference_service.detect_vehicle_bbox_from_image(image)
         bboxes = [box.bbox for box in detection.boxes]
+        track_inputs = self._build_track_inputs(detection)
+        speed_measurements = self.speed_tracker.process_detections(
+            camera_code=camera_code,
+            captured_at=captured_at,
+            detections=track_inputs,
+        )
+        speed_violation = next(
+            (
+                measurement
+                for measurement in speed_measurements
+                if measurement.is_violation
+            ),
+            None,
+        )
 
         frame = self._build_buffered_frame(
             camera_code=camera_code,
@@ -106,6 +128,8 @@ class StreamEventService:
                     bbox=frame.bbox,
                     bboxes=frame.bboxes,
                     bbox_confidence_score=frame.confidence_score,
+                    speed_measurements=speed_measurements,
+                    speed_violation=speed_violation,
                 )
 
             event = self._start_event(camera_code, captured_at, received_monotonic)
@@ -114,6 +138,9 @@ class StreamEventService:
             event.miss_count = 0
         else:
             event.miss_count += 1
+
+        if speed_violation is not None:
+            event.speed_violation = speed_violation
 
         if event.frames and event.frames[-1] is not frame:
             event.frames.append(frame)
@@ -141,6 +168,8 @@ class StreamEventService:
                 bboxes=frame.bboxes,
                 bbox_confidence_score=frame.confidence_score,
                 event_age_seconds=event_age_seconds,
+                speed_measurements=speed_measurements,
+                speed_violation=event.speed_violation or speed_violation,
                 result=result,
             )
 
@@ -153,10 +182,36 @@ class StreamEventService:
             bboxes=frame.bboxes,
             bbox_confidence_score=frame.confidence_score,
             event_age_seconds=event_age_seconds,
+            speed_measurements=speed_measurements,
+            speed_violation=event.speed_violation or speed_violation,
         )
 
     def clear(self) -> None:
         self._events_by_camera.clear()
+        self.speed_tracker.clear()
+
+    def _build_track_inputs(
+        self,
+        detection,
+    ) -> list[VehicleTrackInput]:
+        if detection.boxes:
+            return [
+                VehicleTrackInput(
+                    bbox=box.bbox,
+                    confidence_score=box.confidence_score,
+                )
+                for box in detection.boxes
+            ]
+
+        if detection.bbox is None:
+            return []
+
+        return [
+            VehicleTrackInput(
+                bbox=detection.bbox,
+                confidence_score=detection.confidence_score,
+            )
+        ]
 
     def _start_event(
         self,

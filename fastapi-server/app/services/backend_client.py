@@ -1,7 +1,13 @@
 import httpx
 
-from app.core.config import BACKEND_INTERNAL_API_KEY, SPRING_BACKEND_BASE_URL, SPRING_DETECTION_PATH
+from app.core.config import (
+    BACKEND_INTERNAL_API_KEY,
+    SPRING_BACKEND_BASE_URL,
+    SPRING_DETECTION_PATH,
+    SPRING_SPEED_VIOLATION_PATH,
+)
 from app.schemas.detection import DetectionResult
+from app.schemas.speed import SpeedViolationCreateRequest
 
 
 class BackendClient:
@@ -31,6 +37,34 @@ class BackendClient:
                 url,
                 json=payload,
                 headers=headers
+            )
+
+        response.raise_for_status()
+
+        if not response.content:
+            return {"status": "sent"}
+
+        return response.json()
+
+    async def send_speed_violation(
+        self,
+        request: SpeedViolationCreateRequest,
+    ) -> dict:
+        if not BACKEND_INTERNAL_API_KEY:
+            raise RuntimeError("BACKEND_INTERNAL_API_KEY is not set")
+
+        url = f"{SPRING_BACKEND_BASE_URL}{SPRING_SPEED_VIOLATION_PATH}"
+        headers = {
+            "X-Internal-Api-Key": BACKEND_INTERNAL_API_KEY,
+            "Content-Type": "application/json",
+        }
+        payload = request.model_dump(by_alias=True, mode="json")
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                url,
+                json=payload,
+                headers=headers,
             )
 
         response.raise_for_status()
