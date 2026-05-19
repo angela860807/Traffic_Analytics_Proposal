@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 @Builder
 public class DetectionResponse {
     private final Long logId;
+    private final Long flowEventId;
     private final String cameraName;
     private final String zoneName;
     private final Direction directionType;
@@ -28,8 +29,13 @@ public class DetectionResponse {
     private final DetectionLogStatus status;
 
     public static DetectionResponse of(DetectionLog log, DetectionAnalysisResult result) {
+        return of(log, result, null);
+    }
+
+    public static DetectionResponse of(DetectionLog log, DetectionAnalysisResult result, Long flowEventId) {
         return DetectionResponse.builder()
                 .logId(log.getLogId())
+                .flowEventId(flowEventId)
                 .cameraName(log.getCamera().getCameraName())
                 .zoneName(log.getCamera().getZone().getZoneName())
                 .directionType(log.getCamera().getDirectionType())

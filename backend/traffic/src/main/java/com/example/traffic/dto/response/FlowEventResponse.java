@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 @Getter
 @Builder
 public class FlowEventResponse {
+    private final Long flowEventId;
     private final String plateNumber;
     private final String zoneName;
     private final String cameraName;
@@ -20,6 +21,7 @@ public class FlowEventResponse {
 
     public static FlowEventResponse from(VehicleFlowEvent event) {
         return FlowEventResponse.builder()
+                .flowEventId(event.getFlowEventId())
                 .plateNumber(event.getVehicle().getPlateNumber())
                 .zoneName(event.getZone().getZoneName())
                 .cameraName(event.getCamera().getCameraName())

@@ -47,6 +47,7 @@ public class SecurityConfig {
 
                         // FastAPI internal ingestion endpoint. Controller checks X-Internal-Api-Key.
                         .requestMatchers(HttpMethod.POST, "/api/v1/detection-logs").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/speed-violations").permitAll()
 
                         // TODO(frontend-integration): Temporary permitAll for Vue first-pass integration.
                         // Remove this GET rule after JWT login is wired from Vue and protect it with authenticated().
