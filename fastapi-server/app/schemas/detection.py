@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.speed import SpeedMeasurementResult
+
 
 DirectionType = Literal["IN", "OUT", "BOTH"]
 DetectionType = Literal["VEHICLE", "PLATE", "UNKNOWN"]
@@ -153,6 +155,18 @@ class StreamFrameResponse(BaseModel):
         alias="eventAgeSeconds",
         ge=0,
         examples=[2.4],
+    )
+    speed_measurements: list[SpeedMeasurementResult] = Field(
+        default_factory=list,
+        alias="speedMeasurements",
+    )
+    speed_violation: SpeedMeasurementResult | None = Field(
+        default=None,
+        alias="speedViolation",
+    )
+    speed_violation_sent: bool = Field(
+        default=False,
+        alias="speedViolationSent",
     )
     analysis_status: AnalysisStatus | None = Field(
         default=None,
