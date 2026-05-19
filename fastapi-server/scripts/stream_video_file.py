@@ -203,14 +203,33 @@ def build_parser() -> argparse.ArgumentParser:
 
 def summarize_response(frame_number: int, response_body: dict[str, Any]) -> str:
     data = response_body.get("data") or {}
+    speed_violation = response_body.get("speedViolation") or {}
+    speed_measurements = response_body.get("speedMeasurements") or []
+    speed_text = "-"
+    over_speed = False
+    if speed_violation:
+        over_speed = True
+        speed_text = (
+            f"VIOLATION:{speed_violation.get('measuredSpeed', '-')}/"
+            f"{speed_violation.get('speedLimit', '-')}"
+        )
+    elif speed_measurements:
+        measurement = speed_measurements[0]
+        over_speed = bool(measurement.get("isViolation", False))
+        speed_text = (
+            f"{measurement.get('measuredSpeed', '-')}/"
+            f"{measurement.get('speedLimit', '-')}"
+        )
     return (
         f"frame={frame_number} "
         f"streamStatus={response_body.get('streamStatus')} "
         f"eventId={response_body.get('eventId') or '-'} "
         f"frameCount={response_body.get('frameCount')} "
         f"analysisStatus={response_body.get('analysisStatus') or '-'} "
-        f"plateNumber={data.get('plateNumber') or '-'} "
-        f"message={response_body.get('message', '')}"
+        f"speed={speed_text} "
+        f"overSpeed={over_speed} "
+        f"speedSent={response_body.get('speedViolationSent', False)} "
+        f"plateNumber={data.get('plateNumber') or '-'}"
     )
 
 
@@ -226,7 +245,7 @@ def post_frame(
         url,
         data={
             "cameraCode": camera_code,
-            "capturedAt": captured_at.replace(microsecond=0).isoformat(),
+            "capturedAt": captured_at.isoformat(timespec="milliseconds"),
         },
         files={
             "image": ("video-frame.jpg", frame_bytes, "image/jpeg"),
