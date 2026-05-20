@@ -74,7 +74,6 @@
 .admin-shell, .cc-shell, .ops-shell, .sa-shell { display: flex; }
 
 /* ───── 사이드바 (Reports/Control/Ops/Super 공통) ───── */
-.admin-shell .side,
 .cc-shell .side,
 .ops-shell .side,
 .sa-shell .side {
@@ -87,7 +86,6 @@
   height: 100vh;
 }
 
-.admin-shell .brand,
 .cc-shell .brand,
 .ops-shell .brand,
 .sa-shell .brand {
@@ -102,15 +100,12 @@
   text-decoration: none;
   cursor: pointer;
 }
-.admin-shell .brand:hover em,
 .cc-shell .brand:hover em,
 .ops-shell .brand:hover em,
 .sa-shell .brand:hover em { opacity: .85; }
-.admin-shell .brand em,
 .cc-shell .brand em,
 .ops-shell .brand em,
 .sa-shell .brand em { color: #60a5fa; font-style: normal; }
-.admin-shell .brand .dot,
 .cc-shell .brand .dot,
 .ops-shell .brand .dot,
 .sa-shell .brand .dot {
@@ -118,12 +113,10 @@
   background: #60a5fa; box-shadow: 0 0 8px #60a5fa;
 }
 
-.admin-shell .snav,
 .cc-shell .snav,
 .ops-shell .snav,
 .sa-shell .snav { display: flex; flex-direction: column; gap: 2px; }
 
-.admin-shell .snav-i,
 .cc-shell .snav-i,
 .ops-shell .snav-i,
 .sa-shell .snav-i {
@@ -134,15 +127,12 @@
   border: 0; background: none; cursor: pointer;
   font-family: inherit; transition: all .15s;
 }
-.admin-shell .snav-i:hover,
 .cc-shell .snav-i:hover,
 .ops-shell .snav-i:hover,
 .sa-shell .snav-i:hover { background: rgba(96,165,250,.06); color: #e4eeff; }
-.admin-shell .snav-i.on,
 .cc-shell .snav-i.on,
 .ops-shell .snav-i.on,
 .sa-shell .snav-i.on { background: rgba(96,165,250,.12); color: #60a5fa; }
-.admin-shell .snav-i i,
 .cc-shell .snav-i i,
 .ops-shell .snav-i i,
 .sa-shell .snav-i i { width: 16px; font-size: 15px; }
@@ -152,7 +142,6 @@
 /* legacy t-bell / .bdg / t-user 다크 스타일 제거 — 시설운영팀 통일 헤더 사용 */
 
 /* ───── 카드 공통 ───── */
-.admin-shell .card,
 .cc-shell .card,
 .ops-shell .card,
 .sa-shell .card,
@@ -161,14 +150,12 @@
   background: #0f1d34; border: 1px solid #1f3055;
   border-radius: 10px; padding: 14px;
 }
-.admin-shell .card h3,
 .cc-shell .card h3,
 .ops-shell .card h3,
 .sa-shell .card h3,
 .an-shell .card h3,
 .rev-shell .card h3 { font-size: 14px; font-weight: 700; margin: 0 0 12px; }
 
-.admin-shell .seg-sub,
 .cc-shell .seg-sub,
 .ops-shell .seg-sub,
 .sa-shell .seg-sub,
@@ -176,7 +163,6 @@
 .rev-shell .seg-sub { font-size: 12px; opacity: .55; font-weight: 400; margin-left: 4px; }
 
 /* ───── 상태 태그 공통 ───── */
-.admin-shell .stat,
 .cc-shell .stat,
 .ops-shell .stat,
 .sa-shell .stat,
@@ -185,25 +171,21 @@
   padding: 2px 8px; border-radius: 100px;
   font-size: 10.5px; font-weight: 700; display: inline-block;
 }
-.admin-shell .stat.ok,
 .cc-shell .stat.ok,
 .ops-shell .stat.ok,
 .sa-shell .stat.ok,
 .an-shell .stat.ok,
 .rev-shell .stat.ok { background: rgba(16,185,129,.15); color: #34d399; }
-.admin-shell .stat.wn,
 .cc-shell .stat.wn,
 .ops-shell .stat.wn,
 .sa-shell .stat.wn,
 .an-shell .stat.wn,
 .rev-shell .stat.wn { background: rgba(245,158,11,.18); color: #fbbf24; }
-.admin-shell .stat.no,
 .cc-shell .stat.no,
 .ops-shell .stat.no,
 .sa-shell .stat.no,
 .an-shell .stat.no,
 .rev-shell .stat.no { background: rgba(239,68,68,.18); color: #f87171; }
-.admin-shell .stat.wait,
 .cc-shell .stat.wait,
 .ops-shell .stat.wait,
 .sa-shell .stat.wait,
@@ -211,7 +193,6 @@
 .rev-shell .stat.wait { background: rgba(96,165,250,.1); color: #60a5fa; border: 1px solid rgba(96,165,250,.3); }
 
 /* ───── Footer 공통 ───── */
-.admin-shell .foot,
 .cc-shell .foot,
 .ops-shell .foot,
 .sa-shell .foot,
@@ -361,7 +342,6 @@
   color: #0c1f40; border-bottom-color: #e3e9f2 !important;
 }
 .cc-shell tbody tr:nth-child(even), .sa-shell tbody tr:nth-child(even),
-.admin-shell tbody tr:nth-child(even), .an-shell tbody tr:nth-child(even),
 .rev-shell tbody tr:nth-child(even) { background: #ecf0f6; }
 
 /* 모노 폰트 */
@@ -508,12 +488,6 @@
 .sa-shell .kpi.cy i { background: rgba(8,145,178,.12) !important; color: #0891b2 !important; }
 
 /* ReportsView KPI 아이콘 (kpi-ic) */
-.admin-shell .kpi.bl .kpi-ic { background: rgba(37,99,235,.1) !important; color: #2563eb !important; }
-.admin-shell .kpi.gr .kpi-ic { background: rgba(5,150,105,.12) !important; color: #059669 !important; }
-.admin-shell .kpi.or .kpi-ic { background: rgba(220,104,3,.12) !important; color: #b45309 !important; }
-.admin-shell .kpi.pl .kpi-ic { background: rgba(124,58,237,.1) !important; color: #7c3aed !important; }
-.admin-shell .kpi.cy .kpi-ic { background: rgba(8,145,178,.12) !important; color: #0891b2 !important; }
-.admin-shell .kpi.or { background: #fef3e2 !important; border-color: #f3c787 !important; }
 
 /* ControlView 상단 KPI 통계바 */
 .cc-shell .st.bad, .cc-shell .st.alert { color: #dc2626 !important; }
@@ -632,43 +606,6 @@
 /* ============================================================
    운영기획팀 - 보고서 생성 카드
    ============================================================ */
-.admin-shell .rep {
-  background: #ffffff !important;
-  border: 1px solid #c9d4e3 !important;
-  border-radius: 8px !important;
-  padding: 14px !important;
-  color: #0c1f40 !important;
-}
-.admin-shell .rep-h {
-  color: #0c1f40 !important; font-weight: 800 !important; font-size: 13.5px !important;
-}
-.admin-shell .rep-h i { color: #2563eb !important; }
-.admin-shell .rep-d {
-  color: #4a5b78 !important; opacity: 1 !important; font-size: 12px !important;
-}
-.admin-shell .rep-date {
-  color: #6b7a92 !important; opacity: 1 !important; font-size: 11.5px !important;
-  font-family: "JetBrains Mono", monospace !important;
-}
-.admin-shell .rep-btn {
-  background: rgba(37,99,235,.08) !important;
-  border: 1px solid rgba(37,99,235,.35) !important;
-  color: #2563eb !important;
-  font-weight: 700 !important; font-size: 12.5px !important;
-}
-.admin-shell .rep-btn:hover { background: rgba(37,99,235,.16) !important; }
-.admin-shell .btn-pri {
-  background: #2563eb !important; color: #fff !important; border: 0 !important;
-  font-weight: 700 !important;
-}
-.admin-shell .btn-pri:hover { background: #1d4ed8 !important; }
-.admin-shell .btn-sec {
-  background: #ffffff !important;
-  border: 1px solid #c9d4e3 !important;
-  color: #0c1f40 !important;
-  font-weight: 700 !important;
-}
-.admin-shell .btn-sec:hover { background: #eef3fb !important; border-color: #2563eb !important; color: #2563eb !important; }
 
 /* ============================================================
    교통분석팀 - 구간 성능 비교
@@ -1256,245 +1193,41 @@
 .admin-shell, .admin-shell * { color: #0c1f40; }
 
 /* 헤더 */
-.admin-shell .top h1 { font-size: 22px !important; color: #0c1f40 !important; }
-.admin-shell .top h1 .t-sub { color: #2563eb !important; font-weight: 700 !important; font-size: 18px !important; }
-.admin-shell .t-pick {
-  background: #ffffff !important; border: 1px solid #c9d4e3 !important; color: #0c1f40 !important;
-  font-size: 13.5px !important; font-weight: 600 !important;
-}
-.admin-shell .t-bell { color: #2563eb !important; font-size: 18px !important; }
-.admin-shell .t-bell .bdg {
-  background: #dc2626 !important; color: #fff !important; font-weight: 800 !important; font-size: 11px !important;
-}
-.admin-shell .t-user { color: #0c1f40 !important; font-size: 13.5px !important; font-weight: 700 !important; }
 
 /* 사이드 nav */
-.admin-shell .snav-i { font-size: 13.5px !important; color: #4a5b78 !important; opacity: 1 !important; }
-.admin-shell .snav-i.on { color: #2563eb !important; font-weight: 700 !important; }
-.admin-shell .brand { color: #0c1f40 !important; font-size: 17px !important; font-weight: 800 !important; }
 
 /* seg-h */
-.admin-shell .seg-h h2 { color: #0c1f40 !important; font-size: 17px !important; font-weight: 800 !important; }
-.admin-shell .seg-sub { color: #4a5b78 !important; opacity: 1 !important; font-size: 13px !important; font-weight: 500 !important; }
-.admin-shell .seg-ts { color: #4a5b78 !important; opacity: 1 !important; font-size: 13px !important; }
 
 /* KPI 카드 */
-.admin-shell .kpi {
-  background: #f1f5fb !important; border: 1px solid #c9d4e3 !important; padding: 16px !important;
-}
-.admin-shell .kpi.or { background: #fef3e7 !important; border-color: #f1d4a8 !important; }
-.admin-shell .kpi-ic { font-size: 19px !important; }
-.admin-shell .kpi.bl .kpi-ic { background: rgba(37,99,235,.12) !important; color: #2563eb !important; }
-.admin-shell .kpi.gr .kpi-ic { background: rgba(5,150,105,.14) !important; color: #059669 !important; }
-.admin-shell .kpi.or .kpi-ic { background: rgba(180,83,9,.14) !important; color: #b45309 !important; }
-.admin-shell .kpi.pl .kpi-ic { background: rgba(124,58,237,.12) !important; color: #7c3aed !important; }
-.admin-shell .kpi.cy .kpi-ic { background: rgba(8,145,178,.12) !important; color: #0891b2 !important; }
-.admin-shell .kpi-lab { color: #4a5b78 !important; opacity: 1 !important; font-size: 13px !important; font-weight: 600 !important; }
-.admin-shell .kpi-val { color: #0c1f40 !important; font-size: 26px !important; font-weight: 800 !important; }
-.admin-shell .kpi.or .kpi-val { color: #b45309 !important; }
-.admin-shell .kpi-u { color: #4a5b78 !important; opacity: 1 !important; font-size: 13px !important; }
-.admin-shell .kpi-bar {
-  background: rgba(37,99,235,.08) !important;
-}
-.admin-shell .kpi-foot { color: #4a5b78 !important; opacity: 1 !important; font-size: 12px !important; font-weight: 600 !important; }
-.admin-shell .kpi-foot .up { color: #059669 !important; }
-.admin-shell .kpi-foot .dn { color: #dc2626 !important; }
-.admin-shell .kpi-foot .flat { color: #6b7a92 !important; }
 
 /* 성과 개요 카드 */
-.admin-shell .card {
-  background: #f1f5fb !important; border: 1px solid #c9d4e3 !important;
-}
-.admin-shell .card h3 { color: #0c1f40 !important; font-size: 16px !important; font-weight: 800 !important; }
-.admin-shell .card-h .rb {
-  background: rgba(220,38,38,.14) !important; color: #b91c1c !important;
-  font-size: 12.5px !important; font-weight: 800 !important;
-}
-.admin-shell .tab {
-  background: #ffffff !important; border: 1px solid #c9d4e3 !important; color: #4a5b78 !important;
-  font-size: 13px !important; font-weight: 600 !important;
-}
-.admin-shell .tab.on {
-  background: rgba(37,99,235,.12) !important; color: #2563eb !important; border-color: rgba(37,99,235,.4) !important;
-}
-.admin-shell .legend { color: #0c1f40 !important; opacity: 1 !important; font-size: 12.5px !important; font-weight: 600 !important; }
-.admin-shell .lg-dot.bl { background: #2563eb !important; }
-.admin-shell .lg-dot.gr { background: #059669 !important; }
-.admin-shell .lg-dot.yl { background: #b45309 !important; }
-.admin-shell .lg-dot.rd { background: #dc2626 !important; }
 
 /* 바 차트 */
-.admin-shell .bnum { color: #2563eb !important; font-size: 12px !important; font-weight: 800 !important; }
-.admin-shell .bwrap {
-  background: rgba(37,99,235,.06) !important;
-}
-.admin-shell .bbar { background: linear-gradient(180deg, #2563eb, #1d4ed8) !important; }
-.admin-shell .bline { background: #059669 !important; box-shadow: 0 0 4px #059669 !important; }
-.admin-shell .bday { color: #4a5b78 !important; opacity: 1 !important; font-size: 12px !important; font-weight: 600 !important; }
-.admin-shell .b-tip {
-  background: #ffffff !important; border: 1px solid #c9d4e3 !important; color: #0c1f40 !important;
-  font-size: 11.5px !important; box-shadow: 0 4px 12px rgba(15,40,90,.15) !important;
-}
-.admin-shell .b-tip strong { color: #2563eb !important; font-size: 13px !important; }
-.admin-shell .b-tip .b-delta.up { color: #059669 !important; }
-.admin-shell .b-tip .b-delta.dn { color: #dc2626 !important; }
 
 /* 도넛(이벤트 처리 현황) */
-.admin-shell .donut circle[stroke="#1d2c44"] { stroke: #e7edf6 !important; }
-.admin-shell .donut circle[stroke="#3b82f6"] { stroke: #2563eb !important; }
-.admin-shell .donut circle[stroke="#f59e0b"] { stroke: #b45309 !important; }
-.admin-shell .donut circle[stroke="#ef4444"] { stroke: #dc2626 !important; }
-.admin-shell .dc-lab { color: #4a5b78 !important; opacity: 1 !important; font-size: 12.5px !important; }
-.admin-shell .dc-val { color: #0c1f40 !important; font-size: 26px !important; font-weight: 800 !important; }
-.admin-shell .dc-u { color: #4a5b78 !important; opacity: 1 !important; font-size: 13px !important; }
-.admin-shell .donut-legend { color: #0c1f40 !important; opacity: 1 !important; font-size: 13px !important; font-weight: 600 !important; }
-.admin-shell .donut-legend strong { color: #0c1f40 !important; font-weight: 800 !important; }
 
 /* 리스크 요약 */
-.admin-shell .risk .rk { border-bottom: 1px solid #d8dfe9 !important; }
-.admin-shell .risk .rk > i.bi-exclamation-triangle { color: #b45309 !important; font-size: 16px !important; }
-.admin-shell .rk-t { color: #0c1f40 !important; font-size: 14px !important; font-weight: 700 !important; }
-.admin-shell .rk-cnt { color: #b45309 !important; font-weight: 800 !important; font-size: 13.5px !important; }
-.admin-shell .rk-d { color: #4a5b78 !important; opacity: 1 !important; font-size: 12.5px !important; }
-.admin-shell .rk-a { color: #6b7a92 !important; opacity: 1 !important; font-size: 12px !important; }
-.admin-shell .risk .rk > i.bi-chevron-right { color: #6b7a92 !important; opacity: 1 !important; }
-.admin-shell .rk-more {
-  background: rgba(37,99,235,.08) !important; border: 1px solid rgba(37,99,235,.35) !important;
-  color: #2563eb !important; font-size: 13px !important; font-weight: 700 !important;
-}
 
 /* 부서별 성과 테이블 */
-.admin-shell .tbl-dept { font-size: 13px !important; }
-.admin-shell .tbl-dept th {
-  color: #4a5b78 !important; opacity: 1 !important; font-size: 12.5px !important;
-  font-weight: 800 !important; background: #e7edf6 !important;
-  border-bottom: 1px solid #c9d4e3 !important;
-}
-.admin-shell .tbl-dept td {
-  color: #0c1f40 !important; border-bottom-color: #d8dfe9 !important; padding: 10px 10px !important;
-}
-.admin-shell .tbl-dept .dn { color: #0c1f40 !important; font-weight: 800 !important; }
-.admin-shell .tbl-dept .up { color: #059669 !important; font-weight: 700 !important; }
-.admin-shell .tbl-dept .flat { color: #6b7a92 !important; }
 
 /* 절차/스텝 - 카드 내부 인라인 한 줄 변형 */
-.admin-shell .steps.inline.compact {
-  background: transparent !important; border: 0 !important;
-  margin-top: 8px !important; padding: 6px 0 0 !important;
-  border-top: 1px solid #d8dfe9 !important;
-  display: flex !important; align-items: center !important; gap: 10px !important; flex-wrap: wrap !important;
-}
-.admin-shell .steps.inline.compact .steps-h {
-  font-size: 11px !important; font-weight: 800 !important; color: #4a5b78 !important;
-  letter-spacing: .04em !important; text-transform: uppercase !important; margin: 0 !important;
-}
-.admin-shell .steps.inline.compact .steps-row {
-  display: inline-flex !important; align-items: center !important; gap: 4px !important; flex-wrap: wrap !important;
-}
-.admin-shell .steps.inline.compact .step {
-  display: inline-flex !important; align-items: baseline !important; gap: 3px !important;
-  background: transparent !important; border: 0 !important; padding: 0 !important;
-  font-size: 12px !important; color: #0c1f40 !important; font-weight: 600 !important;
-}
-.admin-shell .steps.inline.compact .step b {
-  color: #2563eb !important; font-weight: 800 !important;
-  font-family: "JetBrains Mono", monospace !important;
-}
-.admin-shell .steps.inline.compact .step-arrow {
-  color: #6b7a92 !important; font-size: 10px !important; position: static !important;
-  background: transparent !important; padding: 0 2px !important;
-}
 
 /* 절차/스텝 */
-.admin-shell .steps {
-  background: #f1f5fb !important; border: 1px solid #c9d4e3 !important;
-}
-.admin-shell .sn {
-  background: rgba(37,99,235,.14) !important; color: #2563eb !important;
-  font-size: 12.5px !important; font-weight: 800 !important;
-}
-.admin-shell .st { color: #0c1f40 !important; font-size: 14px !important; font-weight: 800 !important; }
-.admin-shell .sd { color: #4a5b78 !important; opacity: 1 !important; font-size: 12px !important; }
-.admin-shell .step-arrow { color: #6b7a92 !important; opacity: 1 !important; }
 
 /* 패널 (탭 전환 화면) */
-.admin-shell .panel { background: #f1f5fb !important; border: 1px solid #c9d4e3 !important; }
-.admin-shell .map-stub {
-  background: #ffffff !important; border: 1px dashed #c9d4e3 !important; opacity: 1 !important;
-  color: #0c1f40 !important;
-}
-.admin-shell .map-stub > i { color: #2563eb !important; }
-.admin-shell .ms-legend { color: #0c1f40 !important; font-size: 12.5px !important; font-weight: 600 !important; }
-.admin-shell .ms-legend i.gr { background: #059669 !important; }
-.admin-shell .ms-legend i.yl { background: #b45309 !important; }
-.admin-shell .ms-legend i.or { background: #ea580c !important; }
-.admin-shell .ms-legend i.rd { background: #dc2626 !important; }
 
 /* 카메라 셀 */
-.admin-shell .cam-cell {
-  background: #ffffff !important; border: 1px solid #c9d4e3 !important; color: #0c1f40 !important;
-}
-.admin-shell .cam-cell > i { color: #2563eb !important; font-size: 24px !important; }
-.admin-shell .cc-id { color: #0c1f40 !important; font-size: 13.5px !important; font-weight: 800 !important; }
-.admin-shell .cc-loc { color: #4a5b78 !important; opacity: 1 !important; font-size: 12px !important; }
-.admin-shell .cam-cell.ok .cc-st { background: rgba(5,150,105,.14) !important; color: #059669 !important; font-size: 11.5px !important; }
-.admin-shell .cam-cell.warn .cc-st { background: rgba(180,83,9,.14) !important; color: #b45309 !important; font-size: 11.5px !important; }
-.admin-shell .cam-cell.bad .cc-st { background: rgba(220,38,38,.14) !important; color: #b91c1c !important; font-size: 11.5px !important; }
 
 /* 설정 패널 */
-.admin-shell .set-row {
-  font-size: 14px !important; color: #0c1f40 !important;
-  border-bottom-color: #d8dfe9 !important;
-}
-.admin-shell .set-row label { color: #0c1f40 !important; font-weight: 600 !important; }
-.admin-shell .set-row input[type="number"],
-.admin-shell .set-row select {
-  background: #ffffff !important; border: 1px solid #c9d4e3 !important; color: #0c1f40 !important;
-  font-size: 13.5px !important;
-}
-.admin-shell .set-msg { color: #059669 !important; font-size: 13px !important; font-weight: 700 !important; }
 
 /* footer */
-.admin-shell .foot { color: #4a5b78 !important; opacity: 1 !important; font-size: 12.5px !important; font-weight: 600 !important; }
 
 /* 카드 헤더 인라인 KPI 칩 (운영기획팀 상태 요약 분산) */
-.admin-shell .card-h { gap: 12px !important; flex-wrap: wrap !important; }
-.admin-shell .hdr-kpis {
-  display: flex !important; gap: 10px !important; align-items: center !important; flex-wrap: wrap !important;
-}
-.admin-shell .hk {
-  display: inline-flex !important; align-items: baseline !important; gap: 6px !important;
-  padding: 5px 11px !important; border-radius: 6px !important;
-  background: #ffffff !important; border: 1px solid #c9d4e3 !important;
-  font-family: "Pretendard Variable", Pretendard, sans-serif !important;
-}
-.admin-shell .hk-l { color: #4a5b78 !important; font-size: 12.5px !important; font-weight: 700 !important; }
-.admin-shell .hk-v {
-  color: #0c1f40 !important; font-size: 17px !important; font-weight: 800 !important;
-  font-family: "JetBrains Mono", monospace !important;
-}
-.admin-shell .hk-v small { font-size: 12px !important; font-weight: 600 !important; margin-left: 1px !important; color: #4a5b78 !important; }
-.admin-shell .hk-d { font-size: 11.5px !important; font-weight: 800 !important; }
-.admin-shell .hk-d.up { color: #059669 !important; }
-.admin-shell .hk-d.dn { color: #dc2626 !important; }
-.admin-shell .hk-d.flat { color: #6b7a92 !important; }
-.admin-shell .hk.bl { border-left: 3px solid #2563eb !important; }
-.admin-shell .hk.gr { border-left: 3px solid #059669 !important; }
-.admin-shell .hk.or { border-left: 3px solid #b45309 !important; }
-.admin-shell .hk.pl { border-left: 3px solid #7c3aed !important; }
-.admin-shell .hk.cy { border-left: 3px solid #0891b2 !important; }
-.admin-shell .hk.or .hk-v { color: #b45309 !important; }
-.admin-shell .hdr-ts {
-  color: #4a5b78 !important; font-size: 12px !important; font-weight: 600 !important;
-  margin-left: 4px !important;
-}
-.admin-shell .hdr-ts i { color: #2563eb !important; margin-left: 3px !important; }
 
 /* ============================================================
    헤더 통일 (시설운영팀 기준)
    모든 부서: 부서명만 + hdr-time + km-toggle + DeptSwitcher + t-user
    ============================================================ */
-html .admin-shell .top,
 html .cc-shell .top,
 html .sa-shell .top,
 html .an-shell .top,
@@ -1507,7 +1240,6 @@ html .ops-shell .top {
   background: #ffffff !important;
   border-bottom: 1px solid #b8c5d8 !important;
 }
-html .admin-shell .top h1,
 html .cc-shell .top h1,
 html .sa-shell .top h1,
 html .an-shell .top h1,
@@ -1522,7 +1254,6 @@ html .ops-shell .top h1 {
   align-items: center !important;
   gap: 8px !important;
 }
-html .admin-shell .top h1 .t-main,
 html .cc-shell .top h1 .t-main,
 html .sa-shell .top h1 .t-main,
 html .an-shell .top h1 .t-main,
@@ -1536,7 +1267,6 @@ html .ops-shell .top h1 .t-main {
   text-decoration: none !important;
   display: inline-block !important;
 }
-html .admin-shell .top h1 .t-main:hover,
 html .cc-shell .top h1 .t-main:hover,
 html .sa-shell .top h1 .t-main:hover,
 html .an-shell .top h1 .t-main:hover,
@@ -1546,7 +1276,6 @@ html .ops-shell .top h1 .t-main:hover {
   text-decoration: none !important;
 }
 
-html .admin-shell .top .t-right,
 html .cc-shell .top .t-right,
 html .sa-shell .top .t-right,
 html .an-shell .top .t-right,
@@ -1558,7 +1287,6 @@ html .ops-shell .top .t-right {
 }
 
 /* 마지막 업데이트 시각 */
-html .admin-shell .hdr-time,
 html .cc-shell .hdr-time,
 html .sa-shell .hdr-time,
 html .an-shell .hdr-time,
@@ -1573,7 +1301,6 @@ html .ops-shell .hdr-time {
   white-space: nowrap !important;
   font-weight: 500 !important;
 }
-html .admin-shell .hdr-time > i,
 html .cc-shell .hdr-time > i,
 html .sa-shell .hdr-time > i,
 html .an-shell .hdr-time > i,
@@ -1583,7 +1310,6 @@ html .ops-shell .hdr-time > i {
   opacity: 0.8 !important;
   color: #4a5b78 !important;
 }
-html .admin-shell .hdr-time strong,
 html .cc-shell .hdr-time strong,
 html .sa-shell .hdr-time strong,
 html .an-shell .hdr-time strong,
@@ -1596,7 +1322,6 @@ html .ops-shell .hdr-time strong {
 }
 
 /* 자동 새로고침 토글 */
-html .admin-shell .km-toggle,
 html .cc-shell .km-toggle,
 html .sa-shell .km-toggle,
 html .an-shell .km-toggle,
@@ -1614,7 +1339,6 @@ html .ops-shell .km-toggle {
   font-family: inherit !important;
   cursor: pointer !important;
 }
-html .admin-shell .km-toggle.on,
 html .cc-shell .km-toggle.on,
 html .sa-shell .km-toggle.on,
 html .an-shell .km-toggle.on,
@@ -1624,7 +1348,6 @@ html .ops-shell .km-toggle.on {
   border-color: rgba(5,150,105,.4) !important;
   color: #0c1f40 !important;
 }
-html .admin-shell .km-dot,
 html .cc-shell .km-dot,
 html .sa-shell .km-dot,
 html .an-shell .km-dot,
@@ -1633,7 +1356,6 @@ html .ops-shell .km-dot {
   width: 7px !important; height: 7px !important; border-radius: 50% !important;
   background: #94a3b8 !important; flex-shrink: 0 !important;
 }
-html .admin-shell .km-toggle.on .km-dot,
 html .cc-shell .km-toggle.on .km-dot,
 html .sa-shell .km-toggle.on .km-dot,
 html .an-shell .km-toggle.on .km-dot,
@@ -1641,13 +1363,11 @@ html .rev-shell .km-toggle.on .km-dot,
 html .ops-shell .km-toggle.on .km-dot {
   background: #059669 !important;
 }
-html .admin-shell .km-lab,
 html .cc-shell .km-lab,
 html .sa-shell .km-lab,
 html .an-shell .km-lab,
 html .rev-shell .km-lab,
 html .ops-shell .km-lab { flex: 1 !important; text-align: left !important; }
-html .admin-shell .km-state,
 html .cc-shell .km-state,
 html .sa-shell .km-state,
 html .an-shell .km-state,
@@ -1659,7 +1379,6 @@ html .ops-shell .km-state {
   padding: 2px 6px !important; border-radius: 3px !important;
   background: #e8eff8 !important; color: #0c1f40 !important;
 }
-html .admin-shell .km-toggle.on .km-state,
 html .cc-shell .km-toggle.on .km-state,
 html .sa-shell .km-toggle.on .km-state,
 html .an-shell .km-toggle.on .km-state,
@@ -1669,7 +1388,6 @@ html .ops-shell .km-toggle.on .km-state {
 }
 
 /* t-user 통일 */
-html .admin-shell .t-user,
 html .cc-shell .t-user,
 html .sa-shell .t-user,
 html .an-shell .t-user,
@@ -1683,7 +1401,6 @@ html .ops-shell .t-user {
   padding: 6px 12px !important; border-radius: 4px !important;
   cursor: pointer !important; white-space: nowrap !important;
 }
-html .admin-shell .t-user:hover,
 html .cc-shell .t-user:hover,
 html .sa-shell .t-user:hover,
 html .an-shell .t-user:hover,
@@ -1691,7 +1408,6 @@ html .rev-shell .t-user:hover,
 html .ops-shell .t-user:hover { border-color: #2563eb !important; }
 
 /* 헤더 부서명 클릭 (모든 부서 공통) */
-html .admin-shell .t-main,
 html .cc-shell .t-main,
 html .sa-shell .t-main,
 html .an-shell .t-main,
@@ -1702,7 +1418,6 @@ html .ops-shell .t-main {
   transition: color 0.15s !important;
   user-select: none !important;
 }
-html .admin-shell .t-main:hover,
 html .cc-shell .t-main:hover,
 html .sa-shell .t-main:hover,
 html .an-shell .t-main:hover,
@@ -1714,302 +1429,36 @@ html .ops-shell .t-main:hover {
 }
 
 /* 성과 개요 - 컨트롤 행 + 통계 푸터 */
-.admin-shell .ctrl-row {
-  display: flex !important; justify-content: space-between !important; align-items: center !important;
-  gap: 12px !important; margin-bottom: 10px !important; flex-wrap: wrap !important;
-}
-.admin-shell .period-sel {
-  display: inline-flex !important; background: #ffffff !important; border: 1px solid #c9d4e3 !important;
-  border-radius: 6px !important; padding: 2px !important;
-}
-.admin-shell .period-sel .ps {
-  background: none !important; border: 0 !important; color: #4a5b78 !important;
-  font-size: 12.5px !important; font-weight: 700 !important; padding: 5px 12px !important;
-  border-radius: 4px !important; cursor: pointer !important;
-}
-.admin-shell .period-sel .ps.on { background: #2563eb !important; color: #fff !important; }
-.admin-shell .lg-dot.or { background: #b45309 !important; }
-.admin-shell .bwrap.miss .bbar { background: linear-gradient(180deg, #f59e0b, #b45309) !important; }
-.admin-shell .perf-stats {
-  display: flex !important; gap: 0 !important;
-  margin-top: 10px !important; padding-top: 10px !important;
-  border-top: 1px solid #d8dfe9 !important;
-}
-.admin-shell .ps-i {
-  flex: 1 !important;
-  display: flex !important; flex-direction: row !important; align-items: baseline !important; gap: 6px !important;
-  padding: 4px 10px !important;
-  border-right: 1px solid #d8dfe9 !important;
-}
-.admin-shell .ps-i:last-child { border-right: 0 !important; }
-.admin-shell .ps-l { color: #4a5b78 !important; font-size: 11.5px !important; font-weight: 600 !important; white-space: nowrap !important; }
-.admin-shell .ps-v { color: #0c1f40 !important; font-size: 14px !important; font-weight: 800 !important; font-family: "JetBrains Mono", monospace !important; white-space: nowrap !important; }
-.admin-shell .ps-v.gr { color: #059669 !important; }
-.admin-shell .ps-v.or { color: #b45309 !important; }
-.admin-shell .ps-e { color: #6b7a92 !important; font-size: 11px !important; font-weight: 600 !important; font-style: normal !important; margin-left: auto !important; }
-.admin-shell .ps-e.gr { color: #059669 !important; }
 
 /* 이벤트 처리 현황 - 컴팩트 */
-.admin-shell .evt-body { display: grid !important; grid-template-columns: 130px 1fr !important; gap: 12px !important; align-items: center !important; }
-.admin-shell .donut-wrap { width: 130px !important; height: 130px !important; margin: 0 !important; }
-.admin-shell .donut-legend.compact { gap: 4px !important; font-size: 12px !important; }
-.admin-shell .donut-legend em { margin-left: auto !important; color: #4a5b78 !important; font-style: normal !important; font-size: 11.5px !important; font-weight: 700 !important; font-family: "JetBrains Mono", monospace !important; }
-.admin-shell .donut-legend > div { display: flex !important; align-items: center !important; gap: 6px !important; }
-.admin-shell .evt-meta-row {
-  margin-top: 10px !important; padding-top: 8px !important; border-top: 1px solid #d8dfe9 !important;
-  display: flex !important; justify-content: space-between !important; gap: 8px !important;
-  font-size: 12px !important;
-}
-.admin-shell .evt-meta-row > span { color: #4a5b78 !important; font-weight: 600 !important; display: inline-flex !important; align-items: center !important; gap: 4px !important; }
-.admin-shell .evt-meta-row > span i { color: #6b7a92 !important; }
-.admin-shell .evt-meta-row strong { color: #0c1f40 !important; font-weight: 800 !important; font-family: "JetBrains Mono", monospace !important; }
-.admin-shell .evt-meta-row strong.rd { color: #b91c1c !important; }
-.admin-shell .evt-meta-row strong.gr { color: #059669 !important; }
-.admin-shell .evt-types {
-  margin-top: 8px !important; padding-top: 8px !important; border-top: 1px solid #d8dfe9 !important;
-  display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 4px 12px !important;
-}
-.admin-shell .et-i { display: grid !important; grid-template-columns: 40px 1fr 26px !important; gap: 6px !important; align-items: center !important; padding: 2px 0 !important; }
-.admin-shell .et-tag { font-size: 10.5px !important; font-weight: 800 !important; padding: 1px 6px !important; border-radius: 3px !important; text-align: center !important; }
-.admin-shell .et-tag.bl { background: rgba(37,99,235,.14) !important; color: #2563eb !important; }
-.admin-shell .et-tag.or { background: rgba(180,83,9,.14) !important; color: #b45309 !important; }
-.admin-shell .et-tag.rd { background: rgba(220,38,38,.14) !important; color: #b91c1c !important; }
-.admin-shell .et-tag.pl { background: rgba(124,58,237,.14) !important; color: #7c3aed !important; }
-.admin-shell .et-bar { display: block !important; height: 6px !important; background: #e7edf6 !important; border-radius: 3px !important; overflow: hidden !important; }
-.admin-shell .et-bar > span { display: block !important; height: 100% !important; border-radius: 3px !important; }
-.admin-shell .et-i > strong { color: #0c1f40 !important; font-size: 12px !important; font-weight: 800 !important; font-family: "JetBrains Mono", monospace !important; text-align: right !important; }
 
 /* 리스크 요약 - 심각도/담당/마감/점수 */
-.admin-shell .rsk-cnts { display: inline-flex !important; gap: 6px !important; }
-.admin-shell .rsk-c { font-size: 11.5px !important; font-weight: 800 !important; padding: 3px 9px !important; border-radius: 100px !important; }
-.admin-shell .rsk-c.high { background: rgba(220,38,38,.14) !important; color: #b91c1c !important; }
-.admin-shell .rsk-c.med  { background: rgba(180,83,9,.14) !important; color: #b45309 !important; }
-.admin-shell .rsk-c.low  { background: rgba(37,99,235,.14) !important; color: #2563eb !important; }
 
-.admin-shell .risk .rk {
-  display: grid !important; grid-template-columns: 4px 1fr !important; gap: 10px !important;
-  padding: 8px 0 !important; align-items: stretch !important;
-  border-bottom: 1px solid #d8dfe9 !important;
-}
-.admin-shell .rk-bar { display: block !important; width: 4px !important; border-radius: 2px !important; }
-.admin-shell .rk-bar.high { background: #dc2626 !important; }
-.admin-shell .rk-bar.med  { background: #b45309 !important; }
-.admin-shell .rk-bar.low  { background: #2563eb !important; }
-.admin-shell .rk-top { display: flex !important; align-items: center !important; gap: 8px !important; }
-.admin-shell .rk-sev-tag {
-  font-size: 10.5px !important; font-weight: 800 !important; padding: 2px 7px !important; border-radius: 3px !important;
-  flex-shrink: 0 !important;
-}
-.admin-shell .rk-sev-tag.high { background: rgba(220,38,38,.14) !important; color: #b91c1c !important; }
-.admin-shell .rk-sev-tag.med  { background: rgba(180,83,9,.14) !important; color: #b45309 !important; }
-.admin-shell .rk-sev-tag.low  { background: rgba(37,99,235,.14) !important; color: #2563eb !important; }
-.admin-shell .risk .rk-t { color: #0c1f40 !important; font-size: 13px !important; font-weight: 700 !important; flex: 1 !important; }
-.admin-shell .risk .rk-cnt { color: #0c1f40 !important; font-weight: 800 !important; font-size: 12.5px !important; font-family: "JetBrains Mono", monospace !important; }
-.admin-shell .risk .rk-d { color: #4a5b78 !important; font-size: 11.5px !important; margin-top: 2px !important; }
-.admin-shell .risk .rk-d em { color: #6b7a92 !important; font-style: normal !important; }
-.admin-shell .rk-bot { display: grid !important; grid-template-columns: 80px 26px 1fr !important; gap: 8px !important; align-items: center !important; margin-top: 4px !important; }
-.admin-shell .rk-sb { display: block !important; height: 5px !important; background: #e7edf6 !important; border-radius: 3px !important; overflow: hidden !important; }
-.admin-shell .rk-sb > span { display: block !important; height: 100% !important; border-radius: 3px !important; }
-.admin-shell .rk-sb > span.high { background: #dc2626 !important; }
-.admin-shell .rk-sb > span.med  { background: #b45309 !important; }
-.admin-shell .rk-sb > span.low  { background: #2563eb !important; }
-.admin-shell .rk-num { color: #0c1f40 !important; font-size: 12px !important; font-weight: 800 !important; font-family: "JetBrains Mono", monospace !important; text-align: center !important; }
-.admin-shell .rk-act { color: #2563eb !important; font-size: 11.5px !important; font-weight: 700 !important; }
 
 /* 부서별 성과 비교 - 등급 + 평균 푸터 */
-.admin-shell .grade {
-  display: inline-block !important; min-width: 32px !important; padding: 3px 8px !important;
-  border-radius: 4px !important; font-size: 12px !important; font-weight: 800 !important;
-  font-family: "JetBrains Mono", monospace !important; text-align: center !important;
-}
-.admin-shell .grade.A { background: rgba(5,150,105,.14) !important; color: #059669 !important; }
-.admin-shell .grade.B { background: rgba(180,83,9,.14) !important; color: #b45309 !important; }
-.admin-shell .grade.C { background: rgba(220,38,38,.14) !important; color: #b91c1c !important; }
-.admin-shell .tbl-dept tfoot td {
-  background: #e7edf6 !important; border-top: 2px solid #c9d4e3 !important;
-  font-weight: 800 !important; font-family: "JetBrains Mono", monospace !important;
-  padding: 10px 10px !important; color: #0c1f40 !important;
-}
-.admin-shell .tbl-dept tfoot td.dn { font-family: inherit !important; }
 
 /* 보고서 생성 - 자동 발행 + 최근 발행 리스트 */
-.admin-shell .auto-pub {
-  display: inline-flex !important; align-items: center !important; gap: 6px !important;
-  font-size: 12.5px !important; color: #0c1f40 !important; font-weight: 700 !important; cursor: pointer !important;
-}
-.admin-shell .auto-pub input { accent-color: #2563eb !important; }
-.admin-shell .recent-rep {
-  margin-top: 10px !important; padding-top: 8px !important; border-top: 1px solid #d8dfe9 !important;
-}
-.admin-shell .rr-h {
-  display: flex !important; justify-content: space-between !important; align-items: center !important;
-  font-size: 12.5px !important; font-weight: 800 !important; color: #0c1f40 !important; margin-bottom: 6px !important;
-}
-.admin-shell .rr-h .rr-cnt { font-style: normal !important; color: #6b7a92 !important; font-size: 11.5px !important; margin-left: 4px !important; font-weight: 600 !important; }
-.admin-shell .rr-all {
-  color: #2563eb !important; font-size: 11.5px !important; font-weight: 700 !important;
-  text-decoration: none !important;
-}
-.admin-shell .rr-list { display: flex !important; flex-direction: column !important; gap: 4px !important; }
-.admin-shell .rr-i {
-  display: grid !important; grid-template-columns: 1fr auto auto !important; gap: 10px !important;
-  padding: 6px 8px !important; align-items: center !important;
-  background: #ffffff !important; border: 1px solid #c9d4e3 !important; border-radius: 5px !important;
-}
-.admin-shell .rr-i-l { display: flex !important; flex-direction: column !important; min-width: 0 !important; }
-.admin-shell .rr-i .rr-t { color: #0c1f40 !important; font-size: 12.5px !important; font-weight: 800 !important; }
-.admin-shell .rr-i .rr-meta { color: #4a5b78 !important; font-size: 11px !important; font-weight: 600 !important; font-family: "JetBrains Mono", monospace !important; }
-.admin-shell .rr-views { color: #4a5b78 !important; font-size: 11.5px !important; font-weight: 700 !important; font-family: "JetBrains Mono", monospace !important; }
-.admin-shell .rr-views i { color: #6b7a92 !important; margin-right: 3px !important; }
-.admin-shell .rr-st { font-size: 10.5px !important; font-weight: 800 !important; padding: 2px 7px !important; border-radius: 100px !important; }
-.admin-shell .rr-st.ok   { background: rgba(5,150,105,.14) !important; color: #059669 !important; }
-.admin-shell .rr-st.appr { background: rgba(37,99,235,.14) !important; color: #2563eb !important; }
 
 /* 운영기획팀 전체 크기·폰트 업 */
 .admin-shell .row2, .admin-shell .row3 { gap: 14px !important; }
-.admin-shell .main { gap: 14px !important; padding: 20px 24px !important; }
-.admin-shell .card { padding: 16px 18px !important; }
-.admin-shell .card h3 { margin-bottom: 10px !important; font-size: 17px !important; font-weight: 800 !important; }
-.admin-shell .card-h { margin-bottom: 10px !important; }
-.admin-shell .top { padding: 16px 24px !important; }
-.admin-shell .top h1 { font-size: 22px !important; }
-.admin-shell .top h1 .t-main { font-size: 24px !important; }
 
 /* 성과 개요 */
-.admin-shell .bars { height: 160px !important; padding: 0 6px !important; }
-.admin-shell .bnum { font-size: 13px !important; font-weight: 800 !important; }
-.admin-shell .bday { font-size: 12px !important; font-weight: 600 !important; }
-.admin-shell .ctrl-row { margin-bottom: 10px !important; }
-.admin-shell .legend { margin-bottom: 8px !important; font-size: 13px !important; font-weight: 600 !important; }
-.admin-shell .perf-stats { margin-top: 14px !important; padding-top: 12px !important; }
-.admin-shell .ps-i { padding: 6px 12px !important; }
-.admin-shell .ps-v { font-size: 16px !important; }
-.admin-shell .ps-l { font-size: 13px !important; }
-.admin-shell .ps-e { font-size: 12px !important; }
-.admin-shell .tab { font-size: 13.5px !important; padding: 7px 14px !important; }
-.admin-shell .period-sel .ps { font-size: 13px !important; padding: 6px 14px !important; }
 
 /* 이벤트 처리 현황 */
-.admin-shell .donut-wrap { width: 140px !important; height: 140px !important; }
-.admin-shell .evt-body { grid-template-columns: 140px 1fr !important; gap: 14px !important; }
-.admin-shell .dc-val { font-size: 26px !important; }
-.admin-shell .dc-lab { font-size: 12.5px !important; }
-.admin-shell .dc-u { font-size: 13px !important; }
-.admin-shell .donut-legend.compact { font-size: 13px !important; }
-.admin-shell .donut-legend em { font-size: 12.5px !important; }
-.admin-shell .evt-meta-row { margin-top: 12px !important; padding-top: 10px !important; font-size: 13px !important; }
-.admin-shell .evt-types { margin-top: 12px !important; padding-top: 10px !important; }
-.admin-shell .et-i { padding: 4px 0 !important; }
-.admin-shell .et-bar { height: 8px !important; }
-.admin-shell .et-tag { font-size: 12px !important; padding: 3px 9px !important; }
-.admin-shell .et-i > strong { font-size: 13.5px !important; }
 
 /* 리스크 요약 */
-.admin-shell .risk .rk { padding: 10px 0 !important; }
-.admin-shell .risk .rk-t { font-size: 14px !important; }
-.admin-shell .risk .rk-d { font-size: 12.5px !important; margin-top: 3px !important; }
-.admin-shell .rk-bot { margin-top: 6px !important; }
-.admin-shell .rk-more { margin-top: 10px !important; padding: 9px !important; font-size: 13px !important; }
-.admin-shell .rsk-cnts { gap: 6px !important; }
-.admin-shell .rsk-c { padding: 3px 10px !important; font-size: 12.5px !important; }
-.admin-shell .rk-sev-tag { font-size: 11.5px !important; padding: 3px 9px !important; }
-.admin-shell .risk .rk-cnt { font-size: 13.5px !important; }
-.admin-shell .rk-act { font-size: 12.5px !important; }
-.admin-shell .rk-num { font-size: 13.5px !important; }
 
 /* 부서별 성과 비교 */
-.admin-shell .tbl-dept { font-size: 13.5px !important; }
 .admin-shell .tbl-dept th, .admin-shell .tbl-dept td { padding: 9px 10px !important; }
-.admin-shell .tbl-dept th { font-size: 12.5px !important; }
-.admin-shell .grade { font-size: 12.5px !important; padding: 4px 10px !important; }
-.admin-shell .steps.inline { margin-top: 14px !important; padding-top: 12px !important; }
-.admin-shell .steps.inline.compact { gap: 12px !important; }
-.admin-shell .steps.inline.compact .step { font-size: 13.5px !important; }
-.admin-shell .steps.inline.compact .steps-h { font-size: 12.5px !important; }
 
 /* 보고서 생성 */
-.admin-shell .rep-grid { gap: 8px !important; margin-bottom: 10px !important; }
-.admin-shell .rep { padding: 11px 13px !important; }
-.admin-shell .rep-h { font-size: 13.5px !important; margin-bottom: 4px !important; }
-.admin-shell .rep-d { font-size: 12.5px !important; }
-.admin-shell .rep-date { font-size: 12px !important; margin: 4px 0 8px !important; }
-.admin-shell .rep-btn { padding: 7px !important; font-size: 12.5px !important; }
-.admin-shell .rep-actions { gap: 8px !important; }
 .admin-shell .btn-pri, .admin-shell .btn-sec { padding: 9px !important; font-size: 13px !important; }
-.admin-shell .recent-rep { margin-top: 14px !important; padding-top: 12px !important; }
-.admin-shell .rr-h { margin-bottom: 8px !important; font-size: 13.5px !important; }
-.admin-shell .rr-list { gap: 6px !important; }
-.admin-shell .rr-i { padding: 8px 12px !important; gap: 12px !important; }
-.admin-shell .rr-i .rr-t { font-size: 13px !important; }
-.admin-shell .rr-i .rr-meta { font-size: 11.5px !important; }
-.admin-shell .rr-views { font-size: 12.5px !important; }
-.admin-shell .rr-st { font-size: 11.5px !important; padding: 3px 9px !important; }
 
 /* 사이드 KPI 패널 */
-.admin-shell .side-kpi { gap: 8px !important; }
-.admin-shell .sk-i { padding: 9px 11px !important; gap: 4px !important; }
-.admin-shell .sk-l { font-size: 12.5px !important; }
-.admin-shell .sk-v { font-size: 22px !important; }
-.admin-shell .sk-v small { font-size: 13px !important; }
-.admin-shell .sk-d { font-size: 12px !important; }
-.admin-shell .sk-bar { height: 3px !important; }
-.admin-shell .sk-foot { padding: 8px 4px 0 !important; font-size: 12px !important; }
-.admin-shell .sk-h { font-size: 12px !important; }
 
 /* hdr-kpis chips */
-.admin-shell .hk-l { font-size: 13px !important; }
-.admin-shell .hk-v { font-size: 19px !important; }
-.admin-shell .hk-d { font-size: 12.5px !important; }
-.admin-shell .hdr-ts { font-size: 13px !important; }
 
 /* 좌측 사이드바 KPI 패널 */
-.admin-shell .side { width: 220px !important; display: flex !important; flex-direction: column !important; }
-.admin-shell .side-kpi {
-  margin-top: 14px !important; padding-top: 12px !important;
-  border-top: 1px solid #d8dfe9 !important;
-  display: flex !important; flex-direction: column !important; gap: 8px !important;
-}
-.admin-shell .sk-h {
-  font-size: 11.5px !important; font-weight: 800 !important; color: #4a5b78 !important;
-  letter-spacing: .03em !important; text-transform: uppercase !important;
-  padding: 0 4px !important; margin-bottom: 2px !important;
-}
-.admin-shell .sk-h em { font-style: normal !important; font-weight: 600 !important; color: #6b7a92 !important; font-size: 11px !important; text-transform: none !important; letter-spacing: 0 !important; margin-left: 4px !important; }
-.admin-shell .sk-i {
-  background: #ffffff !important; border: 1px solid #c9d4e3 !important;
-  border-left: 3px solid #c9d4e3 !important;
-  border-radius: 6px !important; padding: 8px 10px !important;
-  display: flex !important; flex-direction: column !important; gap: 4px !important;
-}
-.admin-shell .sk-i.bl { border-left-color: #2563eb !important; }
-.admin-shell .sk-i.gr { border-left-color: #059669 !important; }
-.admin-shell .sk-i.or { border-left-color: #b45309 !important; background: #fef9f0 !important; }
-.admin-shell .sk-i.pl { border-left-color: #7c3aed !important; }
-.admin-shell .sk-i.cy { border-left-color: #0891b2 !important; }
-.admin-shell .sk-top { display: flex !important; justify-content: space-between !important; align-items: center !important; }
-.admin-shell .sk-l { color: #4a5b78 !important; font-size: 11.5px !important; font-weight: 700 !important; }
-.admin-shell .sk-d { font-size: 11px !important; font-weight: 800 !important; font-family: "JetBrains Mono", monospace !important; }
-.admin-shell .sk-d.up   { color: #059669 !important; }
-.admin-shell .sk-d.dn   { color: #dc2626 !important; }
-.admin-shell .sk-d.flat { color: #6b7a92 !important; }
-.admin-shell .sk-v {
-  color: #0c1f40 !important; font-size: 20px !important; font-weight: 800 !important;
-  font-family: "JetBrains Mono", monospace !important; line-height: 1 !important;
-}
-.admin-shell .sk-i.or .sk-v { color: #b45309 !important; }
-.admin-shell .sk-v small { font-size: 12px !important; font-weight: 600 !important; color: #4a5b78 !important; margin-left: 2px !important; }
-.admin-shell .sk-bar { display: block !important; height: 3px !important; background: #e7edf6 !important; border-radius: 2px !important; overflow: hidden !important; }
-.admin-shell .sk-bar > span { display: block !important; height: 100% !important; border-radius: 2px !important; }
-.admin-shell .sk-bar > span.bl { background: #2563eb !important; }
-.admin-shell .sk-bar > span.gr { background: #059669 !important; }
-.admin-shell .sk-bar > span.or { background: #b45309 !important; }
-.admin-shell .sk-bar > span.pl { background: #7c3aed !important; }
-.admin-shell .sk-bar > span.cy { background: #0891b2 !important; }
-.admin-shell .sk-foot {
-  font-size: 11px !important; color: #6b7a92 !important; font-weight: 600 !important;
-  padding: 6px 4px 0 !important; display: inline-flex !important; align-items: center !important; gap: 4px !important;
-}
-.admin-shell .sk-foot i { color: #2563eb !important; }
 
 /* ============================================================
    사이드바 날씨/대기 패널 (cc-shell, ops-shell, an-shell 공용)
@@ -2144,7 +1593,6 @@ html .ops-shell .t-main:hover {
 html .cc-shell .side,
 html .ops-shell .side,
 html .sa-shell .side,
-html .admin-shell .side,
 html .an-shell .filter {
   width: 220px !important;
   background: #e3e9f2 !important;
@@ -2167,7 +1615,6 @@ html .an-shell .filter {
 html .cc-shell .brand,
 html .ops-shell .brand,
 html .sa-shell .brand,
-html .admin-shell .brand,
 html .rev-shell .brand,
 html .an-shell .filter .brand {
   display: inline-flex !important; align-items: center !important; gap: 10px !important;
@@ -2180,7 +1627,6 @@ html .an-shell .filter .brand {
 html .cc-shell .brand .dot,
 html .ops-shell .brand .dot,
 html .sa-shell .brand .dot,
-html .admin-shell .brand .dot,
 html .rev-shell .brand .dot,
 html .an-shell .filter .brand .dot {
   width: 8px !important; height: 8px !important; border-radius: 50% !important;
@@ -2189,7 +1635,6 @@ html .an-shell .filter .brand .dot {
 html .cc-shell .brand em,
 html .ops-shell .brand em,
 html .sa-shell .brand em,
-html .admin-shell .brand em,
 html .rev-shell .brand em,
 html .an-shell .filter .brand em { color: #2563eb !important; font-style: normal !important; }
 
@@ -2200,7 +1645,6 @@ html .rev-shell .brand { padding: 0 !important; flex-shrink: 0 !important; }
 html .cc-shell .snav,
 html .ops-shell .snav,
 html .sa-shell .snav,
-html .admin-shell .snav,
 html .an-shell .filter .snav {
   display: flex !important; flex-direction: column !important; gap: 1px !important;
   background: none !important; border: 0 !important; padding: 0 !important;
@@ -2208,7 +1652,6 @@ html .an-shell .filter .snav {
 html .cc-shell .snav-i,
 html .ops-shell .snav-i,
 html .sa-shell .snav-i,
-html .admin-shell .snav-i,
 html .an-shell .filter .snav-i {
   display: flex !important; align-items: center !important; gap: 10px !important;
   padding: 11px 12px !important; border-radius: 2px !important;
@@ -2221,14 +1664,12 @@ html .an-shell .filter .snav-i {
 html .cc-shell .snav-i:hover,
 html .ops-shell .snav-i:hover,
 html .sa-shell .snav-i:hover,
-html .admin-shell .snav-i:hover,
 html .an-shell .filter .snav-i:hover {
   background: rgba(37,99,235,.06) !important; color: #0c1f40 !important;
 }
 html .cc-shell .snav-i.on,
 html .ops-shell .snav-i.on,
 html .sa-shell .snav-i.on,
-html .admin-shell .snav-i.on,
 html .an-shell .filter .snav-i.on {
   background: rgba(37,99,235,.1) !important; color: #2563eb !important;
   border-left: 3px solid #2563eb !important; padding-left: 8px !important;
@@ -2237,14 +1678,12 @@ html .an-shell .filter .snav-i.on {
 html .cc-shell .snav-i i,
 html .ops-shell .snav-i i,
 html .sa-shell .snav-i i,
-html .admin-shell .snav-i i,
 html .an-shell .filter .snav-i i { width: 18px !important; font-size: 17px !important; color: inherit !important; }
 
 /* snav-bdg - 시설운영팀 빨간 정사각 라벨 */
 html .cc-shell .snav-bdg,
 html .ops-shell .snav-bdg,
 html .sa-shell .snav-bdg,
-html .admin-shell .snav-bdg,
 html .an-shell .filter .snav-bdg {
   margin-left: auto !important;
   background: #dc2626 !important; color: #fff !important;
@@ -2258,14 +1697,12 @@ html .an-shell .filter .snav-bdg {
 html .cc-shell .snav-lab,
 html .ops-shell .snav-lab,
 html .sa-shell .snav-lab,
-html .admin-shell .snav-lab,
 html .an-shell .filter .snav-lab { flex: 1 !important; color: inherit !important; }
 
 /* side-foot 통일 */
 html .cc-shell .side-foot,
 html .ops-shell .side-foot,
 html .sa-shell .side-foot,
-html .admin-shell .side-foot,
 html .an-shell .filter .side-foot {
   margin-top: auto !important;
   padding: 10px 6px 0 !important;
@@ -2402,7 +1839,6 @@ html .ops-shell .snav-i .snav-bdg {
 }
 
 /* side-kpi 좌측 경계선이 brand border와 겹치지 않게 */
-.admin-shell .side-kpi { border-top: 0 !important; padding-top: 0 !important; margin-top: 0 !important; }
 
 /* ============================================================
    교통정보센터 (cc-shell) - 폰트 키우기 + 라이트 가독성 보정

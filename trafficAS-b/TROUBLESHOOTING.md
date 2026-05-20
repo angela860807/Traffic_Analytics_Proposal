@@ -1726,3 +1726,85 @@ function downloadCSV(filename, rows) {
 ### 교훈
 엑셀(Windows)은 UTF-8 BOM이 있어야 한글 인식. 다수 사용자가 윈도우 엑셀이라 BOM 붙이는 게 안전.
 
+---
+
+## 51. Vue SFC `<style>` 외부 파일로 빼기 — scoped 유지하면서 파일 분리
+
+### 증상
+OpsView.vue가 6,284줄(CSS 3,287줄 포함)로 비대. IDE 검색/스크롤이 무거움. 컴포넌트로 분할하면 scoped CSS 깨질 위험.
+
+### 해결
+Vue SFC는 `<style scoped src="./file.css">` 패턴을 지원. 외부 파일로 빼도 scoped 동작(컴파일러가 자동으로 `[data-v-xxx]` 부착) 그대로 유지.
+
+```vue
+<!-- OpsView.vue -->
+<script setup>
+// ...
+</script>
+
+<style scoped src="./OpsView.css"></style>
+```
+
+```css
+/* OpsView.css */
+.ops-shell .main { /* scoped 처리됨 */ }
+```
+
+### 절차
+```bash
+sed -n '<style 시작줄>,<끝줄>p' X.vue > X.css
+head -<script 끝줄> X.vue > /tmp/x.txt
+cat /tmp/x.txt > X.vue
+echo '<style scoped src="./X.css"></style>' >> X.vue
+```
+
+### 결과
+- OpsView: 6,284 → 2,996 (-52%)
+- 동작/번들 크기 변화 0
+- 디자인 작업 시 .css만, 로직 작업 시 .vue만 열어서 진행 가능
+
+### 교훈
+컴포넌트 분할 전에 **`<style scoped src>` 패턴**부터 시도. 위험도 0이고 파일 크기 절반 즉시 감소.
+
+---
+
+## 52. CSS regex 정제 함정 — 인라인 멀티셀렉터에서 한 토큰만 제거
+
+### 증상
+admin-shared.css에서 사용 안 하는 `.admin-shell`을 제거하려고 regex로 인라인 멀티셀렉터(`.cc-shell, .admin-shell, .ops-shell { ... }`) 안에서 `.admin-shell` 부분만 빼는 스크립트 작성. 빌드는 통과했지만 배경이 검정색으로 나오는 등 시각 깨짐.
+
+### 원인
+```python
+pattern = re.compile(r"([^{}]+?)(\{[^{}]*\})", re.DOTALL)
+```
+- `[^{}]+?` 비탐욕 매치로 셀렉터 추출 시 **`@media` 블록 안에 또 다른 `{ }`가 있으면 경계 오인**
+- `data:image/svg+xml;...{...}` 같은 url() 안 값에도 `{`가 포함될 수 있음
+- 라이트 테마 override 블록의 일부를 통째로 삼키거나 잘못 자르는 사례 발생
+
+### 해결
+즉시 `git checkout src/styles/admin-shared.css`로 원복.
+
+대신 보수적 접근:
+- ✅ Solo 룰 (`.admin-shell .xxx { ... }`): 블록 단위로 정확히 식별 가능 → 안전 제거
+- ✅ 멀티셀렉터의 **줄 단위** 항목 (`.admin-shell .xxx,` 단독 라인): 라인 단위로 매치 가능 → 안전 제거
+- ❌ **인라인 정제** (`.cc-shell, .admin-shell, .ops-shell {`에서 `.admin-shell`만 빼기): regex로는 위험
+
+`@media`/`@keyframes`/`@supports` 블록은 통째로 skip해서 보호:
+```python
+if re.match(r"^@(media|supports|keyframes)", stripped):
+    out.append(line)
+    i += 1
+    depth = line.count("{") - line.count("}")
+    while depth > 0 and i < len(lines):
+        out.append(lines[i])
+        depth += lines[i].count("{") - lines[i].count("}")
+        i += 1
+    continue
+```
+
+### 교훈
+- **CSS는 정규 언어가 아님** — `[^{}]` 같은 단순 regex로 안 풀림
+- regex 정제는 **줄 단위·블록 단위**로 명확한 경계만 다룰 것
+- 인라인 셀렉터 토큰 단위 정제가 필요하면 **proper CSS parser**(postcss 등) 사용
+- 정제 작업은 **백업 + 빌드 + 시각 확인** 3단계 검증 필수
+
