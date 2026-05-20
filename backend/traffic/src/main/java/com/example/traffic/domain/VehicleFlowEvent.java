@@ -73,4 +73,8 @@ public class VehicleFlowEvent {
         this.stayTime = stayTime;
         this.createdAt = LocalDateTime.now();
     }
+
+    public void updateSpeed(BigDecimal speed) {
+        this.speed = speed;
+    }
 }

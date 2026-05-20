@@ -168,6 +168,10 @@ class StreamFrameResponse(BaseModel):
         default=False,
         alias="speedViolationSent",
     )
+    speed_violation_send_error: str | None = Field(
+        default=None,
+        alias="speedViolationSendError",
+    )
     analysis_status: AnalysisStatus | None = Field(
         default=None,
         alias="analysisStatus",

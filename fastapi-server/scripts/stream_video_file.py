@@ -2,6 +2,7 @@ import argparse
 from collections import deque
 from dataclasses import dataclass, field
 import json
+import os
 import queue
 import threading
 import time
@@ -15,6 +16,7 @@ import requests
 
 STREAM_FRAME_PATH = "/api/detections/stream-frame"
 WINDOW_NAME = "Traffic Stream + BBox Preview"
+SPEED_ZONE_WINDOW_NAME = "Speed Zone Config"
 
 
 @dataclass
@@ -59,6 +61,20 @@ class PreviewFrame:
     frame: Any
 
 
+@dataclass(frozen=True)
+class SpeedOverlayConfig:
+    roi: list[tuple[int, int]] = field(default_factory=list)
+    line_a: tuple[int, int, int, int] | None = None
+    line_b: tuple[int, int, int, int] | None = None
+    homography_points: list[tuple[int, int]] = field(default_factory=list)
+    speed_mode: str = "TRACK_DELTA"
+
+
+@dataclass
+class SpeedZoneSelectionState:
+    points: list[tuple[int, int]] = field(default_factory=list)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Stream a local video file to FastAPI /api/detections/stream-frame.",
@@ -83,6 +99,16 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=3.0,
         help="Target frame upload FPS.",
+    )
+    parser.add_argument(
+        "--video-speed-ratio",
+        type=float,
+        default=1.0,
+        help=(
+            "Playback speed ratio of the video compared with real/original time. "
+            "Use 0.70 when the video is slowed to 70%% speed so capturedAt time "
+            "is compressed for speed calculation."
+        ),
     )
     parser.add_argument(
         "--jpeg-quality",
@@ -198,6 +224,54 @@ def build_parser() -> argparse.ArgumentParser:
         default=2.0,
         help="Delay GUI playback so bbox responses can be drawn on their matching frames.",
     )
+    parser.add_argument(
+        "--speed-config-json",
+        default=None,
+        help=(
+            "Optional SPEED_CAMERA_CONFIGS_JSON value or JSON file path used only "
+            "to draw ROI, lineA/B, and homography image points on preview."
+        ),
+    )
+    parser.add_argument(
+        "--configure-speed-zone",
+        action="store_true",
+        help=(
+            "Open the first upload-scaled video frame and click ROI 4 points "
+            "for this run. Press Enter without points to use the full frame."
+        ),
+    )
+    parser.add_argument(
+        "--save-speed-config-json",
+        default=None,
+        help=(
+            "Optional output JSON file path used with --configure-speed-zone. "
+            "When omitted, the clicked speed zone is used only for this run."
+        ),
+    )
+    parser.add_argument(
+        "--roi-width-meters",
+        type=float,
+        default=14.0,
+        help="World width in meters for the clicked ROI homography rectangle.",
+    )
+    parser.add_argument(
+        "--roi-height-meters",
+        type=float,
+        default=14.0,
+        help="World height in meters for the clicked ROI homography rectangle.",
+    )
+    parser.add_argument(
+        "--distance-meters",
+        type=float,
+        default=14.0,
+        help="Fallback lineA/lineB distance in meters when homography is unavailable.",
+    )
+    parser.add_argument(
+        "--speed-limit-kmh",
+        type=float,
+        default=50.0,
+        help="Speed limit written to the generated speed config JSON.",
+    )
     return parser
 
 
@@ -209,17 +283,11 @@ def summarize_response(frame_number: int, response_body: dict[str, Any]) -> str:
     over_speed = False
     if speed_violation:
         over_speed = True
-        speed_text = (
-            f"VIOLATION:{speed_violation.get('measuredSpeed', '-')}/"
-            f"{speed_violation.get('speedLimit', '-')}"
-        )
+        speed_text = format_speed_text(speed_violation, prefix="VIOLATION:")
     elif speed_measurements:
         measurement = speed_measurements[0]
         over_speed = bool(measurement.get("isViolation", False))
-        speed_text = (
-            f"{measurement.get('measuredSpeed', '-')}/"
-            f"{measurement.get('speedLimit', '-')}"
-        )
+        speed_text = format_speed_text(measurement)
     return (
         f"frame={frame_number} "
         f"streamStatus={response_body.get('streamStatus')} "
@@ -233,6 +301,13 @@ def summarize_response(frame_number: int, response_body: dict[str, Any]) -> str:
     )
 
 
+def format_speed_text(measurement: dict[str, Any], *, prefix: str = "") -> str:
+    return (
+        f"{prefix}{measurement.get('measuredSpeed', '-')}/"
+        f"{measurement.get('speedLimit', '-')}"
+    )
+
+
 def post_frame(
     *,
     url: str,
@@ -240,13 +315,18 @@ def post_frame(
     captured_at: datetime,
     frame_bytes: bytes,
     timeout: float,
+    speed_config_json: str | None = None,
 ) -> dict[str, Any]:
+    data = {
+        "cameraCode": camera_code,
+        "capturedAt": captured_at.isoformat(timespec="milliseconds"),
+    }
+    if speed_config_json is not None:
+        data["speedConfigJson"] = speed_config_json
+
     response = requests.post(
         url,
-        data={
-            "cameraCode": camera_code,
-            "capturedAt": captured_at.isoformat(timespec="milliseconds"),
-        },
+        data=data,
         files={
             "image": ("video-frame.jpg", frame_bytes, "image/jpeg"),
         },
@@ -333,6 +413,19 @@ def encode_upload_frame(
     return buffer.tobytes()
 
 
+def resize_for_upload(frame, *, upload_scale: float):
+    if upload_scale == 1.0:
+        return frame.copy()
+
+    return cv2.resize(
+        frame,
+        None,
+        fx=upload_scale,
+        fy=upload_scale,
+        interpolation=cv2.INTER_AREA,
+    )
+
+
 def draw_text(
     frame,
     text: str,
@@ -364,6 +457,370 @@ def draw_text(
     )
 
 
+def parse_speed_overlay_config(
+    raw_value: str | None,
+    *,
+    camera_code: str,
+) -> SpeedOverlayConfig | None:
+    config_source = raw_value or os.getenv("SPEED_CAMERA_CONFIGS_JSON")
+    if not config_source:
+        return None
+
+    config_source = read_speed_config_source(config_source)
+
+    raw_configs = json.loads(config_source)
+    if not isinstance(raw_configs, list):
+        raise ValueError("speed overlay config must be a JSON array")
+
+    raw_config = next(
+        (
+            item
+            for item in raw_configs
+            if isinstance(item, dict) and item.get("cameraCode") == camera_code
+        ),
+        None,
+    )
+    if raw_config is None:
+        return None
+
+    homography = raw_config.get("homography") or {}
+    return SpeedOverlayConfig(
+        roi=parse_preview_points(raw_config.get("roi") or []),
+        line_a=parse_preview_line(raw_config.get("lineA")),
+        line_b=parse_preview_line(raw_config.get("lineB")),
+        homography_points=parse_preview_points(homography.get("imagePoints") or []),
+        speed_mode=str(raw_config.get("speedMode", "TRACK_DELTA")).upper(),
+    )
+
+
+def read_speed_config_source(config_source: str) -> str:
+    source_text = config_source.strip()
+    source_path = Path(config_source)
+    if not source_text.startswith("[") and source_path.exists():
+        return source_path.read_text(encoding="utf-8")
+    return config_source
+
+
+def parse_preview_line(raw_line: Any) -> tuple[int, int, int, int] | None:
+    if raw_line is None:
+        return None
+    values = [int(value) for value in raw_line]
+    if len(values) != 4:
+        raise ValueError("preview line must contain four integers")
+    return (values[0], values[1], values[2], values[3])
+
+
+def parse_preview_points(raw_points: Any) -> list[tuple[int, int]]:
+    points: list[tuple[int, int]] = []
+    for raw_point in raw_points:
+        values = [int(value) for value in raw_point]
+        if len(values) != 2:
+            raise ValueError("preview point must contain two integers")
+        points.append((values[0], values[1]))
+    return points
+
+
+def build_speed_zone_config(
+    *,
+    camera_code: str,
+    roi_points: list[tuple[int, int]],
+    line_a_points: list[tuple[int, int]],
+    line_b_points: list[tuple[int, int]],
+    distance_meters: float,
+    speed_limit_kmh: float,
+    roi_width_meters: float,
+    roi_height_meters: float,
+) -> list[dict[str, Any]]:
+    if len(roi_points) != 4:
+        raise ValueError("ROI must contain exactly four clicked points")
+    if len(line_a_points) != 2:
+        raise ValueError("Line A must contain exactly two clicked points")
+    if len(line_b_points) != 2:
+        raise ValueError("Line B must contain exactly two clicked points")
+    if distance_meters <= 0:
+        raise ValueError("--distance-meters must be greater than 0")
+    if speed_limit_kmh <= 0:
+        raise ValueError("--speed-limit-kmh must be greater than 0")
+    if roi_width_meters <= 0 or roi_height_meters <= 0:
+        raise ValueError("--roi-width-meters and --roi-height-meters must be greater than 0")
+
+    return [
+        {
+            "cameraCode": camera_code,
+            "speedMode": "TRACK_DELTA",
+            "lineA": flatten_line_points(line_a_points),
+            "lineB": flatten_line_points(line_b_points),
+            "roi": [[x, y] for x, y in roi_points],
+            "distanceMeters": distance_meters,
+            "speedLimitKmh": speed_limit_kmh,
+            "enabled": True,
+            "homography": {
+                "imagePoints": [[x, y] for x, y in roi_points],
+                "worldPointsMeters": [
+                    [0, 0],
+                    [roi_width_meters, 0],
+                    [roi_width_meters, roi_height_meters],
+                    [0, roi_height_meters],
+                ],
+            },
+        }
+    ]
+
+
+def build_full_frame_speed_zone_config(
+    *,
+    camera_code: str,
+    frame_width: int,
+    frame_height: int,
+    distance_meters: float,
+    speed_limit_kmh: float,
+    roi_width_meters: float,
+    roi_height_meters: float,
+) -> list[dict[str, Any]]:
+    right = max(1, frame_width - 1)
+    bottom = max(1, frame_height - 1)
+    return build_speed_zone_config(
+        camera_code=camera_code,
+        roi_points=[
+            (0, 0),
+            (right, 0),
+            (right, bottom),
+            (0, bottom),
+        ],
+        line_a_points=[(0, 0), (right, 0)],
+        line_b_points=[(0, bottom), (right, bottom)],
+        distance_meters=distance_meters,
+        speed_limit_kmh=speed_limit_kmh,
+        roi_width_meters=roi_width_meters,
+        roi_height_meters=roi_height_meters,
+    )
+
+
+def flatten_line_points(points: list[tuple[int, int]]) -> list[int]:
+    first, second = points
+    return [first[0], first[1], second[0], second[1]]
+
+
+def split_clicked_speed_zone_points(
+    points: list[tuple[int, int]],
+) -> tuple[list[tuple[int, int]], list[tuple[int, int]], list[tuple[int, int]]]:
+    if len(points) == 4:
+        return points, [points[0], points[1]], [points[3], points[2]]
+    if len(points) == 8:
+        return points[:4], points[4:6], points[6:8]
+    raise ValueError("speed zone selection requires 4 ROI points")
+
+
+def scale_point(
+    point: tuple[int, int],
+    *,
+    response_coord_scale: float,
+    coord_scale: float,
+) -> tuple[int, int]:
+    return (
+        int(round(point[0] * response_coord_scale * coord_scale)),
+        int(round(point[1] * response_coord_scale * coord_scale)),
+    )
+
+
+def draw_speed_overlay(
+    frame,
+    overlay: SpeedOverlayConfig,
+    *,
+    response_coord_scale: float,
+    coord_scale: float,
+    font_scale: float,
+) -> None:
+    overlay_thickness = 1
+    if overlay.roi:
+        roi_points = np.array(
+            [
+                scale_point(
+                    point,
+                    response_coord_scale=response_coord_scale,
+                    coord_scale=coord_scale,
+                )
+                for point in overlay.roi
+            ],
+            dtype=np.int32,
+        )
+        cv2.polylines(
+            frame,
+            [roi_points],
+            isClosed=True,
+            color=(0, 255, 0),
+            thickness=overlay_thickness,
+        )
+        draw_text(frame, "ROI", tuple(roi_points[0]), (0, 255, 0), font_scale)
+
+    if overlay.line_a is not None and overlay.speed_mode != "TRACK_DELTA":
+        x1, y1, x2, y2 = overlay.line_a
+        start = scale_point((x1, y1), response_coord_scale=response_coord_scale, coord_scale=coord_scale)
+        end = scale_point((x2, y2), response_coord_scale=response_coord_scale, coord_scale=coord_scale)
+        cv2.line(frame, start, end, (255, 255, 255), overlay_thickness)
+        draw_text(frame, "Line A", (start[0], max(18, start[1] - 8)), (255, 255, 255), font_scale)
+
+    if overlay.line_b is not None and overlay.speed_mode != "TRACK_DELTA":
+        x1, y1, x2, y2 = overlay.line_b
+        start = scale_point((x1, y1), response_coord_scale=response_coord_scale, coord_scale=coord_scale)
+        end = scale_point((x2, y2), response_coord_scale=response_coord_scale, coord_scale=coord_scale)
+        cv2.line(frame, start, end, (255, 255, 255), overlay_thickness)
+        draw_text(frame, "Line B", (start[0], max(18, start[1] - 8)), (255, 255, 255), font_scale)
+
+    for index, point in enumerate(overlay.homography_points, start=1):
+        center = scale_point(point, response_coord_scale=response_coord_scale, coord_scale=coord_scale)
+        cv2.circle(frame, center, 3, (0, 255, 0), 1)
+        draw_text(
+            frame,
+            f"H{index}",
+            (center[0] + 7, center[1] - 7),
+            (0, 255, 0),
+            font_scale,
+        )
+
+
+def draw_speed_zone_selection(
+    frame,
+    points: list[tuple[int, int]],
+) -> Any:
+    display = frame.copy()
+    overlay = SpeedOverlayConfig(
+        roi=points[:4],
+        homography_points=points[:4],
+    )
+    draw_speed_overlay(
+        display,
+        overlay,
+        response_coord_scale=1.0,
+        coord_scale=1.0,
+        font_scale=0.5,
+    )
+
+    for index, point in enumerate(points, start=1):
+        cv2.circle(display, point, 5, (255, 255, 255), -1)
+        draw_text(display, str(index), (point[0] + 8, point[1] + 18), (255, 255, 255), 0.5)
+
+    next_label = next_speed_zone_point_label(len(points))
+    draw_text(
+        display,
+        f"Click {next_label} | u: undo  r: reset  Enter: start  ESC/q: cancel",
+        (12, 28),
+        (255, 255, 255),
+        0.55,
+    )
+    draw_text(
+        display,
+        "ROI order: top-left, top-right, bottom-right, bottom-left",
+        (12, 56),
+        (255, 255, 255),
+        0.50,
+    )
+    return display
+
+
+def next_speed_zone_point_label(count: int) -> str:
+    labels = (
+        "ROI 1/4",
+        "ROI 2/4",
+        "ROI 3/4",
+        "ROI 4/4",
+    )
+    if count == 0:
+        return "ROI 1/4 or Enter for full frame"
+    if count >= len(labels):
+        return "Enter to start"
+    return labels[count]
+
+
+def on_speed_zone_mouse(event, x, y, _flags, userdata) -> None:
+    state: SpeedZoneSelectionState = userdata
+    if event == cv2.EVENT_LBUTTONDOWN and len(state.points) < 4:
+        state.points.append((int(x), int(y)))
+
+
+def configure_speed_zone_from_video(args: argparse.Namespace, video_path: Path) -> str:
+    if args.roi_width_meters <= 0 or args.roi_height_meters <= 0:
+        raise SystemExit("--roi-width-meters and --roi-height-meters must be greater than 0")
+    if args.distance_meters <= 0:
+        raise SystemExit("--distance-meters must be greater than 0")
+    if args.speed_limit_kmh <= 0:
+        raise SystemExit("--speed-limit-kmh must be greater than 0")
+
+    capture = cv2.VideoCapture(str(video_path))
+    if not capture.isOpened():
+        raise SystemExit(f"failed to open video file: {video_path}")
+
+    try:
+        ok, frame = capture.read()
+    finally:
+        capture.release()
+
+    if not ok:
+        raise SystemExit(f"failed to read the first frame: {video_path}")
+
+    upload_frame = resize_for_upload(frame, upload_scale=args.upload_scale)
+    state = SpeedZoneSelectionState()
+    cv2.namedWindow(SPEED_ZONE_WINDOW_NAME, cv2.WINDOW_AUTOSIZE)
+    cv2.setMouseCallback(SPEED_ZONE_WINDOW_NAME, on_speed_zone_mouse, state)
+
+    while True:
+        cv2.imshow(SPEED_ZONE_WINDOW_NAME, draw_speed_zone_selection(upload_frame, state.points))
+        key = cv2.waitKey(30) & 0xFF
+
+        if key in {27, ord("q")}:
+            cv2.destroyWindow(SPEED_ZONE_WINDOW_NAME)
+            raise SystemExit("speed zone configuration cancelled")
+        if key == ord("u") and state.points:
+            state.points.pop()
+        if key == ord("r"):
+            state.points.clear()
+        if key in {10, 13}:
+            if not state.points:
+                config = build_full_frame_speed_zone_config(
+                    camera_code=args.camera_code,
+                    frame_width=upload_frame.shape[1],
+                    frame_height=upload_frame.shape[0],
+                    distance_meters=args.distance_meters,
+                    speed_limit_kmh=args.speed_limit_kmh,
+                    roi_width_meters=args.roi_width_meters,
+                    roi_height_meters=args.roi_height_meters,
+                )
+                break
+            if len(state.points) != 4:
+                print(
+                    "need 4 ROI points before starting, or reset and press Enter "
+                    f"for full frame; current={len(state.points)}"
+                )
+                continue
+            roi_points = state.points
+            config = build_speed_zone_config(
+                camera_code=args.camera_code,
+                roi_points=roi_points,
+                line_a_points=[roi_points[0], roi_points[1]],
+                line_b_points=[roi_points[3], roi_points[2]],
+                distance_meters=args.distance_meters,
+                speed_limit_kmh=args.speed_limit_kmh,
+                roi_width_meters=args.roi_width_meters,
+                roi_height_meters=args.roi_height_meters,
+            )
+            break
+
+    config_json = json.dumps(config, ensure_ascii=False)
+    if args.save_speed_config_json:
+        output_path = Path(args.save_speed_config_json)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(config, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        print(f"savedSpeedConfig={output_path}")
+
+    cv2.destroyWindow(SPEED_ZONE_WINDOW_NAME)
+    print("speedConfigMode=full_frame_default" if not state.points else "speedConfigMode=clicked")
+    print(config_json)
+    return config_json
+
+
 def draw_preview(
     *,
     frame,
@@ -374,6 +831,7 @@ def draw_preview(
     tracker_bbox: tuple[int, int, int, int] | None = None,
     tracker_confidence: float = 0.0,
     response_coord_scale: float = 1.0,
+    speed_overlay: SpeedOverlayConfig | None = None,
 ) -> int:
     if scale != 1.0:
         display_frame = cv2.resize(
@@ -394,6 +852,15 @@ def draw_preview(
     bbox = response.get("bbox")
     bboxes = response.get("bboxes") or []
     bbox_confidence = response.get("bboxConfidenceScore", 0.0)
+
+    if speed_overlay is not None:
+        draw_speed_overlay(
+            display_frame,
+            speed_overlay,
+            response_coord_scale=response_coord_scale,
+            coord_scale=coord_scale,
+            font_scale=overlay_font_scale,
+        )
 
     if tracker_bbox is not None:
         bboxes = [list(tracker_bbox)]
@@ -705,6 +1172,7 @@ def upload_worker(
     camera_code: str,
     timeout: float,
     stop_after_finalized: int,
+    speed_config_json: str | None = None,
 ) -> None:
     while True:
         if stop_event.is_set() and upload_queue.empty():
@@ -722,6 +1190,7 @@ def upload_worker(
                 captured_at=task.captured_at,
                 frame_bytes=task.frame_bytes,
                 timeout=timeout,
+                speed_config_json=speed_config_json,
             )
 
             with upload_state.lock:
@@ -763,6 +1232,9 @@ def main() -> None:
     if args.fps <= 0:
         raise SystemExit("--fps must be greater than 0")
 
+    if args.video_speed_ratio <= 0:
+        raise SystemExit("--video-speed-ratio must be greater than 0")
+
     if args.scale <= 0:
         raise SystemExit("--scale must be greater than 0")
 
@@ -783,6 +1255,28 @@ def main() -> None:
 
     if args.bbox_hold_seconds < 0:
         raise SystemExit("--bbox-hold-seconds must be greater than or equal to 0")
+
+    speed_config_json: str | None = None
+    if args.configure_speed_zone:
+        speed_config_json = configure_speed_zone_from_video(args, video_path)
+        speed_overlay = parse_speed_overlay_config(
+            speed_config_json,
+            camera_code=args.camera_code,
+        )
+    else:
+        try:
+            speed_overlay = parse_speed_overlay_config(
+                args.speed_config_json,
+                camera_code=args.camera_code,
+            )
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"invalid --speed-config-json: {exc}") from exc
+
+        speed_config_json = (
+            read_speed_config_source(args.speed_config_json)
+            if args.speed_config_json
+            else None
+        )
 
     if args.preview_bbox:
         configure_preview_window(args.window_width, args.window_height)
@@ -843,6 +1337,7 @@ def main() -> None:
                 "camera_code": args.camera_code,
                 "timeout": args.timeout,
                 "stop_after_finalized": args.stop_after_finalized,
+                "speed_config_json": speed_config_json,
             },
             daemon=True,
         )
@@ -856,6 +1351,7 @@ def main() -> None:
                 "cameraCode": args.camera_code,
                 "sourceFps": source_fps,
                 "targetFps": args.fps,
+                "videoSpeedRatio": args.video_speed_ratio,
                 "frameStep": frame_step,
                 "stopAfterFinalized": args.stop_after_finalized,
                 "flushFrames": args.flush_frames,
@@ -874,6 +1370,8 @@ def main() -> None:
                 "previewDelaySeconds": args.preview_delay_seconds,
                 "previewDelayFrames": preview_delay_frames,
                 "bboxSource": "fastapi-response" if args.preview_bbox else None,
+                "speedOverlay": speed_overlay is not None,
+                "speedConfigSent": speed_config_json is not None,
             },
             ensure_ascii=False,
         )
@@ -932,7 +1430,11 @@ def main() -> None:
                     if frame_bytes is None:
                         print(f"frame={read_count} encode_failed")
                     else:
-                        captured_at = base_time + timedelta(seconds=uploaded_count / args.fps)
+                        captured_at = base_time + timedelta(
+                            seconds=uploaded_count
+                            * args.video_speed_ratio
+                            / args.fps
+                        )
                         enqueue_upload_task(
                             upload_queue,
                             upload_state,
@@ -1038,6 +1540,7 @@ def main() -> None:
                         tracker_bbox=tracker_bbox,
                         tracker_confidence=tracker_confidence,
                         response_coord_scale=response_coord_scale,
+                        speed_overlay=speed_overlay,
                     )
                     should_quit, should_toggle_pause = handle_preview_key(key)
                 else:
@@ -1067,11 +1570,12 @@ def main() -> None:
                     key = draw_preview(
                         frame=frame,
                         frame_number=read_count,
-                    response_body=latest_response_body,
-                    scale=args.scale,
-                    wait_ms=preview_wait_ms if args.realtime else 1,
-                    response_coord_scale=response_coord_scale,
-                )
+                        response_body=latest_response_body,
+                        scale=args.scale,
+                        wait_ms=preview_wait_ms if args.realtime else 1,
+                        response_coord_scale=response_coord_scale,
+                        speed_overlay=speed_overlay,
+                    )
                     should_quit, should_toggle_pause = handle_preview_key(key)
 
                     if should_quit:
@@ -1094,7 +1598,9 @@ def main() -> None:
                 print(f"frame={read_count} encode_failed")
                 continue
 
-            captured_at = base_time + timedelta(seconds=uploaded_count / args.fps)
+            captured_at = base_time + timedelta(
+                seconds=uploaded_count * args.video_speed_ratio / args.fps
+            )
 
             if use_async_upload and upload_queue is not None:
                 enqueue_upload_task(
@@ -1116,6 +1622,7 @@ def main() -> None:
                     captured_at=captured_at,
                     frame_bytes=frame_bytes,
                     timeout=args.timeout,
+                    speed_config_json=speed_config_json,
                 )
                 latest_response_body = response_body
                 uploaded_count += 1
@@ -1130,6 +1637,7 @@ def main() -> None:
                     scale=args.scale,
                     wait_ms=preview_wait_ms if args.realtime else 1,
                     response_coord_scale=response_coord_scale,
+                    speed_overlay=speed_overlay,
                 )
                 should_quit, should_toggle_pause = handle_preview_key(key)
 
@@ -1186,13 +1694,18 @@ def main() -> None:
         )
 
         for index in range(args.flush_frames):
-            captured_at = base_time + timedelta(seconds=(uploaded_count + index) / args.fps)
+            captured_at = base_time + timedelta(
+                seconds=(uploaded_count + index)
+                * args.video_speed_ratio
+                / args.fps
+            )
             response_body = post_frame(
                 url=url,
                 camera_code=args.camera_code,
                 captured_at=captured_at,
                 frame_bytes=blank_frame_bytes,
                 timeout=args.timeout,
+                speed_config_json=speed_config_json,
             )
             uploaded_count += 1
             print(f"flush={index + 1} {summarize_response(read_count, response_body)}")
