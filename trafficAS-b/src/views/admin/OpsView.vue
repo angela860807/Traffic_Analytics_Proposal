@@ -3,17 +3,15 @@
     <aside class="side">
       <div class="side-top">
         <RouterLink to="/" class="brand" v-if="sideOpen">
-          <span class="dot"></span> Traffic <em>AS</em>
+          Traffic <em>AS</em>
         </RouterLink>
         <button
           class="side-toggle"
           @click="sideOpen = !sideOpen"
           :aria-label="sideOpen ? '사이드바 접기' : '사이드바 펼치기'"
-          :title="sideOpen ? '접기' : '펼치기'"
+          :title="sideOpen ? '사이드바 접기' : '사이드바 펼치기'"
         >
-          <i
-            :class="sideOpen ? 'bi bi-chevron-double-left' : 'bi bi-chevron-double-right'"
-          ></i>
+          <i :class="sideOpen ? 'bi bi-arrow-bar-left' : 'bi bi-arrow-bar-right'"></i>
         </button>
       </div>
       <nav class="snav">
@@ -43,6 +41,17 @@
           <span class="hdr-time"
             ><i class="bi bi-clock"></i> 마지막 업데이트 <strong>10:32:18</strong></span
           >
+          <div class="hdr-weather">
+            <button class="hwx-chip" @click="showWeather = !showWeather" :class="{ on: showWeather }">
+              <i :class="weatherSummary.icon" :style="{ color: weatherSummary.color }"></i>
+              <span class="hwx-temp">{{ weatherSummary.temp }}°</span>
+              <span class="hwx-cond">{{ weatherSummary.condition }}</span>
+              <i class="bi" :class="showWeather ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+            </button>
+            <div v-if="showWeather" class="hwx-pop" @click.stop>
+              <SideWeather />
+            </div>
+          </div>
           <button
             class="km-toggle"
             :class="{ on: autoRefresh }"
@@ -1949,9 +1958,18 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from "vue"
 import echarts from "@/composables/echartsSetup";
 import { RouterLink } from "vue-router";
 import DeptSwitcher from "@/components/dashboard/DeptSwitcher.vue";
+import SideWeather from "@/components/dashboard/SideWeather.vue";
+import { INITIAL_DISTRICTS_WEATHER, DISTRICT_LIST } from "@/data/weather";
 
 const tab = ref("status");
 const autoRefresh = ref(true);
+
+// 헤더 날씨 칩 + 팝오버
+const showWeather = ref(false);
+const weatherSummary = computed(() => {
+  const d = INITIAL_DISTRICTS_WEATHER[DISTRICT_LIST[0]];
+  return { temp: d.temp, condition: d.condition, icon: d.icon, color: d.color };
+});
 const failMemo = ref("PoE 차단기 OFF/ON 1회 시도 — 미복구. 17:00 김기사 현장 출동 예정.");
 
 // 헤더 「시설운영팀」 클릭 → 메인(status) 탭으로 + 스크롤 최상단
@@ -3451,124 +3469,12 @@ function saveSet() {
   border-radius: 4px;
   margin-left: 4px;
 }
-.fl-head {
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  padding: 10px 12px;
-  border-radius: 6px;
-  margin-bottom: 12px;
-}
-.fl-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #fca5a5;
-}
-.fl-tag {
-  background: rgba(239, 68, 68, 0.18);
-  color: #f87171;
-  font-size: 13px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  margin-left: 6px;
-}
-.fl-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  margin-bottom: 12px;
-}
-.fl-row {
-  display: flex;
-  justify-content: space-between;
-}
-.fl-row span {
-  opacity: 0.65;
-}
+/* .fl-*, .hst, .rec-p, .act-row, .ab*, .resp-row, .memo-row, .ab-sm
+   — 모두 라이트 톤 오버라이드(라인 4282+)에 의해 대체됨. 중복 룰 제거. */
 .card h4 {
   font-size: 13px;
   font-weight: 700;
   margin: 10px 0 6px;
-}
-.hst {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 13.5px;
-  padding-left: 4px;
-  margin-bottom: 4px;
-}
-.hst-t {
-  color: #60a5fa;
-  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
-  margin-right: 6px;
-}
-.rec-p {
-  font-size: 13.5px;
-  opacity: 0.75;
-  line-height: 1.5;
-  margin: 0 0 10px;
-}
-.act-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-.ab {
-  padding: 8px;
-  border-radius: 5px;
-  font-size: 13px;
-  font-weight: 700;
-  border: 0;
-  cursor: pointer;
-}
-.ab.bl {
-  background: #3b82f6;
-  color: #fff;
-}
-.ab.rd {
-  background: #ef4444;
-  color: #fff;
-}
-.ab.gy {
-  background: rgba(255, 255, 255, 0.06);
-  color: #e4eeff;
-  border: 1px solid #1f3055;
-}
-.ab.gr {
-  background: #10b981;
-  color: #fff;
-}
-.resp-row,
-.memo-row {
-  display: grid;
-  grid-template-columns: 50px 1fr auto;
-  gap: 6px;
-  align-items: center;
-  font-size: 13px;
-  margin-top: 6px;
-}
-.resp-row span,
-.memo-row span {
-  opacity: 0.65;
-}
-.memo-row input {
-  background: #06101e;
-  border: 1px solid #1f3055;
-  color: #e4eeff;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 13.5px;
-}
-.ab-sm {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid #1f3055;
-  color: #e4eeff;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 13px;
-  cursor: pointer;
 }
 
 /* ============================================================
@@ -3619,25 +3525,36 @@ function saveSet() {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  position: relative;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #c9d4e3;
 }
 .ops-shell .side-toggle {
-  width: 28px;
-  height: 28px;
-  background: #ffffff;
-  border: 1px solid #c9d4e3;
-  color: #4a5b78;
+  width: 36px;
+  height: 36px;
+  background: #2563eb;
+  border: 0;
+  color: #ffffff;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 2px;
-  font-size: 13.5px;
+  border-radius: 6px;
+  font-size: 17px;
   flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(37,99,235,0.3);
+  transition: background 0.15s, transform 0.1s;
 }
 .ops-shell .side-toggle:hover {
-  background: #2563eb;
-  border-color: #2563eb;
-  color: #ffffff;
+  background: #1d4ed8;
+}
+.ops-shell .side-toggle:active {
+  transform: scale(0.92);
+}
+.ops-shell .side-toggle i {
+  font-size: 18px;
+  line-height: 1;
 }
 
 .ops-shell.side-collapsed :deep(.side) {
@@ -3983,6 +3900,29 @@ function saveSet() {
   gap: 6px;
   padding: 0 6px;
   white-space: nowrap;
+}
+.hdr-weather { position: relative; }
+.hwx-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(37,99,235,0.08);
+  border: 1px solid rgba(37,99,235,0.3);
+  color: #0c1f40;
+  padding: 5px 11px; border-radius: 100px;
+  font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.hwx-chip:hover { background: rgba(37,99,235,0.16); }
+.hwx-chip.on { background: #2563eb; border-color: #2563eb; color: #fff; }
+.hwx-chip > i:first-child { font-size: 14px; }
+.hwx-chip.on > i:first-child { color: #fff !important; }
+.hwx-chip .hwx-temp { font-family: "IBM Plex Mono", "JetBrains Mono", monospace; font-weight: 800; }
+.hwx-chip .hwx-cond { opacity: 0.85; font-size: 12px; }
+.hwx-chip > i:last-child { font-size: 11px; opacity: 0.7; }
+.hwx-pop {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 80;
+  width: 320px;
+  background: #0f1d34; border: 1px solid #1f3055;
+  border-radius: 8px; padding: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
 .hdr-time > i {
   font-size: 13px;

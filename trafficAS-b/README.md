@@ -638,3 +638,83 @@ npm run dev -- --host
 ASCII 박스 주석(`═══════ HERO ═══════`)과 친절한 한국어 설명 주석을 **짧은 소문자 영문 라벨**(`/* hero */`, `/* search */`, `/* table */`)로 통일. dead CSS 룰(`.cpanel`, `.chv`, `.post-body`, `.pb-meta`, `.pb-text`) 제거.
 
 ---
+
+## 19. 6개 부서 대시보드 전면 개편 (2026-05-20)
+
+운영기획팀 제거 → 5개 부서 체제로 재편하면서 각 부서의 핵심 역할에 맞춰 IA를 다듬었습니다.
+
+### 19-1 운영기획팀(ReportsView) 제거 + 기능 분산
+- **삭제**: `ReportsView.vue`, `/admin/reports` 라우트, DeptSwitcher/AppNav 메뉴, `reports/1234` 로컬 계정
+- **흡수**:
+  - 월간 운영성과 / 분기 KPI / 감사 로그 보고서 → **경영전략본부(SuperView) `reports` 탭**
+  - 보고서 예약 / 자동 발행 / 최근 발행 목록 → **교통분석팀(AnalyticsView) `보고서 관리` 탭**
+- 옛 `/admin/reports` 링크는 `/admin/super`로 redirect
+
+### 19-2 부서별 보고서 다운로드 시스템
+- 신규 `src/composables/useReportDownload.js` — 6개 부서별 보고서 템플릿(제목/헤더/샘플 데이터) 내장
+- `downloadDeptReport(deptKey, reportKey, { date, endDate })` — CSV + UTF-8 BOM(한글 엑셀 호환)
+- 헤더에 기간 자동 삽입, 파일명에 선택 날짜 반영
+- ReviewView 헤더에 `<input type="date">` + 일일/주간 버튼, ControlView 보고서 탭에 `기준 날짜` 입력
+
+### 19-3 단속관리팀(ReviewView) — 2차 검증 워크플로
+관제센터 영상 → 캡처 이미지 전달 → 사람이 2차 검증 → 최종 결정 흐름으로 재설계:
+- **STEP 1** — 실제 과속인가? 두 버튼(실제 과속 / 시스템 오류)으로 양자택일
+- **STEP 2** — 선택값에 따라 사유 옵션이 동적으로 바뀜
+- **STEP 3** — 단속 확정 / 단속 무효 결정
+- 검토 히스토리에 시스템 자동 감지 → 관제센터 캡처 이미지 전달 → 단속관리팀 결정 3단계 출처 추적
+
+### 19-4 관제센터 → 단속관리팀 위반 전송 (큐 패턴)
+- 신규 `src/composables/useViolationQueue.js` — localStorage 기반 위반 큐 (최대 20건 자동 cap)
+- 관제센터 카메라 컨트롤바에 **빨간 단속 전송 버튼** — 클릭 시 현재 프레임 캡처 + 메타데이터(번호판/감지속도/제한속도/카메라ID) 생성 → 큐에 push
+- 단속관리팀이 마운트 시 큐를 흡수해 이벤트 목록 상단에 표시 (`source: 'control'` 뱃지 + `CTRL` 표식)
+- 이미지 이벤트는 비디오 대신 정지 이미지를 보여주고, OCR 캡처 슬롯에도 그 이미지 자동 채움
+
+### 19-5 OCR 캡처 자동화 (선명도 휴리스틱)
+ReviewView의 OCR 캡처 워크플로:
+- **자동** 버튼 — 1.6초 구간 8프레임 샘플링 → 각 프레임의 엣지 강도 계산 → 가장 선명한 프레임 자동 선택
+- **순간 캡처** — 영상 일시정지 + 그 프레임 크롭 (번호판 추정 영역만 480px로 확대)
+- **프레임 스텝** — 0.1초씩 정밀 조정 후 자동 재캡처
+- 외부 라이브러리 0, 캔버스 기반, ~40줄
+
+### 19-6 교통정보센터(ControlView) — 메인 대시보드 핵심화
+"관제센터가 메인 대시보드"라는 컨셉에 맞춰 흐름 중심으로 재정렬:
+- **제거** (이관·삭제):
+  - 긴급 처리 큐 / 선택 구간 속도 추이 / 선택 이벤트 상세 / 관제 가이드 / 빠른 작업 / 최근 이벤트 로그
+  - 교통통계 탭 + 내용은 **교통분석팀 `교통통계` 탭**으로 이관
+- **추가**:
+  - **ITS Open API 실시간 지표 카드** (서울 한정 + zoom-gate)
+  - 지도에 CCTV 마커 + 클릭 시 HLS 라이브 비디오 모달 (hls.js lazy load, 클릭 전 다운로드 0)
+  - **🚨 실시간 알림 패널** → 헤더 🔔 종 아이콘 + 드롭다운으로 이동 (critical 시 빨간 펄스)
+  - **📢 VMS 도로 전광판 제어** — 메시지 입력/템플릿 4종(사고/정체/기상/초기화)/송출 + LED 디스플레이 미리보기
+- **레이아웃 (한 페이지 fit)**:
+  - 좌측: 실시간 교통 흐름 지도 (1.4fr)
+  - 우측 상단: 선택 카메라 (큰, 세로)
+  - 우측 하단: VMS 전광판 제어 (콤팩트)
+- 헤더에 날씨 칩 + 알림 종 인라인 배치
+
+### 19-7 ECharts 트리쉐이킹 (성능)
+- 신규 `src/composables/echartsSetup.js` — 사용 차트(Line/Bar/Gauge/Pie) + 컴포넌트(Grid/Tooltip/Legend/MarkLine/MarkArea/MarkPoint) + CanvasRenderer만 등록
+- OpsView / AnalyticsView / RoadDashboardView / StatsTab 4파일이 공유
+- 번들 ~53% 절감 (gzip 376kB → **200kB**), RoadDashboardView 688 → **88kB**
+- 화면 출력은 1픽셀도 변화 없음
+
+### 19-8 OSM 도로 모듈 통합
+RoadDashboardView가 가지고 있던 로컬 `loadOSMRoads`/`renderOSMRoads`/`congestionColor` 구현을 공용 `src/composables/useOSMRoads.js`로 일원화. 도로 이름 hash 기반 안정 혼잡도 — 같은 도로의 모든 OSM way 조각이 같은 색으로 표시됨(이전 `Math.random()` 방식은 조각마다 색이 끊겨 보였음).
+
+### 19-9 공용 비디오/시간 유틸
+중복 코드 정리 — 신규 `src/composables/useVideoUtils.js`:
+- `padNum`, `fmtDateTime`, `fmtDate`, `fmtTime`
+- `enterFullscreen(el)` — brower prefix 호환
+- `captureFrameDataURL(videoEl, { outWidth, crop, quality })` — 옵션 크롭 캡처
+- `seekVideo(videoEl, t)` — Promise 기반 seek
+
+ControlView · ReviewView 두 곳에서 사용 (~75줄 중복 제거)
+
+### 19-10 디자인 / 통일
+- 6개 부서 사이드바 폰트 통일 (시설운영팀 기준 — 16px 본문, 17px 아이콘)
+- `Traffic AS` 브랜드에서 파란 dot 모두 제거 (5개 파일 일괄)
+- 부서 셸 베이스 폰트: Inter + Pretendard Variable + 시스템 폰트 fallback, `font-feature-settings: tnum cv11 ss01`
+- 헤더 날씨 칩 — 날씨 상태별 아이콘 자동 매핑 (맑음=태양, 흐림=구름, 비=빗방울 등)
+- 시설운영팀 사이드바 토글 버튼 — 파란 36×36 둥근 박스 + `arrow-bar-left/right` 아이콘
+
+---

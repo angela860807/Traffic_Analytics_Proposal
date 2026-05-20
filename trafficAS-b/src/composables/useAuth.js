@@ -85,7 +85,6 @@ export function useAuth() {
     { email: 'control',         password: '1234',  name: '교통정보센터 매니저', role: 'ADMIN' },
     { email: 'review',          password: '1234',  name: '단속관리팀 매니저',  role: 'ADMIN' },
     { email: 'analytics',       password: '1234',  name: '교통분석팀 매니저',  role: 'ADMIN' },
-    { email: 'reports',         password: '1234',  name: '운영기획팀 매니저',  role: 'ADMIN' },
 
     // 일반 사용자
     { email: 'user',            password: '1234',  name: '일반 사용자',     role: 'USER' },

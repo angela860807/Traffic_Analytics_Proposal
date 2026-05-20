@@ -1246,113 +1246,29 @@ let heatMap = null;
 function heatColor(intensity) {
   return intensity > 0.8 ? "#e05260" : intensity > 0.6 ? "#d4845a" : "#4caf7d";
 }
-/* 도로 혼잡도(0~1) → 색상 5단계 */
-function congestionColor(c) {
-  if (c >= 0.85) return '#e74c3c'  // 정체 (빨강)
-  if (c >= 0.65) return '#f39c12'  // 혼잡 (주황)
-  if (c >= 0.45) return '#f1c40f'  // 보통 (노랑)
-  if (c >= 0.25) return '#7dc242'  // 양호 (연두)
-  return '#2ecc71'                 // 원활 (녹색)
-}
-function congestionLabel(c) {
-  if (c >= 0.85) return '정체'
-  if (c >= 0.65) return '혼잡'
-  if (c >= 0.45) return '보통'
-  if (c >= 0.25) return '양호'
-  return '원활'
-}
-/* 폴리라인 인스턴스 보관 — 실시간 혼잡도 갱신 시 사용 */
-const roadPolylines = new Map()
+/* 공용 OSM 모듈로 통합 — 도로 색 연속성 + 코드 중복 제거 */
+import {
+  loadOSMRoads as loadOSMRoadsShared,
+  renderOSMRoads as renderOSMRoadsShared,
+  applyRoadCongestion as applyRoadCongestionShared,
+} from '@/composables/useOSMRoads'
 
-/* OSM Overpass에서 강남권 주요 도로 geometry 받아오기 (다중 미러 + 캐시) */
-const OVERPASS_MIRRORS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-  'https://lz4.overpass-api.de/api/interpreter',
-]
+/* 폴리라인 맵 — applyRoadCongestion 호출 시 색 갱신 */
+let roadPolylines = new Map()
 const OVERPASS_CACHE_KEY = 'osm-roads-v1-gangnam'
-const OVERPASS_CACHE_TTL = 24 * 60 * 60 * 1000 // 24h
 
-async function loadOSMRoads() {
-  // 1) 캐시 확인 (24시간 유효)
-  try {
-    const raw = localStorage.getItem(OVERPASS_CACHE_KEY)
-    if (raw) {
-      const { ts, data } = JSON.parse(raw)
-      if (Date.now() - ts < OVERPASS_CACHE_TTL && Array.isArray(data) && data.length) {
-        console.info(`[OSM] 캐시 사용 (${data.length}개 도로)`)
-        return data
-      }
-    }
-  } catch {}
-
-  const bbox = '37.470,127.000,37.540,127.140'
-  const query = `[out:json][timeout:25];
-(
-  way["highway"~"^(motorway|trunk|primary|secondary)$"](${bbox});
-);
-out geom;`
-
-  // 2) 미러 순차 시도
-  for (const url of OVERPASS_MIRRORS) {
-    try {
-      const r = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'data=' + encodeURIComponent(query),
-        signal: AbortSignal.timeout(12000),
-      })
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      const data = await r.json()
-      const ways = data.elements?.filter(e => e.type === 'way' && e.geometry?.length >= 2) || []
-      if (ways.length) {
-        try { localStorage.setItem(OVERPASS_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: ways })) } catch {}
-        console.info(`[OSM] ${url} ← ${ways.length}개 도로 로드 완료`)
-        return ways
-      }
-    } catch (e) {
-      console.warn(`[OSM Overpass] ${url} 실패: ${e.message}`)
-    }
-  }
-  console.warn('[OSM Overpass] 모든 미러 실패 — 도로 표시 생략')
-  return null
+function loadOSMRoads() {
+  return loadOSMRoadsShared(
+    OVERPASS_CACHE_KEY,
+    '37.470,127.000,37.540,127.140',
+    ['motorway', 'trunk', 'primary', 'secondary']
+  )
 }
 
 function renderOSMRoads(map, ways) {
-  // 도로 종류별 굵기/우선순위
-  const weights = { motorway: 6, trunk: 5.5, primary: 5, secondary: 4 }
-  ways.forEach(way => {
-    const path = way.geometry.map(p => [p.lat, p.lon])
-    const hwy = way.tags?.highway
-    const w = weights[hwy] || 4
-    // 도로명 추출 (한글 우선)
-    const name = way.tags?.['name:ko']
-              || way.tags?.name
-              || way.tags?.['name:en']
-              || `${hwy} #${way.id}`
-    // 초기 혼잡도는 도로 등급별로 다르게 + 약간의 랜덤성
-    const baseCong = hwy === 'motorway' || hwy === 'trunk' ? 0.75
-                   : hwy === 'primary' ? 0.55 : 0.35
-    const c = Math.max(0.1, Math.min(0.95, baseCong + (Math.random() - 0.5) * 0.3))
-    const seg = { name, c, hwy }
-    const poly = L.polyline(path, {
-      color: congestionColor(c),
-      weight: w, opacity: 0.88,
-      lineCap: 'round', lineJoin: 'round',
-    })
-    .bindTooltip('', {
-      sticky: true, className: 'v2-road-tooltip',
-      direction: 'top', offset: [0, -6],
-    })
-    .addTo(map)
-    poly.__seg = seg
-    updateRoadTooltip(poly)
-    // 중복 이름 방지: 이미 있으면 인덱스 부여
-    let key = name
-    if (roadPolylines.has(key)) key = `${name}#${way.id}`
-    roadPolylines.set(key, poly)
-  })
+  // 공용 모듈 호출 — 도로 이름별 hash 기반 안정 혼잡도
+  const { polylines } = renderOSMRoadsShared(map, ways)
+  roadPolylines = polylines
   console.info(`[OSM] 도로 ${ways.length}개 로드 완료`)
 }
 
@@ -1370,23 +1286,9 @@ async function retryOSMRoads() {
   }
 }
 
-function updateRoadTooltip(poly) {
-  const s = poly.__seg
-  if (!s) return
-  poly.setTooltipContent(
-    `${s.name}<br/><b style="color:${congestionColor(s.c)}">${congestionLabel(s.c)}</b> · ${Math.round(s.c * 100)}%`
-  )
-}
-/* 실시간 갱신 — 백엔드에서 [{ name, c }, ...] 받으면 폴리라인 색상 즉시 변경 */
+/* 실시간 갱신 — 공용 모듈 위임 */
 function applyRoadCongestion(updates) {
-  if (!Array.isArray(updates)) return
-  updates.forEach(({ name, c }) => {
-    const poly = roadPolylines.get(name)
-    if (!poly) return
-    poly.__seg.c = c
-    poly.setStyle({ color: congestionColor(c) })
-    updateRoadTooltip(poly)
-  })
+  applyRoadCongestionShared(roadPolylines, updates)
 }
 
 /* 혼잡 지점 — 사이드바 카메라 그룹의 24개 카메라를 그대로 사용, 혼잡도만 실시간 흔들림 */

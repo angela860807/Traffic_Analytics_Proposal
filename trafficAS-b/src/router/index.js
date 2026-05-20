@@ -8,7 +8,6 @@ const LoginView         = () => import('@/views/LoginView.vue')
 const SignupView        = () => import('@/views/SignupView.vue')
 const RoadDashboardView = () => import('@/views/RoadDashboardView.vue')
 
-const ReportsView   = () => import('@/views/admin/ReportsView.vue')
 const ControlView   = () => import('@/views/admin/ControlView.vue')
 const ReviewView    = () => import('@/views/admin/ReviewView.vue')
 const AnalyticsView = () => import('@/views/admin/AnalyticsView.vue')
@@ -25,8 +24,8 @@ const router = createRouter({
     { path: '/login',         component: LoginView         },
     { path: '/signup',        component: SignupView        },
     { path: '/dashboard',     component: RoadDashboardView },
-    { path: '/admin',         redirect: '/admin/reports'   },
-    { path: '/admin/reports',   component: ReportsView   },
+    { path: '/admin',         redirect: '/admin/super'     },
+    { path: '/admin/reports',   redirect: '/admin/super'    },
     { path: '/admin/control',   component: ControlView   },
     { path: '/admin/review',    component: ReviewView    },
     { path: '/admin/analytics', component: AnalyticsView },
