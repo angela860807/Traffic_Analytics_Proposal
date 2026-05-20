@@ -39,11 +39,10 @@ const open = ref(false);
 const rootRef = ref(null);
 
 const depts = [
-  { to: "/admin/super",     name: "경영전략본부",   desc: "전사 통합 운영",       icon: "bi bi-shield-lock-fill" },
-  { to: "/admin/reports",   name: "운영기획팀",     desc: "KPI · 보고서 발행",    icon: "bi bi-graph-up-arrow" },
+  { to: "/admin/super",     name: "경영전략본부",   desc: "전사 통합 · KPI · 보고", icon: "bi bi-shield-lock-fill" },
   { to: "/admin/control",   name: "교통정보센터",   desc: "실시간 관제 · 이벤트", icon: "bi bi-broadcast" },
   { to: "/admin/review",    name: "단속관리팀",     desc: "위반 검토 · 판정",     icon: "bi bi-card-text" },
-  { to: "/admin/analytics", name: "교통분석팀",     desc: "구간 · 시간대 분석",   icon: "bi bi-bar-chart-line" },
+  { to: "/admin/analytics", name: "교통분석팀",     desc: "구간 분석 · 보고서",   icon: "bi bi-bar-chart-line" },
   { to: "/admin/ops",       name: "시설운영팀",     desc: "카메라 · 서버 · 망",   icon: "bi bi-hdd-stack" },
 ];
 

@@ -1,7 +1,7 @@
 <template>
   <div class="sa-shell">
     <aside class="side">
-      <RouterLink to="/" class="brand"><span class="dot"></span> Traffic <em>AS</em></RouterLink>
+      <RouterLink to="/" class="brand">Traffic <em>AS</em></RouterLink>
       <nav class="snav">
         <button v-for="n in topNav" :key="n.id" class="snav-i"
           :class="{ on: tab === n.id }" @click="tab = n.id">
@@ -296,7 +296,7 @@
       </section>
 
       <section v-if="tab === 'audit'" class="card pnl">
-        <h3>감사 로그</h3>
+        <h3>감사 로그 <button class="su-dl" @click="downloadDeptReport('super', 'audit')"><i class="bi bi-download"></i> CSV 다운로드</button></h3>
         <table class="pnl-tbl">
           <thead><tr><th>시간</th><th>사용자</th><th>작업</th><th>대상</th></tr></thead>
           <tbody>
@@ -308,7 +308,37 @@
         </table>
       </section>
 
-      <section v-if="topNavTabs.includes(tab)" class="card pnl">
+      <section v-if="tab === 'reports'" class="card pnl">
+        <h3>경영전략 보고서 <span class="seg-sub">전사 종합 · 감사용</span></h3>
+        <div class="su-rep-grid">
+          <div class="su-rep">
+            <i class="bi bi-graph-up-arrow"></i>
+            <div class="sr-body">
+              <div class="sr-t">월간 종합 운영 보고서</div>
+              <div class="sr-d">전 부서 KPI 종합 · 매월 1일 자동 생성</div>
+            </div>
+            <button class="su-dl" @click="downloadDeptReport('super', 'monthly')"><i class="bi bi-download"></i> 다운로드</button>
+          </div>
+          <div class="su-rep">
+            <i class="bi bi-shield-lock"></i>
+            <div class="sr-body">
+              <div class="sr-t">보안·감사 로그 보고서</div>
+              <div class="sr-d">사용자 활동 + 권한 변경 이력</div>
+            </div>
+            <button class="su-dl" @click="downloadDeptReport('super', 'audit')"><i class="bi bi-download"></i> 다운로드</button>
+          </div>
+          <div class="su-rep">
+            <i class="bi bi-bar-chart-steps"></i>
+            <div class="sr-body">
+              <div class="sr-t">분기 KPI 종합 보고서</div>
+              <div class="sr-d">분기별 부서 성과 비교</div>
+            </div>
+            <button class="su-dl" @click="downloadDeptReport('reports', 'quarterly')"><i class="bi bi-download"></i> 다운로드</button>
+          </div>
+        </div>
+      </section>
+
+      <section v-if="topNavTabs.includes(tab) && tab !== 'reports'" class="card pnl">
         <h3>{{ topNavLabel }} <span class="seg-sub">전사 통합 뷰</span></h3>
         <div class="map-stub">
           <i class="bi bi-globe2"></i>
@@ -331,6 +361,8 @@
 import { ref, computed } from "vue";
 import { RouterLink } from "vue-router";
 import DeptSwitcher from "@/components/dashboard/DeptSwitcher.vue";
+import { useReportDownload } from "@/composables/useReportDownload";
+const { downloadDeptReport } = useReportDownload();
 
 const tab = ref("dashboard");
 const autoRefresh = ref(true);
@@ -609,4 +641,26 @@ const logs = [
 .set-row input[type="checkbox"] { accent-color: #60a5fa; }
 .btn-save { margin-top: 14px; background: #3b82f6; color: #fff; border: 0; padding: 9px 16px; border-radius: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 .set-msg { margin-top: 10px; font-size: 12px; color: #34d399; }
+
+.su-rep-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.su-rep {
+  display: flex; align-items: center; gap: 14px;
+  background: rgba(96,165,250,0.05);
+  border: 1px solid rgba(96,165,250,0.18);
+  border-radius: 6px; padding: 14px 16px;
+}
+.su-rep > i { font-size: 22px; color: #60a5fa; flex-shrink: 0; }
+.sr-body { flex: 1; min-width: 0; }
+.sr-t { font-size: 14px; font-weight: 700; color: #e4eeff; margin-bottom: 3px; }
+.sr-d { font-size: 12px; opacity: 0.65; }
+.su-dl {
+  background: #059669; color: #fff; border: 0;
+  padding: 7px 14px; border-radius: 4px;
+  font-size: 12.5px; font-weight: 700; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+  flex-shrink: 0;
+}
+.su-dl:hover { background: #047857; }
+.pnl h3 .su-dl { margin-left: auto; }
+.pnl h3 { display: flex; align-items: center; gap: 10px; }
 </style>

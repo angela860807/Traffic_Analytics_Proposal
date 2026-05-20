@@ -57,10 +57,15 @@
 
 /* 공통 admin 대시보드 스타일 — 6개 대시보드 공유 */
 
-/* ───── Shell ───── */
+/* ───── Shell — 6개 대시보드 폰트 통일 (교통분석팀 기준) ───── */
 .admin-shell, .cc-shell, .ops-shell, .sa-shell, .an-shell, .rev-shell {
   min-height: 100vh;
-  font-family: "Pretendard Variable", Pretendard, sans-serif;
+  font-family: "Inter", "Pretendard Variable", Pretendard, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-feature-settings: "tnum" 1, "cv11" 1, "ss01" 1;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   background: #0a1424;
   color: #e4eeff;
 }
@@ -2158,21 +2163,25 @@ html .an-shell .filter {
   align-self: flex-start !important;
 }
 
-/* 브랜드 */
+/* 브랜드 — 6개 대시보드 통일 */
 html .cc-shell .brand,
 html .ops-shell .brand,
 html .sa-shell .brand,
 html .admin-shell .brand,
+html .rev-shell .brand,
 html .an-shell .filter .brand {
   display: inline-flex !important; align-items: center !important; gap: 10px !important;
   font-size: 20px !important; font-weight: 800 !important; color: #0c1f40 !important;
   text-decoration: none !important;
   padding: 4px 4px 14px !important;
+  font-family: "Inter", "Pretendard Variable", Pretendard, sans-serif !important;
+  letter-spacing: -0.01em !important;
 }
 html .cc-shell .brand .dot,
 html .ops-shell .brand .dot,
 html .sa-shell .brand .dot,
 html .admin-shell .brand .dot,
+html .rev-shell .brand .dot,
 html .an-shell .filter .brand .dot {
   width: 8px !important; height: 8px !important; border-radius: 50% !important;
   background: #2563eb !important; box-shadow: none !important;
@@ -2181,7 +2190,11 @@ html .cc-shell .brand em,
 html .ops-shell .brand em,
 html .sa-shell .brand em,
 html .admin-shell .brand em,
+html .rev-shell .brand em,
 html .an-shell .filter .brand em { color: #2563eb !important; font-style: normal !important; }
+
+/* rev-shell은 사이드바 없음 — 헤더 인라인 배치 */
+html .rev-shell .brand { padding: 0 !important; flex-shrink: 0 !important; }
 
 /* nav 영역 - 시설운영팀 산업 톤 */
 html .cc-shell .snav,
@@ -2198,9 +2211,9 @@ html .sa-shell .snav-i,
 html .admin-shell .snav-i,
 html .an-shell .filter .snav-i {
   display: flex !important; align-items: center !important; gap: 10px !important;
-  padding: 7px 11px !important; border-radius: 2px !important;
+  padding: 11px 12px !important; border-radius: 2px !important;
   color: rgba(12,31,64,.92) !important; opacity: 1 !important;
-  font-size: 13.5px !important; font-weight: 600 !important; text-align: left !important;
+  font-size: 16px !important; font-weight: 600 !important; text-align: left !important;
   border: 0 !important; border-left: 3px solid transparent !important;
   background: none !important; cursor: pointer !important;
   font-family: inherit !important; transition: none !important;
@@ -2225,7 +2238,7 @@ html .cc-shell .snav-i i,
 html .ops-shell .snav-i i,
 html .sa-shell .snav-i i,
 html .admin-shell .snav-i i,
-html .an-shell .filter .snav-i i { width: 16px !important; font-size: 15px !important; color: inherit !important; }
+html .an-shell .filter .snav-i i { width: 18px !important; font-size: 17px !important; color: inherit !important; }
 
 /* snav-bdg - 시설운영팀 빨간 정사각 라벨 */
 html .cc-shell .snav-bdg,
@@ -2687,7 +2700,6 @@ html .ops-shell .snav-i .snav-bdg {
 }
 .rev-shell .tbl-rev td { color: #0c1f40 !important; border-bottom-color: #d8dfe9 !important; padding: 10px 8px !important; }
 .rev-shell .tbl-rev tr.sel { background: rgba(37,99,235,.08) !important; }
-.rev-shell .tbl-rev tr.sel td { border-left: 2px solid #2563eb !important; }
 .rev-shell .tbl-rev .mono { font-family: "JetBrains Mono", monospace !important; color: #0c1f40 !important; }
 .rev-shell .tbl-rev .ttl { color: #0c1f40 !important; font-weight: 700 !important; font-size: 13.5px !important; max-width: 220px !important; }
 .rev-shell .tbl-rev .row-sub {

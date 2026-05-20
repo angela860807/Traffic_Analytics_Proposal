@@ -18,9 +18,8 @@
               관제 시스템 <i class="bi bi-chevron-down"></i>
             </button>
             <div v-if="open" class="admin-pop">
-              <RouterLink to="/admin/super"     class="ap-i" @click="open = false"><i class="bi bi-shield-shaded"></i><div><strong>경영전략본부</strong><span>전사 통합 운영</span></div></RouterLink>
+              <RouterLink to="/admin/super"     class="ap-i" @click="open = false"><i class="bi bi-shield-shaded"></i><div><strong>경영전략본부</strong><span>전사 통합 · KPI · 보고</span></div></RouterLink>
               <div class="ap-sep"></div>
-              <RouterLink to="/admin/reports"   class="ap-i" @click="open = false"><i class="bi bi-file-earmark-text"></i><div><strong>운영기획팀</strong><span>KPI · 보고서 발행</span></div></RouterLink>
               <RouterLink to="/admin/control"   class="ap-i" @click="open = false"><i class="bi bi-bullseye"></i><div><strong>교통정보센터</strong><span>실시간 관제 · 이벤트</span></div></RouterLink>
               <RouterLink to="/admin/review"    class="ap-i" @click="open = false"><i class="bi bi-check2-square"></i><div><strong>단속관리팀</strong><span>위반 검토 · 판정</span></div></RouterLink>
               <RouterLink to="/admin/analytics" class="ap-i" @click="open = false"><i class="bi bi-bar-chart"></i><div><strong>교통분석팀</strong><span>구간 · 시간대 분석</span></div></RouterLink>

@@ -1448,3 +1448,281 @@ const posts = computed(() => [...customPosts.value, ...seedPosts]);
 ### 교훈
 **가변 데이터와 불변 데이터를 한 컴퓨티드로 합치는 패턴**은 데모/MVP에서 매우 유용. 백엔드 연동 시엔 customPosts를 API 응답으로 교체만 하면 끝.
 
+---
+
+## 41. ECharts zombie 인스턴스 — `v-if` 탭 전환 후 차트 안 그려짐
+
+### 증상
+OpsView에서 `tab !== 'status'`인 다른 탭에 갔다가 status로 돌아오면 네트워크 ECharts가 비어 보임.
+
+### 원인
+`v-if`로 DOM이 제거됐다가 다시 마운트되는데, 모듈 스코프의 `let netChart = null`은 옛 인스턴스를 들고 있음. `if (!netChart)` 가드 때문에 재초기화 스킵.
+
+### 해결
+`watch(tab)`로 status 재진입 시 명시적으로 dispose + 재init:
+```js
+watch(tab, (v) => {
+  if (v === "status") {
+    if (netChart) { netChart.dispose(); netChart = null; }
+    nextTick(() => initNetChart());
+  }
+});
+```
+
+### 교훈
+ECharts + Vue `v-if` 조합은 항상 dispose 라이프사이클을 신경 써야 함.
+
+---
+
+## 42. `echarts.init(el, null, { width, height })` 후 resize 불일치
+
+### 증상
+ResizeObserver로 `chart.resize()`를 부르는데도 컨테이너 변경에 따라오지 않음.
+
+### 원인
+init에 픽셀 값을 고정하면 `resize()`도 그 값을 유지함.
+
+### 해결
+init에 width/height 전달하지 않음:
+```js
+const chart = echarts.init(el, null, { renderer: "canvas" });
+new ResizeObserver(() => chart.resize()).observe(el);
+```
+
+### 교훈
+ECharts init의 width/height 옵션은 컨테이너에서 크기를 못 가져올 때만 쓰는 escape hatch.
+
+---
+
+## 43. OSM way 단편으로 도로 색이 끊겨 보임
+
+### 증상
+강변북로 같은 긴 도로가 leaflet 폴리라인으로 그려질 때 색이 중간에 바뀌어 끊겨 보임.
+
+### 원인
+OSM Overpass가 한 도로를 수십~수백 way로 쪼개서 줌. 코드가 조각마다 `Math.random()`으로 따로 혼잡도를 매김.
+
+### 해결
+도로 이름 hash로 안정 혼잡도 + 캐시:
+```js
+function nameHash01(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return ((h % 1000) + 1000) % 1000 / 1000;
+}
+const congByName = new Map();
+ways.forEach(w => {
+  const name = w.tags["name:ko"] || w.tags.name || `${w.tags.highway} #${w.id}`;
+  if (!congByName.has(name)) {
+    congByName.set(name, baseCong(w.tags.highway) + (nameHash01(name) - 0.5) * 0.4);
+  }
+  // 폴리라인 생성
+});
+```
+
+### 교훈
+지도 시각화는 의미 단위(도로명)로 그룹화. `Math.random()`을 시각화에 쓰지 말 것 — 새로고침마다 색이 바뀌는 부작용도 있음.
+
+---
+
+## 44. ECharts 트리쉐이킹 — 번들 절반 이하로
+
+### 증상
+빌드 결과 `installMarkLine-*.js` 526 kB(gzip 178 kB) + index 안에 ECharts 가 또 들어가 600 kB 추가.
+
+### 원인
+`import * as echarts from "echarts"` — 전체 차트 100여 종 + 컴포넌트가 통째로 들어옴.
+
+### 해결
+공용 setup 파일로 사용 모듈만 등록:
+```js
+// src/composables/echartsSetup.js
+import * as echarts from "echarts/core";
+import { LineChart, BarChart, GaugeChart, PieChart } from "echarts/charts";
+import {
+  GridComponent, TooltipComponent, LegendComponent,
+  MarkLineComponent, MarkAreaComponent, MarkPointComponent,
+} from "echarts/components";
+import { CanvasRenderer } from "echarts/renderers";
+
+echarts.use([
+  LineChart, BarChart, GaugeChart, PieChart,
+  GridComponent, TooltipComponent, LegendComponent,
+  MarkLineComponent, MarkAreaComponent, MarkPointComponent,
+  CanvasRenderer,
+]);
+export default echarts;
+```
+
+### 결과
+- 번들 53% 감소 (gzip 376 → 200 kB)
+- RoadDashboardView 688 → 88 kB
+- 화면 출력 변화 없음
+
+### 교훈
+ECharts처럼 거대한 라이브러리는 **반드시 트리쉐이킹**. 한 줄 import로 수백 kB 낭비.
+
+---
+
+## 45. HLS 라이브 스트림(.m3u8) Chrome 재생 — hls.js lazy load
+
+### 증상
+ITS Open API CCTV `cctvurl`이 `.m3u8`. Safari/iOS는 native 지원하지만 Chrome/Edge는 못 재생.
+
+### 해결
+hls.js를 **lazy import** — 클릭할 때만 다운로드:
+```js
+async function attachHls(videoEl, url) {
+  if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {
+    videoEl.src = url;  // Safari
+    return;
+  }
+  const Hls = (await import("hls.js")).default;
+  if (Hls.isSupported()) {
+    const hls = new Hls();
+    hls.loadSource(url);
+    hls.attachMedia(videoEl);
+  }
+}
+```
+
+빌드 시 `hls-*.js`(525 kB / gzip 162 kB)는 별도 청크로 분리. CCTV 안 누르면 다운로드도 안 됨.
+
+### 교훈
+특정 액션에서만 필요한 무거운 의존성은 **dynamic import**로 1차 페이로드에서 빼는 게 좋음.
+
+---
+
+## 46. ITS Open API CORS — Vite dev proxy
+
+### 증상
+`fetch('https://openapi.its.go.kr:9443/cctvInfo?...')` 직접 호출 시 CORS 차단.
+
+### 해결
+`vite.config.js`에 proxy:
+```js
+server: {
+  proxy: {
+    '/its': {
+      target: 'https://openapi.its.go.kr:9443',
+      changeOrigin: true,
+      rewrite: (p) => p.replace(/^\/its/, ''),
+      secure: false,
+    },
+  },
+},
+```
+
+환경별 분기:
+```js
+const CCTV_BASE = import.meta.env.DEV
+  ? "/its/cctvInfo"
+  : "https://openapi.its.go.kr:9443/cctvInfo";
+```
+
+### 교훈
+공공 API CORS는 백엔드 미수정 제약 하에서도 Vite proxy로 dev는 풀 수 있음. 운영은 별도 reverse proxy 필요.
+
+---
+
+## 47. 큰 bbox로 외부 API 호출 폭주 — zoom-gate + clamp
+
+### 증상
+지도 줌아웃하면 전국 단위 bbox로 ITS API 호출 → 마커 폭주.
+
+### 해결
+1. **Zoom-gate**: `flowMap.getZoom() < 11`이면 호출 자체 스킵
+2. **Bbox clamp**: 서울 행정구역 bbox로 교집합
+3. **마커 상한**: 50개로 cap
+
+```js
+const SEOUL_BBOX = { minX: 126.76, maxX: 127.18, minY: 37.41, maxY: 37.70 };
+const minX = Math.max(b.getWest(), SEOUL_BBOX.minX).toFixed(6);
+if (all.length > 50) all = all.slice(0, 50);
+```
+
+### 교훈
+외부 API는 가능한 **좁게 호출**. 사용자 viewport에 맡기지 말고 비즈니스 제약(서울만)을 코드에 박을 것.
+
+---
+
+## 48. localStorage 큐 — 부서간 데이터 전달 (백엔드 없이)
+
+### 증상
+관제센터(ControlView) → 단속관리팀(ReviewView) 이벤트 전달 필요. 백엔드 못 건드림.
+
+### 해결
+localStorage 기반 큐 composable:
+```js
+// useViolationQueue.js
+const STORAGE_KEY = "tas_violation_queue";
+const queue = ref(loadFromStorage());
+
+function submitViolation(payload) {
+  queue.value.unshift({ id: `RT-${Date.now()}`, ...payload, st: "검토 대기" });
+  if (queue.value.length > 20) queue.value.length = 20;
+  saveToStorage();
+}
+```
+
+ControlView가 push → ReviewView가 mount 시 흡수 + 옛 이벤트와 병합. 새로고침 후에도 유지됨.
+
+### 교훈
+부서간 흐름 시연은 **localStorage + reactive ref**로 충분. 실서비스는 큐 부분만 API로 교체.
+
+---
+
+## 49. 비디오 프레임 자동 캡처 — 선명도 휴리스틱
+
+### 증상
+"가장 선명한 프레임 자동 캡처"가 필요한데 OCR/CV 모델은 부담.
+
+### 해결
+캔버스로 후보 프레임들의 엣지 강도(|dx|+|dy|) 측정 → 최댓값 선택:
+```js
+async function autoCapture() {
+  for (let i = 0; i < 8; i++) {
+    const t = startT + i * step;
+    await seekVideo(v, t);
+    aCtx.drawImage(v, 0, 0, aw, ah);
+    const data = aCtx.getImageData(0, 0, aw, ah).data;
+    let score = 0;
+    for (let y = 1; y < ah - 1; y += 2) {
+      for (let x = 1; x < aw - 1; x += 2) {
+        const idx = y * aw * 4 + x * 4;
+        const lum = data[idx]*299 + data[idx+1]*587 + data[idx+2]*114;
+        const lumR = data[idx+4]*299 + ...;
+        const lumB = data[idx+aw*4]*299 + ...;
+        score += Math.abs(lum-lumR) + Math.abs(lum-lumB);
+      }
+    }
+    if (score > best.score) best = { score, time: t };
+  }
+  await seekVideo(v, best.time);
+  captureSnapshot();
+}
+```
+
+### 교훈
+ML 없이도 픽셀 통계로 "꽤 선명한 프레임"을 고를 수 있음. 240×135 다운스케일 + 2픽셀 stride로 ~30ms.
+
+---
+
+## 50. CSV BOM과 한글 엑셀 호환
+
+### 증상
+JS로 CSV blob을 다운로드받으면 한글이 깨져 보임 (엑셀에서 mojibake).
+
+### 해결
+UTF-8 BOM(`﻿`)을 CSV 맨 앞에 붙임:
+```js
+function downloadCSV(filename, rows) {
+  const csv = "﻿" + rowsToCSV(rows);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  // a.href = URL.createObjectURL(blob); a.download = filename;
+}
+```
+
+### 교훈
+엑셀(Windows)은 UTF-8 BOM이 있어야 한글 인식. 다수 사용자가 윈도우 엑셀이라 BOM 붙이는 게 안전.
+

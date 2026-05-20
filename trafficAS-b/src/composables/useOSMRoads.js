@@ -107,37 +107,79 @@ out geom;`;
 
 /**
  * 가져온 도로를 Leaflet에 폴리라인으로 추가
- * @returns Map<string, L.Polyline>
+ * @returns { group: L.LayerGroup, polylines: Map<string, L.Polyline> }
  */
+// 문자열 → 0~1 사이 안정된 hash (도로 이름이 같으면 항상 같은 혼잡도)
+function nameHash01(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  }
+  return ((h % 1000) + 1000) % 1000 / 1000;
+}
+
 export function renderOSMRoads(map, ways) {
   const weights = { motorway: 6, trunk: 5.5, primary: 5, secondary: 4 };
-  // 모든 폴리라인을 layerGroup으로 묶어 한 번에 추가 → reflow 1회
   const group = L.layerGroup();
-  ways.forEach(way => {
-    const path = way.geometry.map(p => [p.lat, p.lon]);
+  // 외부에서 색 업데이트할 수 있도록 폴리라인 맵 반환
+  const polylines = new Map();
+  // 도로 이름별 혼잡도 캐시 — 같은 이름 모든 조각이 같은 색
+  const congByName = new Map();
+
+  ways.forEach((way) => {
+    const path = way.geometry.map((p) => [p.lat, p.lon]);
     const hwy = way.tags?.highway;
     const w = weights[hwy] || 4;
-    const name = way.tags?.["name:ko"]
-              || way.tags?.name
-              || way.tags?.["name:en"]
-              || `${hwy} #${way.id}`;
-    const baseCong = hwy === "motorway" || hwy === "trunk" ? 0.75
-                   : hwy === "primary" ? 0.55 : 0.35;
-    const c = Math.max(0.1, Math.min(0.95, baseCong + (Math.random() - 0.5) * 0.3));
+    const name =
+      way.tags?.["name:ko"] ||
+      way.tags?.name ||
+      way.tags?.["name:en"] ||
+      `${hwy} #${way.id}`;
 
-    L.polyline(path, {
+    // 도로 이름 기준 혼잡도 — 한 도로의 모든 조각이 같은 값
+    let c = congByName.get(name);
+    if (c == null) {
+      const baseCong =
+        hwy === "motorway" || hwy === "trunk" ? 0.72
+        : hwy === "primary" ? 0.52 : 0.32;
+      const delta = (nameHash01(name) - 0.5) * 0.4;
+      c = Math.max(0.1, Math.min(0.95, baseCong + delta));
+      congByName.set(name, c);
+    }
+
+    const poly = L.polyline(path, {
       color: congestionColor(c),
-      weight: w, opacity: 0.88,
-      lineCap: "round", lineJoin: "round",
-      // smoothFactor 높이면 화면 외 미세 곡선 단순화 → 렌더링 비용 ↓
+      weight: w,
+      opacity: 0.88,
+      lineCap: "round",
+      lineJoin: "round",
       smoothFactor: 1.5,
-    })
-      .bindTooltip(
-        `${name}<br/><b style="color:${congestionColor(c)}">${congestionLabel(c)}</b> · ${Math.round(c * 100)}%`,
-        { sticky: true, className: "osm-road-tip", direction: "top", offset: [0, -6] }
-      )
-      .addTo(group);
+    }).bindTooltip(
+      `${name}<br/><b style="color:${congestionColor(c)}">${congestionLabel(c)}</b> · ${Math.round(c * 100)}%`,
+      { sticky: true, className: "osm-road-tip", direction: "top", offset: [0, -6] }
+    );
+    poly.__seg = { name, c, hwy };
+    poly.addTo(group);
+
+    // 이름 중복 시 첫 항목만 키로 등록 (실시간 업데이트는 대표 segment 1개로)
+    if (!polylines.has(name)) polylines.set(name, poly);
   });
+
   group.addTo(map);
-  return group;
+  return { group, polylines };
+}
+
+/** 실시간 혼잡도 업데이트 — [{ name, c }, ...] 받아서 색·툴팁 갱신 */
+export function applyRoadCongestion(polylines, updates) {
+  if (!polylines || !Array.isArray(updates)) return;
+  updates.forEach(({ name, c }) => {
+    const poly = polylines.get(name);
+    if (!poly) return;
+    const color = congestionColor(c);
+    poly.setStyle({ color });
+    if (poly.__seg) poly.__seg.c = c;
+    poly.setTooltipContent(
+      `${name}<br/><b style="color:${color}">${congestionLabel(c)}</b> · ${Math.round(c * 100)}%`
+    );
+  });
 }

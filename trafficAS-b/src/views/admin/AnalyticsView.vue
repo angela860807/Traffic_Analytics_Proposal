@@ -3,77 +3,15 @@
     <div class="body">
       <aside class="filter">
         <RouterLink to="/" class="brand">
-          <span class="dot"></span> Traffic <em>AS</em>
+          Traffic <em>AS</em>
         </RouterLink>
         <nav class="snav">
           <button v-for="m in analysisMenu" :key="m.id" class="snav-i" :class="{ on: anaTab === m.id }" @click="anaTab = m.id">
             <i :class="m.icon"></i>{{ m.label }}
           </button>
         </nav>
-        <div class="f-block">
-          <h3>비교 설정</h3>
-          <div class="f-sec">
-            <div class="f-lab">비교 기준</div>
-            <select class="f-sel" v-model="compareBase">
-              <option value="prev">전일</option>
-              <option value="prevWeek">전주 동일 요일</option>
-              <option value="avg7">최근 7일 평균</option>
-            </select>
-          </div>
-          <div class="f-sec">
-            <div class="f-lab">기간 선택</div>
-            <div class="seg-row">
-              <button v-for="p in periods" :key="p.id" class="seg" :class="{ on: period === p.id }" @click="period = p.id">{{ p.label }}</button>
-            </div>
-            <div class="date-r">{{ dateRange }} <i class="bi bi-calendar3"></i></div>
-          </div>
-          <div class="f-sec">
-            <div class="f-lab">시간대</div>
-            <select class="f-sel" v-model="timeSlot">
-              <option value="all">전체 시간</option>
-              <option value="am">오전 (06~12시)</option>
-              <option value="pm">오후 (12~18시)</option>
-              <option value="rush">출퇴근 (07~09, 17~19)</option>
-              <option value="night">야간 (22~05시)</option>
-            </select>
-          </div>
-        </div>
 
-        <div class="f-block">
-          <h3>권한 및 작업</h3>
-          <div class="auth-grid">
-            <button class="auth-btn bl" @click="opMsg = '통계 조회 실행'"><i class="bi bi-bar-chart"></i>통계 조회</button>
-            <button class="auth-btn bl" @click="opMsg = '기간 비교 실행'"><i class="bi bi-calendar3"></i>기간 비교</button>
-            <button class="auth-btn gr" @click="opMsg = '리포트 생성 시작'"><i class="bi bi-file-earmark-text"></i>리포트 생성</button>
-            <button class="auth-btn pl" @click="opMsg = 'CSV 내보내기 완료'"><i class="bi bi-download"></i>CSV 내보내기</button>
-          </div>
-          <div v-if="opMsg" class="op-msg">{{ opMsg }}</div>
-        </div>
 
-        <div class="side-mk">
-          <div class="smk-h">핵심 지표</div>
-          <div class="smk-i bl">
-            <span class="smk-l">평균속도</span>
-            <span class="smk-v">{{ metrics.avgSpeed }}<small>km/h</small></span>
-            <span class="smk-d dn">▼ {{ metrics.speedDelta }}%</span>
-          </div>
-          <div class="smk-i rd">
-            <span class="smk-l">혼잡 구간</span>
-            <span class="smk-v">{{ metrics.congSections }}<small>개</small></span>
-            <span class="smk-d up-r">▲ {{ metrics.congDelta }}</span>
-          </div>
-          <div class="smk-i or">
-            <span class="smk-l">피크시간 악화</span>
-            <span class="smk-v">{{ metrics.recurringJam }}<small>구간</small></span>
-            <span class="smk-d up-r">▲ 1</span>
-          </div>
-          <div class="smk-i gr">
-            <span class="smk-l">보고서 예약</span>
-            <span class="smk-v">{{ metrics.changeDelta }}<small>건</small></span>
-          </div>
-        </div>
-
-        <SideWeather />
 
         <div class="data-up">
           <div class="du-l">데이터 업데이트</div>
@@ -96,6 +34,43 @@
           </div>
         </header>
 
+        <section class="ctx-bar" v-if="anaTab === 'dashboard'">
+          <div class="ctx-grp">
+            <span class="ctx-lab"><i class="bi bi-arrow-left-right"></i> 비교 기준</span>
+            <select class="ctx-sel" v-model="compareBase">
+              <option value="prev">전일</option>
+              <option value="prevWeek">전주 동일 요일</option>
+              <option value="avg7">최근 7일 평균</option>
+            </select>
+          </div>
+          <div class="ctx-grp">
+            <span class="ctx-lab"><i class="bi bi-calendar3"></i> 기간</span>
+            <div class="ctx-seg">
+              <button v-for="p in periods" :key="p.id"
+                class="ctx-seg-b" :class="{ on: period === p.id }"
+                @click="period = p.id">{{ p.label }}</button>
+            </div>
+            <span class="ctx-date">{{ dateRange }}</span>
+          </div>
+          <div class="ctx-grp">
+            <span class="ctx-lab"><i class="bi bi-clock"></i> 시간대</span>
+            <select class="ctx-sel" v-model="timeSlot">
+              <option value="all">전체 시간</option>
+              <option value="am">오전 (06~12시)</option>
+              <option value="pm">오후 (12~18시)</option>
+              <option value="rush">출퇴근 (07~09, 17~19)</option>
+              <option value="night">야간 (22~05시)</option>
+            </select>
+          </div>
+          <div class="ctx-acts">
+            <button class="ctx-act bl" @click="opMsg = '통계 조회 실행'" title="통계 조회"><i class="bi bi-bar-chart"></i> 통계</button>
+            <button class="ctx-act bl" @click="opMsg = '기간 비교 실행'" title="기간 비교"><i class="bi bi-calendar3"></i> 비교</button>
+            <button class="ctx-act gr" @click="opMsg = '리포트 생성 시작'" title="리포트 생성"><i class="bi bi-file-earmark-text"></i> 리포트</button>
+            <button class="ctx-act pl" @click="opMsg = 'CSV 내보내기 완료'" title="CSV 내보내기"><i class="bi bi-download"></i> CSV</button>
+          </div>
+        </section>
+        <div v-if="opMsg && anaTab === 'dashboard'" class="ctx-msg">{{ opMsg }}</div>
+
         <section class="insight-strip" v-if="anaTab === 'dashboard'">
           <div class="is-h"><i class="bi bi-clipboard-data"></i> 분석 인사이트</div>
           <div class="is-list">
@@ -107,7 +82,7 @@
               </div>
             </div>
           </div>
-          <button class="is-more">상세 <i class="bi bi-arrow-right"></i></button>
+          <button class="is-more" @click="anaTab = 'insight'">상세 <i class="bi bi-arrow-right"></i></button>
         </section>
 
         <section class="row-cmp" v-if="anaTab === 'dashboard'">
@@ -144,15 +119,53 @@
 
         </section>
 
+        <!-- 분석 인사이트 상세 탭 -->
+        <section v-if="anaTab === 'insight'" class="tab-panel">
+          <div class="tp-h">
+            <h2><i class="bi bi-clipboard-data"></i> 분석 인사이트 상세</h2>
+            <span class="tp-sub">AI 분석 · 최근 24시간 · {{ aiInsights.length }}건</span>
+          </div>
+          <div class="ins-grid">
+            <div class="ins-detail" v-for="(ins, i) in insightDetails" :key="i">
+              <div class="id-h">
+                <i :class="ins.icon" :style="{ color: ins.color }"></i>
+                <div class="id-title">
+                  <div class="id-t">{{ ins.title }}</div>
+                  <div class="id-sub">{{ ins.detail }}</div>
+                </div>
+                <span class="id-impact" :class="ins.tone">영향도 {{ ins.impact }}</span>
+              </div>
+              <div class="id-metrics">
+                <div class="id-m"><span>대상 구간</span><strong>{{ ins.target }}</strong></div>
+                <div class="id-m"><span>변동률</span><strong :class="ins.dTone">{{ ins.change }}</strong></div>
+                <div class="id-m"><span>발생 빈도</span><strong>{{ ins.freq }}</strong></div>
+                <div class="id-m"><span>지속 시간</span><strong>{{ ins.duration }}</strong></div>
+              </div>
+              <div class="id-actions">
+                <div class="id-act-h"><i class="bi bi-lightbulb"></i> 권장 조치</div>
+                <ul>
+                  <li v-for="(a, j) in ins.actions" :key="j">{{ a }}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- 구간 분석 탭 -->
         <section v-if="anaTab === 'section'" class="tab-panel">
           <div class="tp-h">
             <h2><i class="bi bi-bezier2"></i> 구간 분석</h2>
-            <span class="tp-sub">{{ segKpis.length }}개 구간</span>
+            <span class="tp-sub">{{ segKpis.length }}개 구간 · {{ activeRoadLabel }}</span>
+          </div>
+          <div class="tp-stat-row">
+            <div class="tp-st"><span>평균 속도</span><strong>{{ metrics.avgSpeed }}<small>km/h</small></strong></div>
+            <div class="tp-st"><span>혼잡 구간</span><strong class="rd">{{ metrics.congSections }}<small>개</small></strong></div>
+            <div class="tp-st"><span>전일 대비</span><strong class="up">▲ {{ metrics.changeDelta }}%</strong></div>
+            <div class="tp-st"><span>상시 혼잡</span><strong>{{ metrics.recurringJam }}<small>개</small></strong></div>
           </div>
           <table class="tp-tbl">
             <thead>
-              <tr><th>구간</th><th>평균 속도</th><th>전일 대비</th><th>피크 시간</th><th>혼잡도</th></tr>
+              <tr><th>구간</th><th>평균 속도</th><th>전일 대비</th><th>피크 시간</th><th>통행량</th><th>혼잡도</th></tr>
             </thead>
             <tbody>
               <tr v-for="r in segKpis" :key="r.name">
@@ -160,6 +173,7 @@
                 <td class="mono"><strong>{{ r.speed }}</strong> km/h</td>
                 <td><span :class="r.dTone" class="mono">{{ r.delta }}</span></td>
                 <td class="mono">{{ r.peak }}</td>
+                <td class="mono">{{ (r.speed * 80).toLocaleString() }}대/h</td>
                 <td><span class="cg-tag" :class="r.cgTone">{{ r.cg }}</span></td>
               </tr>
             </tbody>
@@ -168,73 +182,163 @@
 
         <!-- 교차로 분석 탭 -->
         <section v-if="anaTab === 'cross'" class="tab-panel">
-          <div class="tp-h"><h2><i class="bi bi-diagram-3"></i> 교차로 분석</h2><span class="tp-sub">3개 주요 교차로</span></div>
+          <div class="tp-h"><h2><i class="bi bi-diagram-3"></i> 교차로 분석</h2><span class="tp-sub">3개 주요 교차로 · 신호 효율 평균 71%</span></div>
           <div class="tp-grid">
-            <div class="tp-card" v-for="x in [
-              { name: '강남대로 × 테헤란로', wait: 87, level: '혼잡', tone: 'rd', vol: 4820 },
-              { name: '한남대교 북단',      wait: 62, level: '주의', tone: 'or', vol: 3940 },
-              { name: '여의도 환승센터',   wait: 38, level: '원활', tone: 'gr', vol: 2110 },
-            ]" :key="x.name">
-              <div class="tpc-name">{{ x.name }}</div>
+            <div class="tp-card" v-for="x in crossroads" :key="x.name">
+              <div class="tpc-name"><i class="bi bi-stoplights" :style="{ color: x.tone === 'rd' ? '#dc2626' : x.tone === 'or' ? '#b45309' : '#059669' }"></i> {{ x.name }}</div>
               <div class="tpc-row"><span>평균 대기</span><strong class="mono">{{ x.wait }}초</strong></div>
               <div class="tpc-row"><span>혼잡도</span><span class="cg-tag" :class="x.tone">{{ x.level }}</span></div>
               <div class="tpc-row"><span>통행량 (시간)</span><strong class="mono">{{ x.vol.toLocaleString() }}대</strong></div>
+              <div class="tpc-row"><span>신호 효율</span><strong class="mono" :class="x.effTone">{{ x.eff }}%</strong></div>
+              <div class="tpc-row"><span>좌회전 비율</span><strong class="mono">{{ x.leftPct }}%</strong></div>
+              <div class="tpc-row"><span>보행 통과</span><strong class="mono">{{ x.pedPass }}건/h</strong></div>
             </div>
           </div>
         </section>
 
         <!-- 시간대 분석 탭 -->
         <section v-if="anaTab === 'time'" class="tab-panel">
-          <div class="tp-h"><h2><i class="bi bi-clock"></i> 시간대 분석</h2><span class="tp-sub">24시간 평균 속도</span></div>
+          <div class="tp-h"><h2><i class="bi bi-clock"></i> 시간대 분석</h2><span class="tp-sub">24시간 평균 · 전일 대비 변동</span></div>
           <table class="tp-tbl">
-            <thead><tr><th>시간대</th><th>평균 속도</th><th>혼잡 구간</th><th>특징</th></tr></thead>
+            <thead><tr><th>시간대</th><th>평균 속도</th><th>전일 대비</th><th>혼잡 구간</th><th>통행량</th><th>특징</th></tr></thead>
             <tbody>
-              <tr><td><strong>출근 (07~09)</strong></td><td class="mono"><strong>34</strong> km/h</td><td><span class="cg-tag rd">혼잡</span> 12</td><td>강변·올림픽 정체</td></tr>
-              <tr><td><strong>오전 (09~12)</strong></td><td class="mono"><strong>56</strong> km/h</td><td><span class="cg-tag or">주의</span> 4</td><td>점진적 해소</td></tr>
-              <tr><td><strong>오후 (12~17)</strong></td><td class="mono"><strong>58</strong> km/h</td><td><span class="cg-tag yl">보통</span> 2</td><td>안정</td></tr>
-              <tr><td><strong>퇴근 (17~20)</strong></td><td class="mono"><strong>28</strong> km/h</td><td><span class="cg-tag rd">혼잡</span> 15</td><td>전 구간 정체</td></tr>
-              <tr><td><strong>야간 (22~05)</strong></td><td class="mono"><strong>72</strong> km/h</td><td><span class="cg-tag gr">원활</span> 0</td><td>최저 통행량</td></tr>
+              <tr v-for="t in timeSlots" :key="t.slot">
+                <td><strong>{{ t.slot }}</strong></td>
+                <td class="mono"><strong>{{ t.speed }}</strong> km/h</td>
+                <td><span :class="t.dTone" class="mono">{{ t.delta }}</span></td>
+                <td><span class="cg-tag" :class="t.tone">{{ t.level }}</span> {{ t.cong }}</td>
+                <td class="mono">{{ t.vol.toLocaleString() }}대/h</td>
+                <td>{{ t.note }}</td>
+              </tr>
             </tbody>
           </table>
         </section>
 
+        <!-- 교통통계 탭 (교통정보센터에서 이관) -->
+        <section v-if="anaTab === 'stats'" class="tab-panel">
+          <div class="tp-h">
+            <h2><i class="bi bi-bar-chart"></i> 교통통계</h2>
+            <span class="tp-sub">시간대별 평균 속도 추이</span>
+          </div>
+          <div class="stats-card">
+            <div class="stats-head">
+              <div class="stats-meta">
+                <span class="stats-lab">구간</span>
+                <strong>강변북로 (구리 → 한남)</strong>
+              </div>
+              <div class="stats-tabs">
+                <button v-for="t in statsChartTabs" :key="t.id"
+                  class="stats-t" :class="{ on: statsChartTab === t.id }"
+                  @click="statsChartTab = t.id">{{ t.label }}</button>
+              </div>
+            </div>
+            <div class="stats-kpi-row">
+              <div class="stats-kpi"><span>평균 속도</span><strong>{{ statsAvg }}<small>km/h</small></strong></div>
+              <div class="stats-kpi"><span>최저</span><strong class="rd">32<small>km/h</small></strong></div>
+              <div class="stats-kpi"><span>최고</span><strong class="up">82<small>km/h</small></strong></div>
+              <div class="stats-kpi"><span>표본 구간</span><strong>{{ statsX.length }}<small>지점</small></strong></div>
+            </div>
+            <svg class="stats-line" viewBox="0 0 400 160" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="sg-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#2563eb" stop-opacity="0.35"/>
+                  <stop offset="100%" stop-color="#2563eb" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <line v-for="y in [32, 64, 96, 128]" :key="y" :x1="0" :y1="y" :x2="400" :y2="y" stroke="#e7edf6" stroke-dasharray="3 5"/>
+              <path :d="`${statsLine} L400,160 L0,160 Z`" fill="url(#sg-fill)"/>
+              <path :d="statsLine" fill="none" stroke="#2563eb" stroke-width="2.5"/>
+            </svg>
+            <div class="stats-x">
+              <span v-for="x in statsX" :key="x">{{ x }}</span>
+            </div>
+          </div>
+        </section>
+
         <!-- 사고·이벤트 분석 탭 -->
         <section v-if="anaTab === 'incident'" class="tab-panel">
-          <div class="tp-h"><h2><i class="bi bi-exclamation-triangle"></i> 사고·이벤트 분석</h2><span class="tp-sub">최근 24시간</span></div>
+          <div class="tp-h"><h2><i class="bi bi-exclamation-triangle"></i> 사고·이벤트 분석</h2><span class="tp-sub">최근 24시간 · 진행 1건 / 복구 2건</span></div>
+          <div class="tp-stat-row">
+            <div class="tp-st"><span>총 발생</span><strong>3<small>건</small></strong></div>
+            <div class="tp-st"><span>진행 중</span><strong class="rd">1<small>건</small></strong></div>
+            <div class="tp-st"><span>평균 복구</span><strong class="mono">31<small>분</small></strong></div>
+            <div class="tp-st"><span>영향 거리</span><strong class="mono">4.2<small>km</small></strong></div>
+          </div>
           <table class="tp-tbl">
-            <thead><tr><th>발생 시각</th><th>구간</th><th>유형</th><th>지속</th><th>영향</th><th>상태</th></tr></thead>
+            <thead><tr><th>발생 시각</th><th>구간</th><th>유형</th><th>지속</th><th>영향 거리</th><th>영향</th><th>상태</th></tr></thead>
             <tbody>
-              <tr><td class="mono">14:24</td><td>강변북로 한남TG</td><td>차량 정체 (사고)</td><td class="mono">8분</td><td><span class="cg-tag rd">혼잡 +12</span></td><td><span class="cg-tag rd">진행</span></td></tr>
-              <tr><td class="mono">11:08</td><td>올림픽대로 가양</td><td>차량 고장</td><td class="mono">22분</td><td><span class="cg-tag or">평균 -18%</span></td><td><span class="cg-tag gr">복구</span></td></tr>
-              <tr><td class="mono">08:42</td><td>내부순환 정릉</td><td>출근 정체</td><td class="mono">1시간 14분</td><td><span class="cg-tag rd">평균 -32%</span></td><td><span class="cg-tag gr">복구</span></td></tr>
+              <tr v-for="ev in incidents" :key="ev.id">
+                <td class="mono">{{ ev.time }}</td>
+                <td>{{ ev.place }}</td>
+                <td>{{ ev.type }}</td>
+                <td class="mono">{{ ev.dur }}</td>
+                <td class="mono">{{ ev.dist }}km</td>
+                <td><span class="cg-tag" :class="ev.impTone">{{ ev.impact }}</span></td>
+                <td><span class="cg-tag" :class="ev.stTone">{{ ev.st }}</span></td>
+              </tr>
             </tbody>
           </table>
         </section>
 
         <!-- 보고서 관리 탭 -->
         <section v-if="anaTab === 'report'" class="tab-panel">
-          <div class="tp-h"><h2><i class="bi bi-file-earmark-text"></i> 보고서 관리</h2></div>
+          <div class="tp-h">
+            <h2><i class="bi bi-file-earmark-text"></i> 보고서 관리</h2>
+            <span class="tp-sub">예약 {{ reservations.length }}건 · 저장 {{ savedAnalyses.length }}건 · 최근 발행 {{ recentReports.length }}건</span>
+            <label class="tp-auto"><input type="checkbox" v-model="autoPublish" /> 자동 발행</label>
+          </div>
+          <div class="tp-dl-row">
+            <button class="tp-dl" @click="downloadDeptReport('analytics', 'daily')"><i class="bi bi-download"></i> 일일 교통흐름 리포트 (CSV)</button>
+            <button class="tp-dl" @click="downloadDeptReport('analytics', 'weekly')"><i class="bi bi-download"></i> 주간 구간 성능 분석 (CSV)</button>
+          </div>
+
+          <div class="tp-sec-h">
+            <h3 class="tp-sec">최근 발행</h3>
+          </div>
+          <table class="tp-tbl">
+            <thead><tr><th>보고서명</th><th>발행일</th><th>발행자</th><th>크기</th><th>조회</th><th>상태</th><th></th></tr></thead>
+            <tbody>
+              <tr v-for="r in recentReports" :key="r.t">
+                <td><strong>{{ r.t }}</strong></td>
+                <td class="mono">{{ r.date }}</td>
+                <td>{{ r.by }}</td>
+                <td class="mono">{{ r.size }}</td>
+                <td class="mono"><i class="bi bi-eye"></i> {{ r.views }}</td>
+                <td><span class="cg-tag" :class="r.tone === 'ok' ? 'gr' : 'bl'">{{ r.st }}</span></td>
+                <td><button class="tp-dl-sm" @click="downloadDeptReport('analytics', r.t.includes('주간') || r.t.includes('월간') ? 'weekly' : 'daily')"><i class="bi bi-download"></i></button></td>
+              </tr>
+            </tbody>
+          </table>
           <div class="tp-2col">
             <div>
-              <h3 class="tp-sec">보고서 예약 현황</h3>
+              <div class="tp-sec-h">
+                <h3 class="tp-sec">보고서 예약 현황</h3>
+                <button class="tp-add"><i class="bi bi-plus-lg"></i> 예약 추가</button>
+              </div>
               <table class="tp-tbl">
-                <thead><tr><th>보고서명</th><th>주기</th><th>다음 실행</th><th>상태</th></tr></thead>
+                <thead><tr><th>보고서명</th><th>주기</th><th>다음 실행</th><th>수신자</th><th>상태</th><th></th></tr></thead>
                 <tbody>
                   <tr v-for="r in reservations" :key="r.id">
                     <td><strong>{{ r.name }}</strong></td><td>{{ r.cycle }}</td><td class="mono">{{ r.next }}</td>
+                    <td class="mono">{{ r.to }}</td>
                     <td><span class="cg-tag" :class="r.tone === 'ok' ? 'gr' : 'or'">{{ r.st }}</span></td>
+                    <td><button class="tp-dl-sm" @click="downloadDeptReport('analytics', r.cycle.includes('주') ? 'weekly' : 'daily')"><i class="bi bi-download"></i></button></td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <div>
-              <h3 class="tp-sec">저장된 분석 목록</h3>
+              <div class="tp-sec-h">
+                <h3 class="tp-sec">저장된 분석 목록</h3>
+                <button class="tp-add"><i class="bi bi-plus-lg"></i> 분석 생성</button>
+              </div>
               <table class="tp-tbl">
-                <thead><tr><th>분석명</th><th>유형</th><th>기간</th><th>생성</th></tr></thead>
+                <thead><tr><th>분석명</th><th>유형</th><th>기간</th><th>생성자</th><th>생성</th><th></th></tr></thead>
                 <tbody>
                   <tr v-for="s in savedAnalyses" :key="s.id">
                     <td><strong>{{ s.name }}</strong></td><td>{{ s.type }}</td>
-                    <td class="mono">{{ s.range }}</td><td class="mono">{{ s.created }}</td>
+                    <td class="mono">{{ s.range }}</td><td>{{ s.by }}</td><td class="mono">{{ s.created }}</td>
+                    <td><button class="tp-dl-sm" @click="downloadDeptReport('analytics', s.type.includes('시간') ? 'weekly' : 'daily')"><i class="bi bi-download"></i></button></td>
                   </tr>
                 </tbody>
               </table>
@@ -244,20 +348,40 @@
 
         <!-- 설정 탭 -->
         <section v-if="anaTab === 'settings'" class="tab-panel">
-          <div class="tp-h"><h2><i class="bi bi-gear"></i> 설정</h2></div>
-          <div class="tp-set">
-            <div class="tps-row"><label>기본 비교 기준</label>
-              <select v-model="compareBase">
-                <option value="prev">전일</option><option value="prevWeek">전주 동일 요일</option><option value="avg7">최근 7일 평균</option>
-              </select>
+          <div class="tp-h"><h2><i class="bi bi-gear"></i> 설정</h2><span class="tp-sub">대시보드 · 알람 · 데이터</span></div>
+          <div class="tp-set-grid">
+            <div class="tp-set-blk">
+              <h3 class="tp-sec">분석 기본값</h3>
+              <div class="tps-row"><label>기본 비교 기준</label>
+                <select v-model="compareBase">
+                  <option value="prev">전일</option><option value="prevWeek">전주 동일 요일</option><option value="avg7">최근 7일 평균</option>
+                </select>
+              </div>
+              <div class="tps-row"><label>기본 시간대</label>
+                <select v-model="timeSlot">
+                  <option value="all">전체</option><option value="am">오전</option><option value="pm">오후</option><option value="rush">출퇴근</option><option value="night">야간</option>
+                </select>
+              </div>
+              <div class="tps-row"><label>자동 새로고침</label><input type="checkbox" v-model="autoRefresh" /></div>
+              <div class="tps-row"><label>리포트 자동 발행</label><input type="checkbox" /></div>
             </div>
-            <div class="tps-row"><label>기본 시간대 필터</label>
-              <select v-model="timeSlot">
-                <option value="all">전체</option><option value="am">오전</option><option value="pm">오후</option><option value="rush">출퇴근</option><option value="night">야간</option>
-              </select>
+            <div class="tp-set-blk">
+              <h3 class="tp-sec">알람 임계값</h3>
+              <div class="tps-row"><label>혼잡 경보 (속도 ≤)</label><input type="number" value="30" /> km/h</div>
+              <div class="tps-row"><label>주의 경보 (속도 ≤)</label><input type="number" value="40" /> km/h</div>
+              <div class="tps-row"><label>이벤트 알림</label><input type="checkbox" checked /></div>
+              <div class="tps-row"><label>주말 알림 제외</label><input type="checkbox" /></div>
             </div>
-            <div class="tps-row"><label>자동 새로고침</label><input type="checkbox" v-model="autoRefresh" /></div>
-            <div class="tps-row"><label>리포트 자동 발행</label><input type="checkbox" /></div>
+            <div class="tp-set-blk">
+              <h3 class="tp-sec">데이터·보관</h3>
+              <div class="tps-row"><label>원본 로그 보관</label>
+                <select><option>30일</option><option>60일</option><option>90일</option></select>
+              </div>
+              <div class="tps-row"><label>집계 보관</label>
+                <select><option>1년</option><option>2년</option><option>영구</option></select>
+              </div>
+              <div class="tps-row"><label>익명화 처리</label><input type="checkbox" checked /></div>
+            </div>
           </div>
         </section>
 
@@ -274,14 +398,43 @@
 
           <div class="card kpi-tbl-card">
             <div class="kpi-head">
-              <h3>구간 주요 지표</h3>
+              <h3><i class="bi bi-bar-chart-line"></i> 구간 주요 지표</h3>
               <a class="ch-link" @click="anaTab = 'section'">전체 보기 ›</a>
             </div>
+            <div class="kpi-mini-row">
+              <div class="kpi-mini bl">
+                <span class="km-l"><i class="bi bi-speedometer2"></i> 평균속도</span>
+                <span class="km-v">{{ metrics.avgSpeed }}<small>km/h</small></span>
+                <span class="km-d dn">▼ {{ metrics.speedDelta }}%</span>
+              </div>
+              <div class="kpi-mini rd">
+                <span class="km-l"><i class="bi bi-exclamation-triangle"></i> 혼잡 구간</span>
+                <span class="km-v">{{ metrics.congSections }}<small>개</small></span>
+                <span class="km-d up-r">▲ {{ metrics.congDelta }}</span>
+              </div>
+              <div class="kpi-mini or">
+                <span class="km-l"><i class="bi bi-graph-up-arrow"></i> 피크 악화</span>
+                <span class="km-v">{{ metrics.recurringJam }}<small>구간</small></span>
+                <span class="km-d up-r">▲ 1</span>
+              </div>
+              <div class="kpi-mini gr">
+                <span class="km-l"><i class="bi bi-file-earmark-text"></i> 보고서</span>
+                <span class="km-v">{{ metrics.changeDelta }}<small>건</small></span>
+                <span class="km-d">예약</span>
+              </div>
+            </div>
             <table class="tbl-kpi">
-              <thead><tr><th>구간</th><th>평균(km/h)</th><th>전일 대비</th><th>피크</th><th>혼잡도</th></tr></thead>
+              <thead><tr>
+                <th><i class="bi bi-geo-alt"></i> 구간</th>
+                <th><i class="bi bi-speedometer2"></i> 평균(km/h)</th>
+                <th><i class="bi bi-arrow-down-up"></i> 전일 대비</th>
+                <th><i class="bi bi-clock"></i> 피크</th>
+                <th><i class="bi bi-traffic-light"></i> 혼잡도</th>
+              </tr></thead>
               <tbody>
                 <tr v-for="r in segKpis" :key="r.name">
-                  <td>{{ r.name }}</td><td class="mono">{{ r.speed }}</td>
+                  <td><i class="bi bi-pin-map kpi-i"></i> {{ r.name }}</td>
+                  <td class="mono">{{ r.speed }}</td>
                   <td><span :class="r.dTone" class="mono">{{ r.delta }}</span></td>
                   <td class="mono">{{ r.peak }}</td>
                   <td><span class="cg-tag" :class="r.cgTone">{{ r.cg }}</span></td>
@@ -305,7 +458,8 @@ import "leaflet/dist/leaflet.css";
 import echarts from "@/composables/echartsSetup";
 import { loadOSMRoads, renderOSMRoads } from "@/composables/useOSMRoads";
 import DeptSwitcher from "@/components/dashboard/DeptSwitcher.vue";
-import SideWeather from "@/components/dashboard/SideWeather.vue";
+import { useReportDownload } from "@/composables/useReportDownload";
+const { downloadDeptReport } = useReportDownload();
 
 const roads = [
   { id: "gangbyeon", label: "강변복로 (구리 → 한남)",     subs: ["구리IC", "토평IC", "강일IC", "미사IC", "암사IC", "천호대교", "한남IC"] },
@@ -396,12 +550,75 @@ const aiInsights = [
 
 const analysisMenu = [
   { id: "dashboard", icon: "bi bi-grid-1x2",            label: "대시보드" },
+  { id: "insight",   icon: "bi bi-clipboard-data",      label: "분석 인사이트" },
   { id: "section",   icon: "bi bi-bezier2",             label: "구간 분석" },
   { id: "cross",     icon: "bi bi-diagram-3",           label: "교차로 분석" },
   { id: "time",      icon: "bi bi-clock",               label: "시간대 분석" },
+  { id: "stats",     icon: "bi bi-bar-chart",           label: "교통통계" },
   { id: "incident",  icon: "bi bi-exclamation-triangle",label: "사고·이벤트 분석" },
   { id: "report",    icon: "bi bi-file-earmark-text",   label: "보고서 관리" },
   { id: "settings",  icon: "bi bi-gear",                label: "설정" },
+];
+
+// 교통통계 — 시간대별 평균 속도 (ControlView에서 이관)
+const statsChartTabs = [
+  { id: "1h", label: "1시간" },
+  { id: "3h", label: "3시간" },
+  { id: "6h", label: "6시간" },
+  { id: "24h", label: "24시간" },
+];
+const statsChartTab = ref("3h");
+const statsChartData = {
+  "1h":  { line: "M0,46 L40,42 L80,50 L120,52 L160,58 L200,68 L240,78 L280,88 L320,108 L360,118 L400,128", x: ["13:30","13:45","14:00","14:15","14:30"], avg: 62 },
+  "3h":  { line: "M0,30 L50,38 L100,35 L150,48 L200,55 L250,72 L300,90 L350,108 L400,128", x: ["11:30","12:15","13:00","13:45","14:30"], avg: 54 },
+  "6h":  { line: "M0,28 L60,40 L120,52 L180,58 L240,70 L300,86 L360,110 L400,128", x: ["08:30","10:00","11:30","13:00","14:30"], avg: 48 },
+  "24h": { line: "M0,90 L40,70 L80,40 L120,32 L160,55 L200,75 L240,55 L280,40 L320,60 L360,95 L400,110", x: ["00시","04시","08시","12시","16시","20시","24시"], avg: 56 },
+};
+const statsLine = computed(() => statsChartData[statsChartTab.value].line);
+const statsX = computed(() => statsChartData[statsChartTab.value].x);
+const statsAvg = computed(() => statsChartData[statsChartTab.value].avg);
+
+const insightDetails = [
+  { icon: "bi bi-exclamation-circle-fill", color: "#dc2626", tone: "rd",
+    title: "피크시간 악화 구간 증가", detail: "출근 시간대 혼잡 악화 구간이 전일 대비 1개 증가",
+    target: "강변북로 일산IC, 내부순환로 정릉", change: "+12%", dTone: "dn",
+    freq: "5일 연속", duration: "07:00 ~ 09:30",
+    actions: ["일산IC 우회 경로 안내 강화", "08:00 전 신호 사이클 단축 검토"] },
+  { icon: "bi bi-exclamation-triangle-fill", color: "#b45309", tone: "or",
+    title: "특정 구간 속도 저하", detail: "일산IC → 원효대교 구간 속도 전일 대비 12% 감소",
+    target: "강변북로 일산IC ~ 원효대교", change: "-12%", dTone: "dn",
+    freq: "당일 4회", duration: "누적 2시간 18분",
+    actions: ["원효대교 진입 차로 분배 점검", "사고 다발 패턴 매칭 확인"] },
+  { icon: "bi bi-check-circle-fill", color: "#059669", tone: "gr",
+    title: "전반적 흐름 개선", detail: "전체 평균 속도 전일 대비 6% 개선",
+    target: "전 구간", change: "+6%", dTone: "up",
+    freq: "지속", duration: "당일 종일",
+    actions: ["개선 요인 분석 리포트 자동 생성", "주간 보고서 반영"] },
+  { icon: "bi bi-info-circle-fill", color: "#2563eb", tone: "bl",
+    title: "사고 영향 감소", detail: "사고 다발 구간의 영향이 전일 대비 18% 감소",
+    target: "강변북로 한남TG·올림픽 가양", change: "-18%", dTone: "up",
+    freq: "주간 추세", duration: "최근 7일",
+    actions: ["영향 감소 요인 추적", "유사 패턴 사전 경보 적용 검토"] },
+];
+
+const crossroads = [
+  { name: "강남대로 × 테헤란로", wait: 87, level: "혼잡", tone: "rd", vol: 4820, eff: 58, effTone: "dn", leftPct: 22, pedPass: 312 },
+  { name: "한남대교 북단",      wait: 62, level: "주의", tone: "or", vol: 3940, eff: 74, effTone: "yl", leftPct: 18, pedPass: 188 },
+  { name: "여의도 환승센터",   wait: 38, level: "원활", tone: "gr", vol: 2110, eff: 86, effTone: "up", leftPct: 14, pedPass: 274 },
+];
+
+const timeSlots = [
+  { slot: "출근 (07~09)", speed: 34, delta: "▼ 6",  dTone: "dn", level: "혼잡", tone: "rd", cong: 12, vol: 6800, note: "강변·올림픽 정체" },
+  { slot: "오전 (09~12)", speed: 56, delta: "▲ 2",  dTone: "up", level: "주의", tone: "or", cong: 4,  vol: 5200, note: "점진적 해소" },
+  { slot: "오후 (12~17)", speed: 58, delta: "▲ 1",  dTone: "up", level: "보통", tone: "yl", cong: 2,  vol: 4800, note: "안정" },
+  { slot: "퇴근 (17~20)", speed: 28, delta: "▼ 9",  dTone: "dn", level: "혼잡", tone: "rd", cong: 15, vol: 7200, note: "전 구간 정체" },
+  { slot: "야간 (22~05)", speed: 72, delta: "▲ 3",  dTone: "up", level: "원활", tone: "gr", cong: 0,  vol: 1400, note: "최저 통행량" },
+];
+
+const incidents = [
+  { id: 1, time: "14:24", place: "강변북로 한남TG", type: "차량 정체 (사고)", dur: "8분",       dist: 1.2, impact: "혼잡 +12", impTone: "rd", st: "진행", stTone: "rd" },
+  { id: 2, time: "11:08", place: "올림픽대로 가양", type: "차량 고장",         dur: "22분",     dist: 0.8, impact: "평균 -18%", impTone: "or", st: "복구", stTone: "gr" },
+  { id: 3, time: "08:42", place: "내부순환 정릉",   type: "출근 정체",         dur: "1시간 14분", dist: 2.2, impact: "평균 -32%", impTone: "rd", st: "복구", stTone: "gr" },
 ];
 const anaTab = ref("dashboard");
 const autoRefresh = ref(true);
@@ -437,6 +654,15 @@ const reservations = [
 const savedAnalyses = [
   { id: 1, name: "일산IC 혼잡 원인 분석",       type: "구간 분석",  range: "2025-05-09 ~ 2025-05-15", created: "2025-05-15 07:45", by: "김분석" },
   { id: 2, name: "출근시간 속도 저하 구간 분석", type: "시간대 분석", range: "2025-05-09 ~ 2025-05-15", created: "2025-05-14 18:30", by: "김분석" },
+];
+
+// 최근 발행 보고서 (운영기획팀에서 흡수)
+const autoPublish = ref(true);
+const recentReports = [
+  { t: "일일 운영 보고서",     date: "2026-05-19", by: "교통분석팀 김분석",  size: "2.4MB", views: 12, st: "발행", tone: "ok" },
+  { t: "주간 성과 보고서",     date: "2026-05-12", by: "교통분석팀 정민혁",  size: "5.1MB", views: 38, st: "발행", tone: "ok" },
+  { t: "5월 1주 이슈 리포트", date: "2026-05-08", by: "교통분석팀 이수진",  size: "1.8MB", views: 24, st: "발행", tone: "ok" },
+  { t: "4월 월간 종합",       date: "2026-05-02", by: "교통분석팀 김분석",  size: "8.6MB", views: 56, st: "승인", tone: "appr" },
 ];
 
 function resetFilters() {
@@ -767,6 +993,46 @@ onBeforeUnmount(() => {
   text-decoration: none;
 }
 .an-shell .kpi-tbl-card .ch-link:hover { text-decoration: underline; }
+.an-shell .kpi-head h3 i { color: #2563eb; margin-right: 5px; }
+.an-shell .kpi-mini-row {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  margin-bottom: 10px;
+}
+.an-shell .kpi-mini {
+  background: #f1f5fb; border: 1px solid #c9d4e3; border-left: 3px solid #c9d4e3;
+  border-radius: 4px; padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 0;
+}
+.an-shell .kpi-mini.bl { border-left-color: #2563eb; }
+.an-shell .kpi-mini.rd { border-left-color: #dc2626; }
+.an-shell .kpi-mini.or { border-left-color: #b45309; }
+.an-shell .kpi-mini.gr { border-left-color: #059669; }
+.an-shell .kpi-mini .km-l {
+  font-size: 11.5px; font-weight: 600; color: #4a5b78;
+  display: inline-flex; align-items: center; gap: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.an-shell .kpi-mini .km-l i { color: inherit; opacity: 0.85; }
+.an-shell .kpi-mini.bl .km-l i { color: #2563eb; }
+.an-shell .kpi-mini.rd .km-l i { color: #dc2626; }
+.an-shell .kpi-mini.or .km-l i { color: #b45309; }
+.an-shell .kpi-mini.gr .km-l i { color: #059669; }
+.an-shell .kpi-mini .km-v {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 18px; font-weight: 800; color: #0c1f40; line-height: 1.1;
+}
+.an-shell .kpi-mini .km-v small {
+  font-size: 11px; font-weight: 600; color: #4a5b78; margin-left: 2px;
+}
+.an-shell .kpi-mini .km-d {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px; font-weight: 700;
+}
+.an-shell .kpi-mini .km-d.dn { color: #b91c1c; }
+.an-shell .kpi-mini .km-d.up-r { color: #b45309; }
+.an-shell .tbl-kpi th i { color: #2563eb; opacity: 0.85; margin-right: 4px; font-size: 12px; }
+.an-shell .tbl-kpi .kpi-i { color: #2563eb; opacity: 0.7; margin-right: 4px; font-size: 12px; }
 
 .an-shell .top { padding: 10px 16px !important; flex-shrink: 0; }
 .an-shell .top h1 { font-size: 20px !important; }
@@ -816,6 +1082,127 @@ onBeforeUnmount(() => {
   color: #0c1f40;
 }
 .an-shell .tp-tbl tbody tr:hover { background: #f1f5fb; }
+
+/* === 추가 디테일 === */
+.an-shell .tp-stat-row {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+  margin-bottom: 14px;
+}
+.an-shell .tp-st {
+  background: #f1f5fb; border: 1px solid #c9d4e3; border-radius: 4px;
+  padding: 10px 14px; display: flex; flex-direction: column; gap: 4px;
+}
+.an-shell .tp-st span { font-size: 12px; color: #4a5b78; font-weight: 600; }
+.an-shell .tp-st strong { font-size: 22px; font-weight: 800; color: #0c1f40; font-family: "IBM Plex Mono", monospace; }
+.an-shell .tp-st strong small { font-size: 12px; color: #4a5b78; font-weight: 600; margin-left: 4px; }
+.an-shell .tp-st .rd { color: #b91c1c !important; }
+.an-shell .tp-st .up { color: #059669 !important; }
+
+.an-shell .tp-sec-h {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 6px 0 8px;
+}
+.an-shell .tp-add {
+  background: #2563eb; color: #fff; border: 0; padding: 6px 12px;
+  border-radius: 4px; font-size: 13px; font-weight: 700; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.an-shell .tp-add:hover { background: #1d4ed8; }
+.an-shell .tp-auto {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; color: #4a5b78; cursor: pointer;
+}
+.an-shell .tp-auto input { accent-color: #2563eb; }
+.an-shell .tp-dl-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.an-shell .tp-dl {
+  background: #059669; color: #fff; border: 0; padding: 8px 14px;
+  border-radius: 4px; font-size: 13px; font-weight: 700; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.an-shell .tp-dl:hover { background: #047857; }
+.an-shell .tp-dl-sm {
+  background: rgba(5,150,105,0.12); color: #047857;
+  border: 1px solid rgba(5,150,105,0.3);
+  padding: 3px 8px; border-radius: 3px; cursor: pointer; font-size: 12px;
+}
+.an-shell .tp-dl-sm:hover { background: #059669; color: #fff; }
+
+.an-shell .tp-set-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+}
+.an-shell .tp-set-blk {
+  background: #f1f5fb; border: 1px solid #c9d4e3; border-radius: 4px;
+  padding: 14px 16px;
+}
+.an-shell .tp-set-blk .tp-sec {
+  font-size: 14.5px; font-weight: 700; color: #0c1f40; margin: 0 0 10px;
+  padding-bottom: 6px; border-bottom: 1px solid #c9d4e3;
+}
+.an-shell .tp-set-blk .tps-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  font-size: 13.5px; color: #0c1f40;
+}
+.an-shell .tp-set-blk .tps-row label { flex: 1; font-weight: 600; }
+.an-shell .tp-set-blk input[type="number"] {
+  width: 64px; padding: 4px 6px; border: 1px solid #c9d4e3;
+  border-radius: 3px; font-family: "IBM Plex Mono", monospace;
+}
+.an-shell .tp-set-blk select {
+  padding: 4px 8px; border: 1px solid #c9d4e3; border-radius: 3px;
+  background: #fff; font-size: 13px;
+}
+
+/* 인사이트 상세 */
+.an-shell .ins-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
+  gap: 14px;
+  flex: 1; min-height: 0; overflow: auto;
+  align-items: stretch;
+}
+.an-shell .ins-detail {
+  background: #ffffff; border: 1px solid #c9d4e3; border-radius: 4px;
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+  min-height: 0; min-width: 0;
+}
+.an-shell .ins-detail .id-actions { margin-top: auto; }
+.an-shell .id-h {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding-bottom: 10px; border-bottom: 1px solid #e7edf6;
+}
+.an-shell .id-h > i { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+.an-shell .id-title { flex: 1; min-width: 0; }
+.an-shell .id-t { font-size: 15px; font-weight: 800; color: #0c1f40; margin-bottom: 4px; }
+.an-shell .id-sub { font-size: 12.5px; color: #4a5b78; line-height: 1.4; }
+.an-shell .id-impact {
+  padding: 3px 10px; border-radius: 100px; font-size: 11.5px; font-weight: 700;
+  flex-shrink: 0; align-self: flex-start;
+}
+.an-shell .id-impact.rd { background: rgba(220,38,38,.12); color: #b91c1c; }
+.an-shell .id-impact.or { background: rgba(180,83,9,.12); color: #b45309; }
+.an-shell .id-impact.gr { background: rgba(5,150,105,.12); color: #047857; }
+.an-shell .id-impact.bl { background: rgba(37,99,235,.12); color: #1d4ed8; }
+.an-shell .id-metrics {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+}
+.an-shell .id-m {
+  background: #f1f5fb; border-radius: 3px; padding: 6px 8px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.an-shell .id-m span { font-size: 11px; color: #4a5b78; font-weight: 600; }
+.an-shell .id-m strong { font-size: 13.5px; font-weight: 800; color: #0c1f40; font-family: "IBM Plex Mono", monospace; }
+.an-shell .id-m strong.dn { color: #b91c1c; }
+.an-shell .id-m strong.up { color: #047857; }
+.an-shell .id-actions { background: #fff8e6; border: 1px solid #f5d989; border-radius: 4px; padding: 10px 12px; }
+.an-shell .id-act-h { font-size: 13px; font-weight: 700; color: #92400e; margin-bottom: 6px; display: inline-flex; align-items: center; gap: 5px; }
+.an-shell .id-actions ul { margin: 0; padding-left: 20px; }
+.an-shell .id-actions li { font-size: 13px; color: #0c1f40; line-height: 1.5; }
+
+/* 교차로 카드 — 행 추가에 맞춰 살짝 컴팩트 */
+.an-shell .tp-card .tpc-name { display: inline-flex; align-items: center; gap: 6px; }
+.an-shell .tp-card .tpc-row .mono.dn { color: #b91c1c; }
+.an-shell .tp-card .tpc-row .mono.up { color: #047857; }
+.an-shell .tp-card .tpc-row .mono.yl { color: #b45309; }
 .an-shell .tp-tbl strong { font-weight: 700; }
 .an-shell .tp-tbl .mono { font-family: "IBM Plex Mono", monospace; }
 
@@ -889,6 +1276,113 @@ onBeforeUnmount(() => {
 }
 
 .an-shell .insight-strip { padding: 12px 16px !important; }
+
+/* 비교 설정 컨텍스트 바 */
+.an-shell .ctx-bar {
+  display: flex; align-items: center; gap: 22px;
+  background: #ffffff;
+  border: 1px solid #c9d4e3;
+  border-radius: 4px;
+  padding: 10px 16px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.an-shell .ctx-grp { display: inline-flex; align-items: center; gap: 8px; }
+.an-shell .ctx-lab {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12.5px; font-weight: 700; color: #4a5b78;
+}
+.an-shell .ctx-lab i { color: #2563eb; font-size: 13px; }
+.an-shell .ctx-sel {
+  background: #f1f5fb; border: 1px solid #c9d4e3;
+  color: #0c1f40; font-size: 13px; font-weight: 600;
+  padding: 5px 10px; border-radius: 3px; cursor: pointer;
+}
+.an-shell .ctx-seg {
+  display: inline-flex; background: #f1f5fb; border: 1px solid #c9d4e3;
+  border-radius: 3px; overflow: hidden;
+}
+.an-shell .ctx-seg-b {
+  background: none; border: 0; color: #4a5b78;
+  font-size: 12.5px; font-weight: 600; padding: 5px 11px; cursor: pointer;
+  border-right: 1px solid #c9d4e3;
+}
+.an-shell .ctx-seg-b:last-child { border-right: 0; }
+.an-shell .ctx-seg-b.on { background: #2563eb; color: #fff; }
+.an-shell .ctx-seg-b:hover:not(.on) { background: #e3e9f2; color: #0c1f40; }
+.an-shell .ctx-date {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px; color: #6b7a92; margin-left: 4px;
+}
+.an-shell .ctx-acts {
+  margin-left: auto;
+  display: inline-flex; gap: 5px;
+}
+.an-shell .ctx-act {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #2563eb; color: #fff; border: 0;
+  font-size: 12.5px; font-weight: 700;
+  padding: 6px 12px; border-radius: 3px; cursor: pointer;
+}
+.an-shell .ctx-act i { font-size: 12.5px; }
+.an-shell .ctx-act:hover { background: #1d4ed8; }
+.an-shell .ctx-act.bl { background: #2563eb; }
+.an-shell .ctx-act.bl:hover { background: #1d4ed8; }
+.an-shell .ctx-act.gr { background: #059669; }
+.an-shell .ctx-act.gr:hover { background: #047857; }
+.an-shell .ctx-act.pl { background: #7c3aed; }
+.an-shell .ctx-act.pl:hover { background: #6d28d9; }
+/* 교통통계 카드 (이관) */
+.an-shell .stats-card {
+  background: #ffffff; border: 1px solid #c9d4e3; border-radius: 4px;
+  padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.an-shell .stats-head {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+}
+.an-shell .stats-meta { display: inline-flex; align-items: baseline; gap: 8px; }
+.an-shell .stats-lab { font-size: 12px; color: #4a5b78; font-weight: 600; }
+.an-shell .stats-meta strong { font-size: 14.5px; color: #0c1f40; font-weight: 800; }
+.an-shell .stats-tabs { display: inline-flex; background: #f1f5fb; border: 1px solid #c9d4e3; border-radius: 4px; overflow: hidden; }
+.an-shell .stats-t {
+  background: none; border: 0; padding: 6px 14px; cursor: pointer;
+  font-size: 12.5px; font-weight: 600; color: #4a5b78;
+  border-right: 1px solid #c9d4e3;
+}
+.an-shell .stats-t:last-child { border-right: 0; }
+.an-shell .stats-t.on { background: #2563eb; color: #fff; }
+.an-shell .stats-kpi-row {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+}
+.an-shell .stats-kpi {
+  background: #f1f5fb; border: 1px solid #c9d4e3; border-radius: 3px;
+  padding: 8px 12px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.an-shell .stats-kpi span { font-size: 11.5px; color: #4a5b78; font-weight: 600; }
+.an-shell .stats-kpi strong {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 18px; font-weight: 800; color: #0c1f40;
+}
+.an-shell .stats-kpi strong small { font-size: 11px; font-weight: 600; color: #4a5b78; margin-left: 3px; }
+.an-shell .stats-kpi strong.rd { color: #b91c1c; }
+.an-shell .stats-kpi strong.up { color: #047857; }
+.an-shell .stats-line { width: 100%; height: 220px; }
+.an-shell .stats-x {
+  display: flex; justify-content: space-between;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px; color: #6b7a92; padding: 0 4px;
+}
+
+.an-shell .ctx-msg {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+  padding: 6px 12px; border-radius: 3px;
+  font-size: 12.5px; font-weight: 600;
+  margin-bottom: 10px;
+}
 .an-shell .is-card { padding: 10px 14px !important; }
 .an-shell .is-h { font-size: 19px !important; }
 .an-shell .is-t { font-size: 16.5px !important; }
