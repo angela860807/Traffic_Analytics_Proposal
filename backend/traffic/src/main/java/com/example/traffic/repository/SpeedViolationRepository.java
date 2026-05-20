@@ -8,10 +8,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface SpeedViolationRepository extends JpaRepository<SpeedViolation, Long> {
 
-    boolean existsByFlowEvent_FlowEventId(Long flowEventId);
+    Optional<SpeedViolation> findByFlowEvent_FlowEventId(Long flowEventId);
 
     List<SpeedViolation> findByVehicleOrderByViolatedAtDesc(Vehicle vehicle);
 

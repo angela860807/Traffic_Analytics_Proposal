@@ -37,9 +37,12 @@ public class SpeedViolationService {
             throw new BusinessException("Measured speed must exceed speed limit.", HttpStatus.BAD_REQUEST);
         }
 
-        if (speedViolationRepository.existsByFlowEvent_FlowEventId(request.getFlowEventId())) {
-            throw new BusinessException("Speed violation already exists for flow event: "
-                    + request.getFlowEventId(), HttpStatus.CONFLICT);
+        SpeedViolation existingViolation = speedViolationRepository
+                .findByFlowEvent_FlowEventId(request.getFlowEventId())
+                .orElse(null);
+        if (existingViolation != null) {
+            existingViolation.getFlowEvent().updateSpeed(existingViolation.getMeasuredSpeed());
+            return SpeedViolationResponse.from(existingViolation);
         }
 
         VehicleFlowEvent flowEvent = vehicleFlowEventRepository.findById(request.getFlowEventId())
@@ -64,6 +67,7 @@ public class SpeedViolationService {
                 .violatedAt(request.getViolatedAt())
                 .build();
 
+        flowEvent.updateSpeed(violation.getMeasuredSpeed());
         return SpeedViolationResponse.from(speedViolationRepository.save(violation));
     }
 

@@ -5,6 +5,7 @@ import com.example.traffic.domain.Camera;
 import com.example.traffic.domain.DetectionAnalysisResult;
 import com.example.traffic.domain.DetectionLog;
 import com.example.traffic.domain.Vehicle;
+import com.example.traffic.domain.VehicleFlowEvent;
 import com.example.traffic.dto.request.DetectionRequest;
 import com.example.traffic.dto.response.DetectionResponse;
 import com.example.traffic.dto.response.FlowEventResponse;
@@ -59,6 +60,11 @@ public class DetectionLogService {
             FlowEventResponse flowEventResponse =
                     vehicleFlowEventService.processFlowEvent(savedLog, analysisResult, vehicle);
             flowEventId = flowEventResponse != null ? flowEventResponse.getFlowEventId() : null;
+        } else if (resultStatus == DetectionLogStatus.DUPLICATE_SKIPPED && hasPlateNumber(request)) {
+            Vehicle vehicle = vehicleService.getOrCreateVehicle(request.getPlateNumber());
+            flowEventId = vehicleFlowEventService.findRecentDuplicate(vehicle, savedLog)
+                    .map(VehicleFlowEvent::getFlowEventId)
+                    .orElse(null);
         }
 
         return DetectionResponse.of(savedLog, analysisResult, flowEventId);
