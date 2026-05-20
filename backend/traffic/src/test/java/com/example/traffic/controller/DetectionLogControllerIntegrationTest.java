@@ -218,6 +218,55 @@ class DetectionLogControllerIntegrationTest {
     }
 
     @Test
+    void duplicateDetectionReturnsRecentFlowEventIdWhenItExists() throws Exception {
+        String plateNumber = "DUPFLOW" + System.currentTimeMillis();
+        long flowEventCountBefore = vehicleFlowEventRepository.count();
+
+        MvcResult firstResult = mockMvc.perform(post("/api/v1/detection-logs")
+                        .header("X-Internal-Api-Key", INTERNAL_API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "cameraCode": "CAM_001",
+                                  "plateNumber": "%s",
+                                  "confidenceScore": 0.95,
+                                  "imagePath": "storage/detections/2026/05/12/CAM_001_103600_frame.jpg",
+                                  "imageUrl": "/static/detections/2026/05/12/CAM_001_103600_frame.jpg",
+                                  "detectedAt": "2026-05-12T10:36:00",
+                                  "detectionType": "PLATE"
+                                }
+                                """.formatted(plateNumber)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("FLOW_EVENT_CREATED"))
+                .andExpect(jsonPath("$.data.flowEventId").isNumber())
+                .andReturn();
+
+        Integer flowEventId = JsonPath.read(firstResult.getResponse().getContentAsString(), "$.data.flowEventId");
+
+        mockMvc.perform(post("/api/v1/detection-logs")
+                        .header("X-Internal-Api-Key", INTERNAL_API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "cameraCode": "CAM_001",
+                                  "plateNumber": "%s",
+                                  "confidenceScore": 0.91,
+                                  "imagePath": "storage/detections/2026/05/12/CAM_001_103605_frame.jpg",
+                                  "imageUrl": "/static/detections/2026/05/12/CAM_001_103605_frame.jpg",
+                                  "detectedAt": "2026-05-12T10:36:05",
+                                  "detectionType": "PLATE",
+                                  "status": "DUPLICATE_SKIPPED"
+                                }
+                                """.formatted(plateNumber)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("DUPLICATE_SKIPPED"))
+                .andExpect(jsonPath("$.data.flowEventId").value(flowEventId));
+
+        assertThat(vehicleFlowEventRepository.count()).isEqualTo(flowEventCountBefore + 1);
+    }
+
+    @Test
     void createSpeedViolationSavesViolationForFlowEvent() throws Exception {
         String uniqueSuffix = String.valueOf(System.currentTimeMillis());
         String plateNumber = "SPD" + uniqueSuffix;
@@ -266,6 +315,34 @@ class DetectionLogControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.measuredSpeed").value(72.35))
                 .andExpect(jsonPath("$.data.speedLimit").value(50.0))
                 .andExpect(jsonPath("$.data.violationStatus").value("UNPROCESSED"));
+
+        assertThat(speedViolationRepository.count()).isEqualTo(violationCountBefore + 1);
+        assertThat(vehicleFlowEventRepository.findById(flowEventId.longValue()))
+                .isPresent()
+                .get()
+                .satisfies(flowEvent -> {
+                    assertThat(flowEvent.getSpeed()).isEqualByComparingTo("72.35");
+                    assertThat(flowEvent.getStayTime()).isNull();
+                });
+
+        mockMvc.perform(post("/api/speed-violations")
+                        .header("X-Internal-Api-Key", INTERNAL_API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "flowEventId": %d,
+                                  "plateNumber": "%s",
+                                  "cameraCode": "CAM_001",
+                                  "measuredSpeed": 72.35,
+                                  "speedLimit": 50.0,
+                                  "violationImagePath": "storage/detections/2026/05/19/CAM_001_152000_violation.jpg",
+                                  "violationImageUrl": "/static/detections/2026/05/19/CAM_001_152000_violation.jpg",
+                                  "violatedAt": "2026-05-19T15:20:00"
+                                }
+                                """.formatted(flowEventId, plateNumber)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.flowEventId").value(flowEventId));
 
         assertThat(speedViolationRepository.count()).isEqualTo(violationCountBefore + 1);
     }

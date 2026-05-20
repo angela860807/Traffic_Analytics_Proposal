@@ -21,10 +21,15 @@ from app.services.speed_config import (
     Point,
     SpeedCameraConfig,
     SpeedTrackingConfig,
+    SPEED_MODE_LINE_CROSSING,
+    SPEED_MODE_TRACK_DELTA,
     VirtualLine,
     load_speed_camera_configs,
     parse_virtual_line,
     build_default_speed_config,
+    get_speed_camera_config,
+    reset_speed_settings_cache,
+    validate_speed_settings,
 )
 from app.schemas.speed import SpeedMeasurementResult, SpeedViolationCreateRequest
 from app.services.speed_tracker import SpeedTracker, VehicleTrackInput
@@ -37,6 +42,11 @@ from app.services.stream_event_service import (
     STREAM_STATUS_TRACKING,
     StreamEventService,
     StreamProcessingResult,
+)
+from scripts.stream_video_file import (
+    build_full_frame_speed_zone_config,
+    build_speed_zone_config,
+    split_clicked_speed_zone_points,
 )
 
 
@@ -236,9 +246,14 @@ def test_load_speed_camera_configs_from_json() -> None:
             "cameraCode": "CAM_001",
             "lineA": [100, 200, 500, 200],
             "lineB": [100, 420, 500, 420],
+            "roi": [[80, 180], [520, 180], [520, 440], [80, 440]],
             "distanceMeters": 12.5,
             "speedLimitKmh": 60.0,
-            "enabled": true
+            "enabled": true,
+            "homography": {
+              "imagePoints": [[0, 0], [100, 0], [0, 100], [100, 100]],
+              "worldPointsMeters": [[0, 0], [10, 0], [0, 20], [10, 20]]
+            }
           }
         ]
         """
@@ -249,9 +264,13 @@ def test_load_speed_camera_configs_from_json() -> None:
     assert config.camera_code == "CAM_001"
     assert config.line_a.start.x == 100
     assert config.line_b.end.y == 420
+    assert config.roi is not None
+    assert len(config.roi) == 4
     assert config.distance_meters == 12.5
     assert config.speed_limit_kmh == 60.0
     assert config.enabled is True
+    assert config.homography is not None
+    assert len(config.homography.image_points) == 4
 
 
 def test_default_speed_config_uses_camera_code() -> None:
@@ -273,18 +292,205 @@ def test_speed_camera_config_rejects_invalid_distance() -> None:
         raise AssertionError("expected invalid distanceMeters to fail")
 
 
+def test_speed_camera_config_rejects_invalid_homography() -> None:
+    try:
+        load_speed_camera_configs(
+            """
+            [
+              {
+                "cameraCode": "CAM_001",
+                "lineA": [0, 0, 100, 0],
+                "lineB": [0, 50, 100, 50],
+                "distanceMeters": 10.0,
+                "speedLimitKmh": 50.0,
+                "homography": {
+                  "imagePoints": [[0, 0], [100, 0], [0, 100]],
+                  "worldPointsMeters": [[0, 0], [10, 0], [0, 20]]
+                }
+              }
+            ]
+            """
+        )
+    except ValueError as exc:
+        assert "homography" in str(exc)
+    else:
+        raise AssertionError("expected invalid homography to fail")
+
+
+def test_speed_camera_config_rejects_invalid_roi() -> None:
+    try:
+        load_speed_camera_configs(
+            """
+            [
+              {
+                "cameraCode": "CAM_001",
+                "lineA": [0, 0, 100, 0],
+                "lineB": [0, 50, 100, 50],
+                "roi": [[0, 0], [100, 0]],
+                "distanceMeters": 10.0,
+                "speedLimitKmh": 50.0
+              }
+            ]
+            """
+        )
+    except ValueError as exc:
+        assert "roi" in str(exc)
+    else:
+        raise AssertionError("expected invalid roi to fail")
+
+
+def test_clicked_speed_zone_points_build_config() -> None:
+    clicked_points = [
+        (10, 20),
+        (110, 20),
+        (110, 80),
+        (10, 80),
+    ]
+    roi_points, line_a_points, line_b_points = split_clicked_speed_zone_points(
+        clicked_points
+    )
+
+    config = build_speed_zone_config(
+        camera_code="CAM_001",
+        roi_points=roi_points,
+        line_a_points=line_a_points,
+        line_b_points=line_b_points,
+        distance_meters=14.0,
+        speed_limit_kmh=50.0,
+        roi_width_meters=3.5,
+        roi_height_meters=14.0,
+    )[0]
+
+    assert config["roi"] == [[10, 20], [110, 20], [110, 80], [10, 80]]
+    assert config["speedMode"] == "TRACK_DELTA"
+    assert config["lineA"] == [10, 20, 110, 20]
+    assert config["lineB"] == [10, 80, 110, 80]
+    assert config["homography"]["imagePoints"] == config["roi"]
+    assert config["homography"]["worldPointsMeters"] == [
+        [0, 0],
+        [3.5, 0],
+        [3.5, 14.0],
+        [0, 14.0],
+    ]
+
+
+def test_full_frame_speed_zone_builds_default_roi_and_lines() -> None:
+    config = build_full_frame_speed_zone_config(
+        camera_code="CAM_001",
+        frame_width=320,
+        frame_height=180,
+        distance_meters=14.0,
+        speed_limit_kmh=50.0,
+        roi_width_meters=14.0,
+        roi_height_meters=14.0,
+    )[0]
+
+    assert config["roi"] == [[0, 0], [319, 0], [319, 179], [0, 179]]
+    assert config["speedMode"] == "TRACK_DELTA"
+    assert config["lineA"] == [0, 0, 319, 0]
+    assert config["lineB"] == [0, 179, 319, 179]
+    assert config["homography"]["imagePoints"] == config["roi"]
+
+
+def test_speed_settings_validation_caches_camera_configs(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.services.speed_config.SPEED_CAMERA_CONFIGS_JSON",
+        """
+        [
+          {
+            "cameraCode": "CAM_CACHE",
+            "lineA": [0, 10, 100, 10],
+            "lineB": [0, 40, 100, 40],
+            "distanceMeters": 8.0,
+            "speedLimitKmh": 30.0,
+            "enabled": "false"
+          }
+        ]
+        """,
+    )
+    reset_speed_settings_cache()
+
+    validate_speed_settings()
+    config = get_speed_camera_config("CAM_CACHE")
+
+    assert config.distance_meters == 8.0
+    assert config.speed_limit_kmh == 30.0
+    assert config.enabled is False
+
+    reset_speed_settings_cache()
+
+
+def test_speed_settings_validation_rejects_invalid_json(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.services.speed_config.SPEED_CAMERA_CONFIGS_JSON",
+        "[invalid-json",
+    )
+    reset_speed_settings_cache()
+
+    try:
+        validate_speed_settings()
+    except ValueError as exc:
+        assert "SPEED_CAMERA_CONFIGS_JSON" in str(exc)
+    else:
+        raise AssertionError("expected invalid SPEED_CAMERA_CONFIGS_JSON to fail")
+    finally:
+        reset_speed_settings_cache()
+
+
+def test_app_startup_validates_speed_settings(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.services.speed_config.SPEED_CAMERA_CONFIGS_JSON",
+        "[invalid-json",
+    )
+    reset_speed_settings_cache()
+
+    try:
+        with TestClient(app):
+            raise AssertionError("expected startup settings validation to fail")
+    except ValueError as exc:
+        assert "SPEED_CAMERA_CONFIGS_JSON" in str(exc)
+    finally:
+        reset_speed_settings_cache()
+
+
 def make_speed_camera_config(
     *,
     enabled: bool = True,
     speed_limit_kmh: float = 30.0,
+    with_homography: bool = False,
+    roi: tuple[Point, ...] | None = None,
+    speed_mode: str = SPEED_MODE_LINE_CROSSING,
 ) -> SpeedCameraConfig:
+    homography = None
+    if with_homography:
+        homography = load_speed_camera_configs(
+            """
+            [
+              {
+                "cameraCode": "CAM_001",
+                "lineA": [0, 20, 100, 20],
+                "lineB": [0, 60, 100, 60],
+                "distanceMeters": 10.0,
+                "speedLimitKmh": 30.0,
+                "homography": {
+                  "imagePoints": [[0, 0], [100, 0], [0, 100], [100, 100]],
+                  "worldPointsMeters": [[0, 0], [10, 0], [0, 20], [10, 20]]
+                }
+              }
+            ]
+            """
+        )["CAM_001"].homography
+
     return SpeedCameraConfig(
         camera_code="CAM_001",
         line_a=VirtualLine(start=Point(0, 20), end=Point(100, 20)),
         line_b=VirtualLine(start=Point(0, 60), end=Point(100, 60)),
         distance_meters=10.0,
         speed_limit_kmh=speed_limit_kmh,
+        speed_mode=speed_mode,
         enabled=enabled,
+        roi=roi,
+        homography=homography,
     )
 
 
@@ -329,6 +535,8 @@ def test_speed_tracker_measures_violation_after_line_a_b_crossing() -> None:
     assert third[0].elapsed_seconds == 1.25
     assert third[0].speed_limit == 20.0
     assert third[0].is_violation is True
+    assert third[0].is_estimated is True
+    assert third[0].accuracy_level == "ESTIMATED"
 
 
 def test_speed_tracker_estimates_speed_when_track_starts_after_line_a() -> None:
@@ -361,6 +569,104 @@ def test_speed_tracker_estimates_speed_when_track_starts_after_line_a() -> None:
     assert third[0].measured_speed == 18.0
     assert third[0].elapsed_seconds == 2.0
     assert third[0].is_violation is False
+
+
+def test_speed_tracker_uses_homography_distance_when_configured() -> None:
+    tracker = SpeedTracker(tracking_config=make_speed_tracking_config())
+    config = make_speed_camera_config(speed_limit_kmh=20.0, with_homography=True)
+    captured_at = datetime(2026, 5, 19, 15, 20, 0)
+
+    tracker.process_detections(
+        camera_code="CAM_001",
+        captured_at=captured_at,
+        detections=[VehicleTrackInput(bbox=(10, 0, 50, 10), confidence_score=0.9)],
+        camera_config=config,
+    )
+    tracker.process_detections(
+        camera_code="CAM_001",
+        captured_at=captured_at + timedelta(seconds=1),
+        detections=[VehicleTrackInput(bbox=(10, 10, 50, 30), confidence_score=0.9)],
+        camera_config=config,
+    )
+    measurements = tracker.process_detections(
+        camera_code="CAM_001",
+        captured_at=captured_at + timedelta(seconds=2),
+        detections=[VehicleTrackInput(bbox=(10, 50, 50, 70), confidence_score=0.9)],
+        camera_config=config,
+    )
+
+    assert len(measurements) == 1
+    assert measurements[0].distance_meters == 8.0
+    assert measurements[0].measured_speed == 23.04
+    assert measurements[0].accuracy_level == "HOMOGRAPHY_ESTIMATED"
+    assert measurements[0].is_violation is True
+
+
+def test_speed_tracker_ignores_detections_outside_roi() -> None:
+    tracker = SpeedTracker(tracking_config=make_speed_tracking_config())
+    config = make_speed_camera_config(
+        speed_limit_kmh=20.0,
+        roi=(
+            Point(0, 20),
+            Point(100, 20),
+            Point(100, 60),
+            Point(0, 60),
+        ),
+    )
+    captured_at = datetime(2026, 5, 19, 15, 20, 0)
+
+    first = tracker.process_detections(
+        camera_code="CAM_001",
+        captured_at=captured_at,
+        detections=[VehicleTrackInput(bbox=(110, 0, 150, 10), confidence_score=0.9)],
+        camera_config=config,
+    )
+    second = tracker.process_detections(
+        camera_code="CAM_001",
+        captured_at=captured_at + timedelta(seconds=1),
+        detections=[VehicleTrackInput(bbox=(110, 10, 150, 30), confidence_score=0.9)],
+        camera_config=config,
+    )
+    third = tracker.process_detections(
+        camera_code="CAM_001",
+        captured_at=captured_at + timedelta(seconds=2),
+        detections=[VehicleTrackInput(bbox=(110, 50, 150, 70), confidence_score=0.9)],
+        camera_config=config,
+    )
+
+    assert first == []
+    assert second == []
+    assert third == []
+
+
+def test_speed_tracker_measures_track_delta_with_homography() -> None:
+    tracker = SpeedTracker(tracking_config=make_speed_tracking_config())
+    config = make_speed_camera_config(
+        speed_limit_kmh=20.0,
+        with_homography=True,
+        speed_mode=SPEED_MODE_TRACK_DELTA,
+    )
+    captured_at = datetime(2026, 5, 19, 15, 20, 0)
+
+    first = tracker.process_detections(
+        camera_code="CAM_001",
+        captured_at=captured_at,
+        detections=[VehicleTrackInput(bbox=(10, 0, 50, 10), confidence_score=0.9)],
+        camera_config=config,
+    )
+    second = tracker.process_detections(
+        camera_code="CAM_001",
+        captured_at=captured_at + timedelta(seconds=1),
+        detections=[VehicleTrackInput(bbox=(10, 40, 50, 50), confidence_score=0.9)],
+        camera_config=config,
+    )
+
+    assert first == []
+    assert len(second) == 1
+    assert second[0].speed_mode == "TRACK_DELTA"
+    assert second[0].distance_meters == 8.0
+    assert second[0].measured_speed == 28.8
+    assert second[0].accuracy_level == "HOMOGRAPHY_ESTIMATED"
 
 
 def test_speed_tracker_skips_when_camera_config_disabled() -> None:
@@ -887,6 +1193,67 @@ def test_stream_frame_endpoint_returns_tracking(monkeypatch) -> None:
     assert body["data"] is None
 
 
+def test_stream_frame_endpoint_uses_speed_config_json_override(monkeypatch) -> None:
+    captured_config = {}
+
+    class FakeStreamService:
+        async def process_frame(
+            self,
+            *,
+            camera_code,
+            captured_at,
+            content_type,
+            image_bytes,
+            speed_camera_config=None,
+        ):
+            captured_config["value"] = speed_camera_config
+            return StreamProcessingResult(
+                stream_status=STREAM_STATUS_TRACKING,
+                camera_code=camera_code,
+                event_id="CAM_001-20260514143000-test",
+                frame_count=2,
+            )
+
+    monkeypatch.setattr(
+        detection_route,
+        "stream_detection_service",
+        FakeStreamService(),
+    )
+
+    response = client.post(
+        "/api/detections/stream-frame",
+        data={
+            "cameraCode": "CAM_001",
+            "capturedAt": "2026-05-14T14:30:00",
+            "speedConfigJson": """
+            [
+              {
+                "cameraCode": "CAM_001",
+                "lineA": [10, 20, 100, 20],
+                "lineB": [10, 80, 100, 80],
+                "roi": [[10, 20], [100, 20], [100, 80], [10, 80]],
+                "distanceMeters": 14.0,
+                "speedLimitKmh": 50.0,
+                "enabled": true
+              }
+            ]
+            """,
+        },
+        files={
+            "image": ("frame.jpg", make_test_image_bytes(), "image/jpeg"),
+        },
+    )
+
+    assert response.status_code == 200
+    config = captured_config["value"]
+    assert config is not None
+    assert config.camera_code == "CAM_001"
+    assert config.line_a.start.x == 10
+    assert config.line_b.start.y == 80
+    assert config.roi is not None
+    assert len(config.roi) == 4
+
+
 def test_stream_frame_endpoint_sends_finalized_detection_to_backend(monkeypatch) -> None:
     detection_route.duplicate_detection_guard.clear()
 
@@ -1010,11 +1377,178 @@ def test_stream_frame_endpoint_sends_speed_violation_when_flow_event_id_exists(
     body = response.json()
     assert body["streamStatus"] == "FINALIZED"
     assert body["speedViolation"]["measuredSpeed"] == 72.35
+    assert body["speedViolation"]["isEstimated"] is True
+    assert body["speedViolation"]["accuracyLevel"] == "ESTIMATED"
     assert body["speedViolationSent"] is True
     assert len(speed_payloads) == 1
     assert speed_payloads[0].flow_event_id == 301
     assert speed_payloads[0].plate_number == "123A4567"
     assert speed_payloads[0].measured_speed == 72.35
+
+    detection_route.duplicate_detection_guard.clear()
+
+
+def test_stream_frame_endpoint_keeps_detection_success_when_speed_violation_fails(
+    monkeypatch,
+    caplog,
+) -> None:
+    detection_route.duplicate_detection_guard.clear()
+
+    captured_at = datetime(2026, 5, 14, 14, 30, 0)
+    speed_violation = SpeedMeasurementResult(
+        track_id=1,
+        measured_speed=72.35,
+        speed_limit=50.0,
+        distance_meters=10.0,
+        elapsed_seconds=0.498,
+        is_violation=True,
+        measured_at=captured_at,
+    )
+
+    class FakeStreamService:
+        async def process_frame(self, *, camera_code, captured_at, content_type, image_bytes):
+            return StreamProcessingResult(
+                stream_status=STREAM_STATUS_FINALIZED,
+                camera_code=camera_code,
+                event_id="CAM_001-20260514143000-test",
+                frame_count=6,
+                result=make_recognized_detection(detected_at=captured_at),
+                speed_measurements=[speed_violation],
+                speed_violation=speed_violation,
+            )
+
+    async def record_detection_send(result, detection_status=None):
+        return {
+            "data": {
+                "status": "FLOW_EVENT_CREATED",
+                "flowEventId": 301,
+            }
+        }
+
+    async def raise_speed_send(request):
+        raise httpx.ConnectError("speed backend unavailable")
+
+    monkeypatch.setattr(
+        detection_route,
+        "stream_detection_service",
+        FakeStreamService(),
+    )
+    monkeypatch.setattr(
+        detection_route.backend_client,
+        "send_detection",
+        record_detection_send,
+    )
+    monkeypatch.setattr(
+        detection_route.backend_client,
+        "send_speed_violation",
+        raise_speed_send,
+    )
+    caplog.set_level(logging.WARNING, logger="app.api.routes.detection")
+
+    response = client.post(
+        "/api/detections/stream-frame",
+        data={
+            "cameraCode": "CAM_001",
+            "capturedAt": captured_at.isoformat(),
+        },
+        files={
+            "image": ("frame.jpg", make_test_image_bytes(), "image/jpeg"),
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["streamStatus"] == "FINALIZED"
+    assert body["analysisStatus"] == "FLOW_EVENT_CREATED"
+    assert body["speedViolation"]["measuredSpeed"] == 72.35
+    assert body["speedViolationSent"] is False
+    assert body["speedViolationSendError"] == (
+        "Spring Boot speed violation API is not reachable"
+    )
+    assert "speed violation send failed after detection save" in caplog.text
+
+    detection_route.duplicate_detection_guard.clear()
+
+
+def test_stream_frame_endpoint_sends_duplicate_speed_violation_with_existing_flow_event(
+    monkeypatch,
+) -> None:
+    detection_route.duplicate_detection_guard.clear()
+
+    speed_payloads = []
+    captured_at = datetime(2026, 5, 14, 14, 30, 5)
+    result = make_recognized_detection(detected_at=captured_at)
+    detection_route.duplicate_detection_guard.remember(result)
+    speed_violation = SpeedMeasurementResult(
+        track_id=1,
+        measured_speed=72.35,
+        speed_limit=50.0,
+        distance_meters=10.0,
+        elapsed_seconds=0.498,
+        is_violation=True,
+        measured_at=captured_at,
+    )
+
+    class FakeStreamService:
+        async def process_frame(self, *, camera_code, captured_at, content_type, image_bytes):
+            return StreamProcessingResult(
+                stream_status=STREAM_STATUS_FINALIZED,
+                camera_code=camera_code,
+                event_id="CAM_001-20260514143005-test",
+                frame_count=6,
+                result=result,
+                speed_measurements=[speed_violation],
+                speed_violation=speed_violation,
+            )
+
+    async def record_duplicate_detection_send(result, detection_status=None):
+        assert detection_status == "DUPLICATE_SKIPPED"
+        return {
+            "data": {
+                "status": "DUPLICATE_SKIPPED",
+                "flowEventId": 301,
+            }
+        }
+
+    async def record_speed_send(request):
+        speed_payloads.append(request)
+        return {"data": {"violationId": 1}}
+
+    monkeypatch.setattr(
+        detection_route,
+        "stream_detection_service",
+        FakeStreamService(),
+    )
+    monkeypatch.setattr(
+        detection_route.backend_client,
+        "send_detection",
+        record_duplicate_detection_send,
+    )
+    monkeypatch.setattr(
+        detection_route.backend_client,
+        "send_speed_violation",
+        record_speed_send,
+    )
+
+    response = client.post(
+        "/api/detections/stream-frame",
+        data={
+            "cameraCode": "CAM_001",
+            "capturedAt": captured_at.isoformat(),
+        },
+        files={
+            "image": ("frame.jpg", make_test_image_bytes(), "image/jpeg"),
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["streamStatus"] == "FINALIZED"
+    assert body["analysisStatus"] == "DUPLICATE_SKIPPED"
+    assert body["speedViolationSent"] is True
+    assert len(speed_payloads) == 1
+    assert speed_payloads[0].flow_event_id == 301
+    assert speed_payloads[0].plate_number == "123A4567"
 
     detection_route.duplicate_detection_guard.clear()
 
@@ -1166,6 +1700,62 @@ def test_backend_client_speed_violation_payload(monkeypatch) -> None:
     assert captured["json"]["plateNumber"] == "123A4567"
     assert captured["json"]["measuredSpeed"] == 72.35
     assert captured["headers"]["X-Internal-Api-Key"] == "test-key"
+
+
+def test_backend_client_retries_speed_violation_transient_failure(monkeypatch) -> None:
+    captured = {"attempts": 0}
+
+    class FakeResponse:
+        content = b'{"status":"ok"}'
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"status": "ok"}
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return None
+
+        async def post(self, url, json, headers):
+            captured["attempts"] += 1
+            if captured["attempts"] == 1:
+                raise httpx.ConnectError("temporary speed violation outage")
+            captured["json"] = json
+            return FakeResponse()
+
+    monkeypatch.setattr("app.services.backend_client.BACKEND_INTERNAL_API_KEY", "test-key")
+    monkeypatch.setattr("app.services.backend_client.httpx.AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr("app.services.backend_client.SPRING_SPEED_VIOLATION_RETRY_ATTEMPTS", 2)
+    monkeypatch.setattr(
+        "app.services.backend_client.SPRING_SPEED_VIOLATION_RETRY_DELAY_SECONDS",
+        0.0,
+    )
+
+    asyncio.run(
+        BackendClient().send_speed_violation(
+            SpeedViolationCreateRequest(
+                flow_event_id=301,
+                plate_number="123A4567",
+                camera_code="CAM_001",
+                measured_speed=72.35,
+                speed_limit=50.0,
+                violation_image_path="storage/detections/frame.jpg",
+                violation_image_url="/static/detections/frame.jpg",
+                violated_at=datetime(2026, 5, 19, 15, 20, 0),
+            )
+        )
+    )
+
+    assert captured["attempts"] == 2
+    assert captured["json"]["flowEventId"] == 301
 
 
 def test_create_and_send_mock_detection_without_backend(monkeypatch, tmp_path) -> None:
