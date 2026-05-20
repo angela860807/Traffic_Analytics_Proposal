@@ -22,6 +22,7 @@ from app.services.frame_buffer import BufferedFrame, FrameBuffer, frame_buffer
 from app.services.image_decoder import ImageDecoder
 from app.services.inference_service import InferenceService
 from app.services.speed_tracker import SpeedTracker, VehicleTrackInput
+from app.services.speed_config import SpeedCameraConfig
 from app.services.vehicle_detector import VehicleDetection
 
 
@@ -58,6 +59,7 @@ class StreamProcessingResult:
     speed_measurements: list[SpeedMeasurementResult] = field(default_factory=list)
     speed_violation: SpeedMeasurementResult | None = None
     speed_violation_sent: bool = False
+    speed_violation_send_error: str | None = None
     result: DetectionResult | None = None
 
 
@@ -83,6 +85,7 @@ class StreamEventService:
         captured_at: datetime,
         content_type: str,
         image_bytes: bytes,
+        speed_camera_config: SpeedCameraConfig | None = None,
     ) -> StreamProcessingResult:
         received_monotonic = time.monotonic()
         image = self.image_decoder.decode_image_bytes(image_bytes)
@@ -93,6 +96,7 @@ class StreamEventService:
             camera_code=camera_code,
             captured_at=captured_at,
             detections=track_inputs,
+            camera_config=speed_camera_config,
         )
         speed_violation = next(
             (

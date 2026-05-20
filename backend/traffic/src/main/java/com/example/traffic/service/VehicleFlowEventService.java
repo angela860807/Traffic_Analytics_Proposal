@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -34,10 +35,21 @@ public class VehicleFlowEventService {
 
     public boolean hasRecentDuplicate(Vehicle vehicle, DetectionLog detectionLog) {
         LocalDateTime windowTime = detectionLog.getDetectedAt().minusSeconds(10);
-        return flowEventRepository.existsByVehicleAndZoneAndEventAtAfter(
+        return flowEventRepository.existsByVehicleAndZoneAndEventAtBetween(
                 vehicle,
                 detectionLog.getCamera().getZone(),
-                windowTime
+                windowTime,
+                detectionLog.getDetectedAt()
+        );
+    }
+
+    public Optional<VehicleFlowEvent> findRecentDuplicate(Vehicle vehicle, DetectionLog detectionLog) {
+        LocalDateTime windowTime = detectionLog.getDetectedAt().minusSeconds(10);
+        return flowEventRepository.findFirstByVehicleAndZoneAndEventAtBetweenOrderByEventAtDesc(
+                vehicle,
+                detectionLog.getCamera().getZone(),
+                windowTime,
+                detectionLog.getDetectedAt()
         );
     }
 

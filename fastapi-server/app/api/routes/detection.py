@@ -13,6 +13,7 @@ from app.schemas.speed import SpeedViolationCreateRequest
 from app.services.backend_client import BackendClient
 from app.services.duplicate_detection_guard import DuplicateDetectionGuard
 from app.services.inference_service import InferenceService
+from app.services.speed_config import SpeedCameraConfig, load_speed_camera_configs
 from app.services.stream_event_service import (
     STREAM_STATUS_FINALIZED,
     STREAM_STATUS_IDLE,
@@ -129,6 +130,7 @@ def build_stream_frame_response(
         speed_measurements=stream_result.speed_measurements,
         speed_violation=stream_result.speed_violation,
         speed_violation_sent=stream_result.speed_violation_sent,
+        speed_violation_send_error=stream_result.speed_violation_send_error,
         analysis_status=analysis_status,
         data=stream_result.result,
     )
@@ -165,8 +167,29 @@ async def send_speed_violation_if_ready(
         violation_image_url=result.image_url,
         violated_at=measurement.measured_at,
     )
-    await backend_client.send_speed_violation(request)
-    stream_result.speed_violation_sent = True
+    try:
+        await backend_client.send_speed_violation(request)
+        stream_result.speed_violation_sent = True
+    except httpx.HTTPStatusError as exc:
+        stream_result.speed_violation_send_error = build_spring_error_detail(exc)
+        logger.warning(
+            "speed violation send failed after detection save: cameraCode=%s plateNumber=%s flowEventId=%s error=%s",
+            result.camera_code,
+            result.plate_number,
+            flow_event_id,
+            stream_result.speed_violation_send_error,
+        )
+    except httpx.RequestError as exc:
+        stream_result.speed_violation_send_error = (
+            "Spring Boot speed violation API is not reachable"
+        )
+        logger.warning(
+            "speed violation send failed after detection save: cameraCode=%s plateNumber=%s flowEventId=%s error=%s",
+            result.camera_code,
+            result.plate_number,
+            flow_event_id,
+            exc,
+        )
 
 
 def build_spring_error_detail(exc: httpx.HTTPStatusError) -> str:
@@ -189,6 +212,32 @@ def raise_spring_http_exception(exc: httpx.HTTPStatusError) -> None:
         status_code=status.HTTP_502_BAD_GATEWAY,
         detail=detail,
     ) from exc
+
+
+def parse_speed_camera_config_override(
+    *,
+    camera_code: str,
+    raw_speed_config_json: str | None,
+) -> SpeedCameraConfig | None:
+    if raw_speed_config_json is None or not raw_speed_config_json.strip():
+        return None
+
+    try:
+        configs = load_speed_camera_configs(raw_speed_config_json)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"speedConfigJson is invalid: {exc}",
+        ) from exc
+
+    config = configs.get(camera_code)
+    if config is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"speedConfigJson must include cameraCode {camera_code}",
+        )
+
+    return config
 
 
 @router.post(
@@ -348,6 +397,7 @@ async def create_and_send_detection_from_image(
 async def process_stream_frame(
     camera_code: str = Form(..., alias="cameraCode"),
     captured_at: datetime = Form(..., alias="capturedAt"),
+    speed_config_json: str | None = Form(default=None, alias="speedConfigJson"),
     image: UploadFile = File(...),
 ) -> StreamFrameResponse:
     if image.content_type not in {"image/jpeg", "image/png"}:
@@ -357,13 +407,23 @@ async def process_stream_frame(
         )
 
     image_bytes = await image.read()
+    speed_camera_config = parse_speed_camera_config_override(
+        camera_code=camera_code,
+        raw_speed_config_json=speed_config_json,
+    )
 
     try:
+        process_frame_kwargs = {
+            "camera_code": camera_code,
+            "captured_at": captured_at,
+            "content_type": image.content_type,
+            "image_bytes": image_bytes,
+        }
+        if speed_camera_config is not None:
+            process_frame_kwargs["speed_camera_config"] = speed_camera_config
+
         stream_result = await stream_detection_service.process_frame(
-            camera_code=camera_code,
-            captured_at=captured_at,
-            content_type=image.content_type,
-            image_bytes=image_bytes,
+            **process_frame_kwargs,
         )
 
         if stream_result.stream_status == STREAM_STATUS_IDLE:
@@ -401,7 +461,14 @@ async def process_stream_frame(
             )
 
         if duplicate_detection_guard.is_duplicate(result):
-            await backend_client.send_detection(result, "DUPLICATE_SKIPPED")
+            backend_response = await backend_client.send_detection(
+                result,
+                "DUPLICATE_SKIPPED",
+            )
+            await send_speed_violation_if_ready(
+                stream_result=stream_result,
+                backend_response=backend_response,
+            )
             return build_stream_frame_response(
                 stream_result,
                 message="Vehicle event finalized and sent to backend as DUPLICATE_SKIPPED",

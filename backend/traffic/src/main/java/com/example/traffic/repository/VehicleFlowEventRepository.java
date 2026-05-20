@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface VehicleFlowEventRepository extends JpaRepository<VehicleFlowEvent, Long> {
     // 특정 차량의 통과 이력 조회
@@ -21,7 +22,17 @@ public interface VehicleFlowEventRepository extends JpaRepository<VehicleFlowEve
     List<VehicleFlowEvent> findByVehicleIdWithDetails(@Param("vehicleId") Long vehicleId);
 
     // VehicleFlowEventRepository.java 에 추가
-    boolean existsByVehicleAndZoneAndEventAtAfter(Vehicle vehicle, Zone zone, LocalDateTime dateTime);
+    boolean existsByVehicleAndZoneAndEventAtBetween(
+            Vehicle vehicle,
+            Zone zone,
+            LocalDateTime start,
+            LocalDateTime end);
+
+    Optional<VehicleFlowEvent> findFirstByVehicleAndZoneAndEventAtBetweenOrderByEventAtDesc(
+            Vehicle vehicle,
+            Zone zone,
+            LocalDateTime start,
+            LocalDateTime end);
 
     // 특정 구역, 특정 방향(IN/OUT), 특정 시간대의 데이터 개수를 집계
     long countByZoneAndFlowDirectionAndEventAtBetween(
