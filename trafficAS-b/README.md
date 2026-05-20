@@ -718,3 +718,50 @@ ControlView · ReviewView 두 곳에서 사용 (~75줄 중복 제거)
 - 시설운영팀 사이드바 토글 버튼 — 파란 36×36 둥근 박스 + `arrow-bar-left/right` 아이콘
 
 ---
+
+## 20. 파일 크기 정리 — CSS 외부화 + dead 룰 제거 (2026-05-20 후속)
+
+대시보드 Vue 파일들이 너무 비대해져 IDE 인지 부하가 컸음. 안전한 방식으로 단계적 분리.
+
+### 20-1 Vue SFC CSS 외부화 — `<style scoped src="...">` 패턴
+Vue SFC가 `<style scoped src="./X.css"></style>` 패턴을 지원해, 스타일을 외부 CSS 파일로 빼면서도 **scoped 동작(데이터 attribute 자동 부착)은 그대로 유지**. 동작/렌더링 0 차이, 빌드 결과 번들 크기 동일.
+
+| 파일 | Before | After (.vue) | + .css 파일 |
+|---|---|---|---|
+| OpsView | 6,284 | **2,996** (-52%) | OpsView.css 3,287 |
+| AnalyticsView | 1,597 | **845** (-47%) | AnalyticsView.css 751 |
+| ControlView | 1,302 | **691** (-47%) | ControlView.css 610 |
+| ReviewView | 1,005 | **638** (-37%) | ReviewView.css 366 |
+
+추출 절차:
+```bash
+sed -n '<style 시작줄>,<끝줄-1>p' X.vue > X.css
+head -<script 끝줄> X.vue > /tmp/x.txt
+cat /tmp/x.txt > X.vue
+echo '<style scoped src="./X.css"></style>' >> X.vue
+```
+
+### 20-2 admin-shared.css — dead `.admin-shell` 룰 제거
+운영기획팀(ReportsView) 제거 후 `.admin-shell` 셀렉터는 모든 Vue 파일에서 0회 사용. 그러나 admin-shared.css에는 464회 등장 → 전부 dead.
+
+Python 스크립트로 안전하게 제거:
+1. **Solo 룰** (`.admin-shell .xxx { ... }`): 블록 전체 삭제
+2. **멀티셀렉터의 줄 단위 항목** (`.admin-shell .xxx,` 단독 라인): 라인 삭제
+3. **`@media` / `@keyframes` / `@supports` 블록**: 보존 (regex 사고 방지)
+4. **인라인 멀티셀렉터** (`.cc-shell, .admin-shell { ... }`): **건드리지 않음** — 이걸 regex로 정제하려다 한 번 라이트 테마 override를 깨뜨려서 검은 배경 나옴, 즉시 원복
+
+**결과**: 2,897 → **2,333줄** (-564줄, -20%). 동작 변화 0.
+
+### 20-3 전체 정리 효과
+| 합계 | Before | After | 감소 |
+|---|---|---|---|
+| 5개 파일 합산 | 13,085줄 | **7,503줄** | **-43%** |
+
+- 개발자 경험: IDE 스크롤·검색·점프 부담 절반 이하
+- 런타임: 변화 0 (사용자 체감 차이 없음. 진짜 무게는 ECharts 트리쉐이킹·hls.js lazy load로 이미 줄였음)
+
+### 20-4 시도했다가 원복한 것
+- admin-shared.css **인라인 멀티셀렉터 정제** (`[^{}]+?` regex): CSS 블록 경계를 정확히 못 잡아 라이트 테마 override 블록까지 망가뜨림 → `git checkout` 원복
+- 교훈: regex로 CSS 정제는 위험. 멀티셀렉터에서 한 토큰만 빼려면 proper CSS parser 사용해야 함
+
+---
