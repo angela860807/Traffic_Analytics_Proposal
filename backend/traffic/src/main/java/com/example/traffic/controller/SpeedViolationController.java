@@ -2,6 +2,7 @@ package com.example.traffic.controller;
 
 import com.example.traffic.common.enums.ViolationStatus;
 import com.example.traffic.dto.request.SpeedViolationCreateRequest;
+import com.example.traffic.dto.request.SpeedViolationStatusRequest;
 import com.example.traffic.dto.response.CommonResponse;
 import com.example.traffic.dto.response.SpeedViolationResponse;
 import com.example.traffic.etc.BusinessException;
@@ -56,6 +57,14 @@ public class SpeedViolationController {
             @PathVariable ViolationStatus violationStatus) {
         List<SpeedViolationResponse> violations = speedViolationService.getStatusViolations(violationStatus);
         return ResponseEntity.ok(CommonResponse.success(violations, "상태별 속도위반 이력 조회 성공"));
+    }
+
+    @PatchMapping("/{violationId}/status")
+    public ResponseEntity<CommonResponse<SpeedViolationResponse>> updateViolationStatus(
+            @PathVariable Long violationId,
+            @Valid @RequestBody SpeedViolationStatusRequest request) {
+        SpeedViolationResponse response = speedViolationService.updateViolationStatus(violationId, request);
+        return ResponseEntity.ok(CommonResponse.success(response, "Speed violation status updated."));
     }
 
     @GetMapping

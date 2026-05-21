@@ -16,12 +16,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -267,6 +269,7 @@ class DetectionLogControllerIntegrationTest {
     }
 
     @Test
+    @WithMockUser
     void createSpeedViolationSavesViolationForFlowEvent() throws Exception {
         String uniqueSuffix = String.valueOf(System.currentTimeMillis());
         String plateNumber = "SPD" + uniqueSuffix;
@@ -293,7 +296,7 @@ class DetectionLogControllerIntegrationTest {
 
         Integer flowEventId = JsonPath.read(detectionResult.getResponse().getContentAsString(), "$.data.flowEventId");
 
-        mockMvc.perform(post("/api/speed-violations")
+        MvcResult speedViolationResult = mockMvc.perform(post("/api/speed-violations")
                         .header("X-Internal-Api-Key", INTERNAL_API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -314,7 +317,12 @@ class DetectionLogControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.plateNumber").value(plateNumber))
                 .andExpect(jsonPath("$.data.measuredSpeed").value(72.35))
                 .andExpect(jsonPath("$.data.speedLimit").value(50.0))
-                .andExpect(jsonPath("$.data.violationStatus").value("UNPROCESSED"));
+                .andExpect(jsonPath("$.data.violationStatus").value("UNPROCESSED"))
+                .andReturn();
+
+        Integer violationId = JsonPath.read(
+                speedViolationResult.getResponse().getContentAsString(),
+                "$.data.violationId");
 
         assertThat(speedViolationRepository.count()).isEqualTo(violationCountBefore + 1);
         assertThat(vehicleFlowEventRepository.findById(flowEventId.longValue()))
@@ -345,5 +353,17 @@ class DetectionLogControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.flowEventId").value(flowEventId));
 
         assertThat(speedViolationRepository.count()).isEqualTo(violationCountBefore + 1);
+
+        mockMvc.perform(patch("/api/speed-violations/{violationId}/status", violationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "violationStatus": "REJECTED"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.violationId").value(violationId))
+                .andExpect(jsonPath("$.data.violationStatus").value("REJECTED"));
     }
 }
