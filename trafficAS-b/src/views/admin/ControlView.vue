@@ -1,7 +1,14 @@
 <template>
-  <div class="cc-shell">
+  <div class="cc-shell" :class="{ 'side-collapsed': !sideOpen }">
     <aside class="side">
-      <RouterLink to="/" class="brand">Traffic <em>AS</em></RouterLink>
+      <div class="side-top">
+        <RouterLink to="/" class="brand" v-if="sideOpen">Traffic <em>AS</em></RouterLink>
+        <button class="side-toggle" @click="sideOpen = !sideOpen"
+          :aria-label="sideOpen ? '사이드바 접기' : '사이드바 펼치기'"
+          :title="sideOpen ? '사이드바 접기' : '사이드바 펼치기'">
+          <i :class="sideOpen ? 'bi bi-arrow-left-short' : 'bi bi-arrow-right-short'"></i>
+        </button>
+      </div>
       <nav class="snav">
         <button v-for="n in nav" :key="n.id" class="snav-i"
           :class="{ on: tab === n.id }" @click="tab = n.id">
@@ -70,7 +77,7 @@
           </div>
         </div>
         <div class="st warn">
-          <i class="bi bi-speedometer"></i>
+          <i class="bi bi-speedometer2"></i>
           <div class="st-body">
             <span class="lab">속도 급감 구간</span>
             <span class="val">2<span class="dlt up">↑ +1</span></span>
@@ -159,7 +166,6 @@
               <div v-for="(c, i) in cams" :key="c.src" class="thumb" :class="{ active: camIdx === i }" @click="focusVideo(i)">
                 <div class="thumb-ph">
                   <i class="bi bi-camera-video-fill"></i>
-                  <span class="thumb-live" v-if="camIdx === i"><span class="dot-live"></span> LIVE</span>
                 </div>
                 <div class="thumb-lab">{{ c.label }}</div>
               </div>
@@ -203,20 +209,37 @@
 
       </template>
 
-      <section v-if="tab === 'map'" class="card pnl">
-        <h3>지도 패널</h3>
-        <div class="map-stub"><i class="bi bi-map"></i><div>실시간 도로망 상태 — 11개 자치구 색상 표시</div></div>
-      </section>
-
       <section v-if="tab === 'cams'" class="card pnl">
         <h3>카메라 — {{ cams.length }}대 운영</h3>
         <div class="cam-tab-grid">
-          <div v-for="(c, i) in cams" :key="c.src" class="cam-tab" :class="{ on: camIdx === i }" @click="focusVideo(i)">
+          <div v-for="(c, i) in cams" :key="c.src" class="cam-tab" :class="{ on: camIdx === i }" @click="openCamZoom(i)">
             <video :ref="(el) => setCamVideoRef(el, i)" :src="c.src" muted loop playsinline preload="metadata"></video>
             <div class="ct-info"><strong>{{ c.label }}</strong><span>{{ c.title }}</span></div>
+            <button class="ct-zoom" @click.stop="openCamZoom(i)" title="확대">
+              <i class="bi bi-arrows-fullscreen"></i>
+            </button>
           </div>
         </div>
       </section>
+
+      <!-- 카메라 확대 모달 -->
+      <div v-if="camZoom !== null" class="cam-zoom-bg" @click.self="camZoom = null">
+        <div class="cam-zoom-modal">
+          <div class="czm-h">
+            <div class="czm-t">
+              <i class="bi bi-camera-video-fill"></i>
+              <strong>{{ cams[camZoom].label }}</strong>
+              <span class="czm-sub">{{ cams[camZoom].title }}</span>
+              <span class="czm-live"><span class="dot-live"></span> LIVE</span>
+            </div>
+            <button class="czm-x" @click="camZoom = null"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="czm-body">
+            <video :src="cams[camZoom].src" :key="cams[camZoom].src" autoplay muted loop playsinline></video>
+            <span class="czm-loc">{{ cams[camZoom].loc }}</span>
+          </div>
+        </div>
+      </div>
 
       <section v-if="tab === 'reports'" class="card pnl">
         <h3>보고서 <span class="bc-sub">교통정보센터 전용</span></h3>
@@ -287,13 +310,13 @@ import { INITIAL_DISTRICTS_WEATHER, DISTRICT_LIST } from "@/data/weather";
 
 const tab = ref("center");
 const autoRefresh = ref(true);
+const sideOpen = ref(true);
 function goHome() {
   tab.value = "center";
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 const nav = [
   { id: "center",  icon: "bi bi-broadcast",         label: "교통정보센터" },
-  { id: "map",     icon: "bi bi-map",               label: "지도" },
   { id: "cams",    icon: "bi bi-camera-video",      label: "카메라" },
   { id: "reports", icon: "bi bi-file-earmark-text", label: "보고서" },
   { id: "settings",icon: "bi bi-gear",              label: "설정" },
@@ -308,6 +331,13 @@ const queue = ref([
 ]);
 
 const mapMode = ref("flow");
+
+// 카메라 탭 확대 모달
+const camZoom = ref(null);
+function openCamZoom(i) {
+  camIdx.value = i;
+  camZoom.value = i;
+}
 
 // 🚨 실시간 알림 패널
 const liveAlerts = ref([

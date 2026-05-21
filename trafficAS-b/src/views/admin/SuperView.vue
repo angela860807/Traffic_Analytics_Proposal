@@ -1,7 +1,14 @@
 <template>
-  <div class="sa-shell">
+  <div class="sa-shell" :class="{ 'side-collapsed': !sideOpen }">
     <aside class="side">
-      <RouterLink to="/" class="brand">Traffic <em>AS</em></RouterLink>
+      <div class="side-top">
+        <RouterLink to="/" class="brand" v-if="sideOpen">Traffic <em>AS</em></RouterLink>
+        <button class="side-toggle" @click="sideOpen = !sideOpen"
+          :aria-label="sideOpen ? '사이드바 접기' : '사이드바 펼치기'"
+          :title="sideOpen ? '사이드바 접기' : '사이드바 펼치기'">
+          <i :class="sideOpen ? 'bi bi-arrow-left-short' : 'bi bi-arrow-right-short'"></i>
+        </button>
+      </div>
       <nav class="snav">
         <button v-for="n in topNav" :key="n.id" class="snav-i"
           :class="{ on: tab === n.id }" @click="tab = n.id">
@@ -52,45 +59,7 @@
         </div>
       </section>
 
-      <section class="row-top">
-        <div class="card">
-          <h3>전체 조직 개요</h3>
-          <div class="org-grid">
-            <div class="map-area">
-              <svg viewBox="0 0 240 280" class="kmap">
-                <!-- 북부 -->
-                <path d="M 80 20 Q 110 15 145 22 L 170 30 Q 185 40 178 55 L 168 70
-                         Q 175 80 185 85 L 195 95 Q 205 110 198 130
-                         L 192 155 Q 200 175 188 195 L 175 215
-                         Q 165 235 145 245 L 125 252 Q 105 256 95 248
-                         L 85 240 Q 75 232 80 218 L 88 200
-                         Q 82 185 78 170 L 72 155 Q 60 145 55 130
-                         L 50 115 Q 45 100 55 88 L 65 75
-                         Q 55 60 60 45 L 70 30 Q 75 22 80 20 Z"
-                  fill="rgba(96,165,250,.08)" stroke="rgba(96,165,250,.35)" stroke-width="1.5"/>
-                <!-- 제주 -->
-                <ellipse cx="95" cy="270" rx="14" ry="6" fill="rgba(96,165,250,.08)" stroke="rgba(96,165,250,.3)" stroke-width="1.2"/>
-                <g v-for="(p, i) in mapPins" :key="i">
-                  <circle :cx="p.x" :cy="p.y" r="6" fill="#3b82f6" stroke="#fff" stroke-width="1.5"/>
-                  <circle :cx="p.x" :cy="p.y" r="10" fill="none" stroke="#3b82f6" stroke-width="1.5" opacity=".4"/>
-                </g>
-              </svg>
-            </div>
-            <ul class="org-list">
-              <li v-for="o in orgs" :key="o.name">
-                <i class="bi bi-geo-alt-fill" :style="{ color: o.tone === 'warn' ? '#fbbf24' : '#34d399' }"></i>
-                <span class="ol-n">{{ o.name }}</span>
-                <span class="ol-s" :class="o.tone">{{ o.status }}</span>
-                <span class="ol-c">{{ o.count }}</span>
-              </li>
-            </ul>
-          </div>
-          <div class="org-foot">
-            <span>총 79개 팀 / 81개 시스템</span>
-            <button class="t-view">조직 상세 보기 <i class="bi bi-chevron-right"></i></button>
-          </div>
-        </div>
-
+      <section class="row-top2">
         <div class="card">
           <div class="card-h">
             <h3>부서별 성과 요약 <span class="seg-sub">(오늘 기준)</span></h3>
@@ -118,25 +87,6 @@
           </table>
         </div>
 
-        <div class="card auth-card">
-          <h3>권한 및 역할 <span class="seg-sub">(경영전략본부 권한)</span></h3>
-          <div class="auth-intro">
-            <i class="bi bi-shield-shaded"></i>
-            <span>경영전략본부는 모든 시스템과 데이터에 대한 최고 수준의 권한을 보유합니다.</span>
-          </div>
-          <div class="auth-h">부여된 권한</div>
-          <div v-for="p in perms" :key="p.t" class="perm">
-            <i class="bi bi-check-circle-fill"></i>
-            <div>
-              <div class="p-t">{{ p.t }}</div>
-              <div class="p-d">{{ p.d }}</div>
-            </div>
-          </div>
-          <button class="auth-go">권한 관리로 이동 <i class="bi bi-chevron-right"></i></button>
-        </div>
-      </section>
-
-      <section class="row-bot">
         <div class="card">
           <div class="card-h"><h3>승인 대기 목록 <span class="cnt-bdg">7</span></h3></div>
           <table class="tbl-app">
@@ -153,44 +103,9 @@
           </table>
           <button class="t-view full">전체 승인 요청 보기 <i class="bi bi-chevron-right"></i></button>
         </div>
+      </section>
 
-        <div class="card users-card">
-          <h3>사용자 및 역할 현황</h3>
-          <div class="users-grid">
-            <div class="donut-w">
-              <svg viewBox="0 0 120 120" class="donut">
-                <circle cx="60" cy="60" r="42" fill="none" stroke="#1d2c44" stroke-width="20"/>
-                <!-- 슈퍼관리자 1% -->
-                <circle cx="60" cy="60" r="42" fill="none" stroke="#8b5cf6" stroke-width="20"
-                  stroke-dasharray="2.6 260" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
-                <!-- 관리자 8% -->
-                <circle cx="60" cy="60" r="42" fill="none" stroke="#3b82f6" stroke-width="20"
-                  stroke-dasharray="21 260" stroke-dashoffset="-2.6" transform="rotate(-90 60 60)"/>
-                <!-- 팀장 19% -->
-                <circle cx="60" cy="60" r="42" fill="none" stroke="#fbbf24" stroke-width="20"
-                  stroke-dasharray="50.2 260" stroke-dashoffset="-23.6" transform="rotate(-90 60 60)"/>
-                <!-- 일반 사용자 63% -->
-                <circle cx="60" cy="60" r="42" fill="none" stroke="#34d399" stroke-width="20"
-                  stroke-dasharray="166.4 260" stroke-dashoffset="-73.8" transform="rotate(-90 60 60)"/>
-                <!-- 게스트 9% -->
-                <circle cx="60" cy="60" r="42" fill="none" stroke="#94a3b8" stroke-width="20"
-                  stroke-dasharray="23.8 260" stroke-dashoffset="-240.2" transform="rotate(-90 60 60)"/>
-              </svg>
-              <div class="donut-c">
-                <div class="dc-lab">총 사용자</div>
-                <div class="dc-val">236<span class="dc-u">명</span></div>
-              </div>
-            </div>
-            <div class="user-legend">
-              <div v-for="u in users" :key="u.role"><span class="lg" :style="{ background: u.color }"></span>{{ u.role }} <strong>{{ u.count }}</strong> <span class="pct">({{ u.pct }}%)</span></div>
-            </div>
-          </div>
-          <div class="user-acts">
-            <button class="t-view">사용자 관리 <i class="bi bi-chevron-right"></i></button>
-            <button class="t-view">역할 관리 <i class="bi bi-chevron-right"></i></button>
-          </div>
-        </div>
-
+      <section class="row-bot2">
         <div class="card">
           <h3>최근 활동 로그</h3>
           <table class="tbl-log">
@@ -204,7 +119,7 @@
               </tr>
             </tbody>
           </table>
-          <button class="t-view full">전체 감사 로그 보기 <i class="bi bi-chevron-right"></i></button>
+          <button class="t-view full" @click="tab = 'audit'">전체 감사 로그 보기 <i class="bi bi-chevron-right"></i></button>
         </div>
       </section>
 
@@ -254,7 +169,33 @@
       </section>
 
       <section v-if="tab === 'users'" class="card pnl">
-        <h3>사용자 관리 — 총 {{ userList.length }}명 (예시)</h3>
+        <h3>사용자 및 역할 현황</h3>
+        <div class="users-grid">
+          <div class="donut-w">
+            <svg viewBox="0 0 120 120" class="donut">
+              <circle cx="60" cy="60" r="42" fill="none" stroke="#1d2c44" stroke-width="20"/>
+              <circle cx="60" cy="60" r="42" fill="none" stroke="#8b5cf6" stroke-width="20"
+                stroke-dasharray="2.6 260" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
+              <circle cx="60" cy="60" r="42" fill="none" stroke="#3b82f6" stroke-width="20"
+                stroke-dasharray="21 260" stroke-dashoffset="-2.6" transform="rotate(-90 60 60)"/>
+              <circle cx="60" cy="60" r="42" fill="none" stroke="#fbbf24" stroke-width="20"
+                stroke-dasharray="50.2 260" stroke-dashoffset="-23.6" transform="rotate(-90 60 60)"/>
+              <circle cx="60" cy="60" r="42" fill="none" stroke="#34d399" stroke-width="20"
+                stroke-dasharray="166.4 260" stroke-dashoffset="-73.8" transform="rotate(-90 60 60)"/>
+              <circle cx="60" cy="60" r="42" fill="none" stroke="#94a3b8" stroke-width="20"
+                stroke-dasharray="23.8 260" stroke-dashoffset="-240.2" transform="rotate(-90 60 60)"/>
+            </svg>
+            <div class="donut-c">
+              <div class="dc-lab">총 사용자</div>
+              <div class="dc-val">236<span class="dc-u">명</span></div>
+            </div>
+          </div>
+          <div class="user-legend">
+            <div v-for="u in users" :key="u.role"><span class="lg" :style="{ background: u.color }"></span>{{ u.role }} <strong>{{ u.count }}</strong> <span class="pct">({{ u.pct }}%)</span></div>
+          </div>
+        </div>
+
+        <h3 style="margin-top: 22px;">사용자 목록 — 총 {{ userList.length }}명</h3>
         <input class="pnl-search" v-model="userQuery" placeholder="이름·이메일·부서 검색" />
         <table class="pnl-tbl">
           <thead><tr><th>이름</th><th>이메일</th><th>역할</th><th>계층</th><th>부여 권한</th><th>부서</th><th>상태</th><th>작업</th></tr></thead>
@@ -275,15 +216,32 @@
       </section>
 
       <section v-if="tab === 'org'" class="card pnl">
-        <h3>조직 관리</h3>
-        <ul class="org-list">
-          <li v-for="o in orgs" :key="o.name">
-            <i class="bi bi-geo-alt-fill" :style="{ color: o.tone === 'warn' ? '#fbbf24' : '#34d399' }"></i>
-            <span class="ol-n">{{ o.name }}</span>
-            <span class="ol-s" :class="o.tone">{{ o.status }}</span>
-            <span class="ol-c">{{ o.count }}</span>
-          </li>
-        </ul>
+        <h3>조직 관리 <span class="seg-sub">전체 조직 개요</span></h3>
+        <div class="org-stat">
+          <div class="os-num"><strong>5</strong><span>부서</span></div>
+          <div class="os-num"><strong>79</strong><span>팀</span></div>
+          <div class="os-num"><strong>81</strong><span>시스템</span></div>
+        </div>
+        <div class="org-tiles wide">
+          <div v-for="o in orgs" :key="o.name" class="ot" :class="o.tone">
+            <div class="ot-dot"></div>
+            <div class="ot-n">{{ o.name }}</div>
+            <div class="ot-c">{{ o.count }} <span class="ot-s">· {{ o.status }}</span></div>
+          </div>
+        </div>
+
+        <h3 style="margin-top: 22px;">권한 및 역할 <span class="seg-sub">경영전략본부</span></h3>
+        <div class="auth-hero">
+          <i class="bi bi-shield-shaded"></i>
+          <div class="ah-t">최고 권한</div>
+          <div class="ah-s">전체 시스템 · 전체 데이터</div>
+        </div>
+        <div class="perm-grid wide">
+          <div v-for="p in perms" :key="p.t" class="pg">
+            <i :class="p.icon"></i>
+            <span>{{ p.t }}</span>
+          </div>
+        </div>
       </section>
 
       <section v-if="tab === 'sys'" class="card pnl">
@@ -366,6 +324,7 @@ const { downloadDeptReport } = useReportDownload();
 
 const tab = ref("dashboard");
 const autoRefresh = ref(true);
+const sideOpen = ref(true);
 function goHome() {
   tab.value = "dashboard";
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -444,14 +403,6 @@ const msg = ref("");
 function flash(t) { msg.value = t; setTimeout(() => { msg.value = ""; }, 1800); }
 function saveSys() { flash("시스템 설정 저장 완료"); }
 
-const mapPins = [
-  { x: 130, y: 70 },   // 관제센터 (서울 북부)
-  { x: 155, y: 105 },  // 속도·OCR 검토 (수도권 동부)
-  { x: 95,  y: 130 },  // 교통흐름 분석 (인천 부근)
-  { x: 130, y: 180 },  // 장비운영 (중부)
-  { x: 110, y: 230 },  // 운영성과 보고 (남부)
-];
-
 const orgs = [
   { name: "교통정보센터",  status: "정상", tone: "gr",   count: "24 / 24" },
   { name: "단속관리팀",    status: "정상", tone: "gr",   count: "18 / 18" },
@@ -469,11 +420,11 @@ const depts = [
 ];
 
 const perms = [
-  { t: "전체 조회",   d: "모든 데이터, 시스템, 보고서 조회 가능" },
-  { t: "전체 편집",   d: "모든 설정, 구성, 데이터 수정 가능" },
-  { t: "사용자 관리", d: "사용자 생성, 수정, 삭제 및 역할 부여" },
-  { t: "권한 설정",   d: "역할 및 권한 정책 생성, 수정, 적용" },
-  { t: "보고서 승인", d: "모든 보고서 승인 및 반려 권한" },
+  { t: "전체 조회", icon: "bi bi-eye-fill" },
+  { t: "전체 편집", icon: "bi bi-pencil-fill" },
+  { t: "사용자 관리", icon: "bi bi-people-fill" },
+  { t: "권한 설정", icon: "bi bi-key-fill" },
+  { t: "보고서 승인", icon: "bi bi-check2-square" },
 ];
 
 const approvals = [
@@ -535,14 +486,27 @@ const logs = [
 
 .row-top { display: grid; grid-template-columns: 1.1fr 1.4fr 1.1fr; gap: 12px; }
 .row-bot { display: grid; grid-template-columns: 1.3fr 1fr 1.2fr; gap: 12px; }
+.row-top2 { display: grid; grid-template-columns: 1.1fr 1fr; gap: 12px; }
+.row-bot2 { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.org-tiles.wide { grid-template-columns: repeat(3, 1fr); }
+.perm-grid.wide { grid-template-columns: repeat(3, 1fr); }
 .card { background: #0f1d34; border: 1px solid #1f3055; border-radius: 10px; padding: 16px; }
 .card h3 { font-size: 14px; font-weight: 700; margin: 0 0 12px; }
 .card-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .card-h h3 { margin: 0; }
 
-.org-grid { display: grid; grid-template-columns: 130px 1fr; gap: 14px; }
-.map-area { background: #06101e; border-radius: 8px; padding: 6px; height: 200px; display: flex; align-items: center; justify-content: center; }
-.kmap { width: 100%; height: 100%; }
+.org-card { display: flex; flex-direction: column; }
+.org-stat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.os-num { background: rgba(96,165,250,.08); border: 1px solid rgba(96,165,250,.18); border-radius: 8px; padding: 12px 8px; text-align: center; }
+.os-num strong { display: block; font-size: 22px; font-weight: 800; color: #60a5fa; line-height: 1; }
+.os-num span { display: block; font-size: 11px; opacity: .65; margin-top: 4px; }
+.org-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1; }
+.ot { background: rgba(255,255,255,.02); border: 1px solid #1f3055; border-left: 3px solid #34d399; border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; position: relative; }
+.ot.warn { border-left-color: #fbbf24; }
+.ot-dot { position: absolute; top: 10px; right: 10px; width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 8px rgba(52,211,153,.6); }
+.ot.warn .ot-dot { background: #fbbf24; box-shadow: 0 0 8px rgba(251,191,36,.6); }
+.ot-n { font-size: 12.5px; font-weight: 700; }
+.ot-c { font-size: 11px; opacity: .6; font-family: "JetBrains Mono", monospace; }
 .org-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
 .org-list li { display: grid; grid-template-columns: 16px 1fr auto auto; gap: 8px; align-items: center; font-size: 12.5px; }
 .org-list .ol-n { font-weight: 600; }
@@ -550,7 +514,7 @@ const logs = [
 .ol-s.gr { background: rgba(16,185,129,.15); color: #34d399; }
 .ol-s.warn { background: rgba(245,158,11,.18); color: #fbbf24; }
 .ol-c { font-size: 11px; opacity: .65; font-family: "JetBrains Mono", monospace; }
-.org-foot { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; margin-top: 12px; border-top: 1px solid #1a2a45; font-size: 12px; }
+.org-foot { padding-top: 12px; margin-top: 12px; border-top: 1px solid #1a2a45; font-size: 12px; }
 
 .t-view { background: none; border: 1px solid #1f3055; color: rgba(228,238,255,.7); font-size: 11.5px; padding: 5px 12px; border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
 .t-view.full { width: 100%; justify-content: center; margin-top: 10px; padding: 8px; background: rgba(96,165,250,.06); border-color: rgba(96,165,250,.2); color: #60a5fa; font-weight: 600; }
@@ -574,15 +538,16 @@ const logs = [
 .st-ic.gr { background: rgba(16,185,129,.15); color: #34d399; }
 .st-ic.wn { background: rgba(245,158,11,.18); color: #fbbf24; }
 
-.auth-card { padding: 14px; }
-.auth-intro { display: flex; gap: 10px; padding: 12px; background: rgba(139,92,246,.08); border: 1px solid rgba(139,92,246,.25); border-radius: 8px; margin-bottom: 14px; font-size: 12px; line-height: 1.6; }
-.auth-intro i { color: #a78bfa; font-size: 18px; flex-shrink: 0; }
-.auth-h { font-size: 12px; font-weight: 700; background: rgba(239,68,68,.1); color: #f87171; padding: 6px 10px; border-radius: 5px; display: inline-block; margin-bottom: 10px; }
-.perm { display: flex; gap: 10px; padding: 8px 0; align-items: flex-start; }
-.perm > i { color: #34d399; font-size: 14px; padding-top: 2px; }
-.p-t { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
-.p-d { font-size: 11px; opacity: .65; line-height: 1.5; }
-.auth-go { width: 100%; background: rgba(96,165,250,.06); border: 1px solid rgba(96,165,250,.2); color: #60a5fa; padding: 9px; border-radius: 6px; margin-top: 10px; font-size: 12.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.auth-card { padding: 14px; display: flex; flex-direction: column; }
+.auth-hero { text-align: center; padding: 16px 12px; background: linear-gradient(135deg, rgba(139,92,246,.14), rgba(59,130,246,.1)); border: 1px solid rgba(139,92,246,.28); border-radius: 10px; margin-bottom: 12px; }
+.auth-hero i { font-size: 28px; color: #a78bfa; display: block; margin-bottom: 6px; }
+.ah-t { font-size: 16px; font-weight: 800; color: #e4eeff; letter-spacing: .02em; }
+.ah-s { font-size: 11px; opacity: .65; margin-top: 2px; }
+.perm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex: 1; }
+.pg { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: rgba(52,211,153,.06); border: 1px solid rgba(52,211,153,.2); border-radius: 6px; font-size: 12px; font-weight: 600; }
+.pg i { color: #34d399; font-size: 13px; }
+.pg:nth-child(5) { grid-column: 1 / -1; }
+.auth-go { width: 100%; background: rgba(96,165,250,.06); border: 1px solid rgba(96,165,250,.2); color: #60a5fa; padding: 9px; border-radius: 6px; margin-top: 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 
 .cnt-bdg { background: rgba(245,158,11,.18); color: #fbbf24; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; margin-left: 4px; }
 .tbl-app .ttl { font-weight: 600; }

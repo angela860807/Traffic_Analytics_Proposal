@@ -247,12 +247,18 @@
           <span class="vq-step">STEP 3</span>
           <strong>최종 결정</strong>
         </div>
-        <div class="final-act">
-          <button class="fa-btn gr" @click="judge('승인')">
-            <i class="bi bi-check-circle-fill"></i> 단속 확정 (승인)
+        <div class="final-act final-act-4">
+          <button class="fa-btn wn" @click="judge('보류', 'UNPROCESSED')">
+            <i class="bi bi-pause-circle-fill"></i> 보류 <span class="fa-code">UNPROCESSED</span>
           </button>
-          <button class="fa-btn rd" @click="judge('반려')">
-            <i class="bi bi-x-circle-fill"></i> 단속 무효 (반려)
+          <button class="fa-btn gr" @click="judge('과속 확정', 'NOTIFIED')">
+            <i class="bi bi-check-circle-fill"></i> 과속 확정 <span class="fa-code">NOTIFIED</span>
+          </button>
+          <button class="fa-btn rd" @click="judge('미과속', 'REJECTED')">
+            <i class="bi bi-x-circle-fill"></i> 미과속 <span class="fa-code">REJECTED</span>
+          </button>
+          <button class="fa-btn bl" @click="judge('종결/보관', 'CLOSED')">
+            <i class="bi bi-archive-fill"></i> 종결/보관 <span class="fa-code">CLOSED</span>
           </button>
         </div>
 
@@ -319,13 +325,6 @@ const seed = [
   { time: "14:32:18", place: "강변복로 (구리 → 한남)", type: "속도 위반", typeTone: "tg-rd", plate: "12가 4567", conf: 96, st: "검토 대기", detectSpeed: 112, limitSpeed: 80, camera: "CAM-K-014", lane: 2 },
   { time: "14:31:54", place: "용산구 한강대로",         type: "OCR 인식",  typeTone: "tg-bl", plate: "12서 3456", conf: 93, st: "검토 대기", detectSpeed: 64,  limitSpeed: 60, camera: "CAM-H-022", lane: 1 },
   { time: "14:31:22", place: "내부순환로 (정릉 → 성수)", type: "속도 위반", typeTone: "tg-rd", plate: "34더 5678", conf: 95, st: "검토 대기", detectSpeed: 108, limitSpeed: 80, camera: "CAM-J-007", lane: 3 },
-  { time: "14:30:49", place: "올림픽대로 (가양 → 마포)", type: "OCR 인식",  typeTone: "tg-bl", plate: "56루 7890", conf: 92, st: "검토 대기", detectSpeed: 78,  limitSpeed: 80, camera: "CAM-O-011", lane: 2 },
-  { time: "14:30:11", place: "강변복로 (한남 TG 부근)",   type: "속도 위반", typeTone: "tg-rd", plate: "11가 2233", conf: 97, st: "검토 대기", detectSpeed: 121, limitSpeed: 80, camera: "CAM-K-015", lane: 1 },
-  { time: "14:29:33", place: "동부간선로 (수락 → 성수)", type: "속도 위반", typeTone: "tg-rd", plate: "28오 3344", conf: 94, st: "검토 대기", detectSpeed: 104, limitSpeed: 80, camera: "CAM-D-031", lane: 2 },
-  { time: "14:28:52", place: "강변복로 (마포 → 구리)",   type: "OCR 인식",  typeTone: "tg-bl", plate: "45주 6677", conf: 96, st: "승인",       detectSpeed: 72,  limitSpeed: 80, camera: "CAM-K-008", lane: 3 },
-  { time: "14:28:10", place: "마포구 마포대로",          type: "OCR 인식",  typeTone: "tg-bl", plate: "33바 8899", conf: 91, st: "승인",       detectSpeed: 58,  limitSpeed: 60, camera: "CAM-M-002", lane: 1 },
-  { time: "14:27:31", place: "올림픽대로 (여의도 → 가양)", type: "속도 위반", typeTone: "tg-rd", plate: "71너 9900", conf: 93, st: "반려",       detectSpeed: 95,  limitSpeed: 80, camera: "CAM-O-019", lane: 2 },
-  { time: "14:26:44", place: "강남구 테헤란로",          type: "OCR 인식",  typeTone: "tg-bl", plate: "65도 1122", conf: 95, st: "승인",       detectSpeed: 55,  limitSpeed: 60, camera: "CAM-G-004", lane: 1 },
 ];
 
 // 시드 이벤트에 가상 날짜 부여 (최근 3일에 걸쳐 분산)
@@ -535,7 +534,11 @@ const countAll = computed(() => allEvents.value.length);
 const countSpeed = computed(() => allEvents.value.filter((e) => e.type === "속도 위반").length);
 const countOcr = computed(() => allEvents.value.filter((e) => e.type === "OCR 인식").length);
 
-const stTone = (s) => s === "검토 대기" ? "wait" : (s === "승인" ? "ok" : (s === "반려" || s === "오탐" ? "no" : "wait"));
+const stTone = (s) => {
+  if (s === "과속 확정" || s === "승인") return "ok";
+  if (s === "미과속" || s === "반려" || s === "오탐") return "no";
+  return "wait";
+};
 
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase();
@@ -607,21 +610,28 @@ function selectEvent(e) {
 
 const nowStr = () => fmtDateTime();
 
-function judge(verdict) {
+const VERDICT_TONE = {
+  "보류": "wait",
+  "과속 확정": "ok",
+  "미과속": "no",
+  "종결/보관": "wait",
+};
+function judge(verdict, code) {
   if (!selected.value) return;
   const target = allEvents.value.find(x => x.id === selected.value.id);
   if (!target) return;
   target.st = verdict;
+  target.stCode = code;
   history.value.unshift({
     at: nowStr(), evtId: target.evtId, type: target.type, typeTone: target.typeTone,
     plate: target.plate, verdict,
-    verdictTone: verdict === "승인" ? "ok" : "no",
+    verdictTone: VERDICT_TONE[verdict] || "wait",
     by: "단속관리팀", note: memo.value || reason.value || "-",
   });
   auditLog.value.unshift({
     at: nowStr(), user: "단속관리팀", role: "단속관리팀",
-    action: `검토 ${verdict}`, result: "성공", resultTone: "ok",
-    note: `${target.evtId} → ${verdict}${reason.value ? ` (${reason.value})` : ""}`,
+    action: `검토 ${verdict} (${code})`, result: "성공", resultTone: "ok",
+    note: `${target.evtId} → ${code}${reason.value ? ` (${reason.value})` : ""}`,
   });
   memo.value = "";
   reason.value = "";

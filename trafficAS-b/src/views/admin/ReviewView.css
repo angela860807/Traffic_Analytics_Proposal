@@ -300,10 +300,11 @@
 
 /* 최종 결정 */
 .final-act { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.final-act.final-act-4 { grid-template-columns: 1fr 1fr; gap: 8px; }
 .fa-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   padding: 12px; border-radius: 5px; border: 0; cursor: pointer;
-  font-size: 13.5px; font-weight: 800;
+  font-size: 13.5px; font-weight: 800; flex-wrap: wrap;
 }
 .fa-btn:disabled {
   background: rgba(255,255,255,0.04) !important;
@@ -315,6 +316,16 @@
 .fa-btn.gr:hover:not(:disabled) { background: #059669; }
 .fa-btn.rd { background: #ef4444; color: #fff; }
 .fa-btn.rd:hover:not(:disabled) { background: #dc2626; }
+.fa-btn.wn { background: #f59e0b; color: #fff; }
+.fa-btn.wn:hover:not(:disabled) { background: #d97706; }
+.fa-btn.bl { background: #2563eb; color: #fff; }
+.fa-btn.bl:hover:not(:disabled) { background: #1d4ed8; }
+.fa-code {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .05em;
+  padding: 2px 6px; border-radius: 3px;
+  background: rgba(255,255,255,.22); color: #fff;
+  font-family: "JetBrains Mono", monospace;
+}
 
 .memo.dim { opacity: 0.45; pointer-events: none; }
 .memo .reason-sel:disabled, .memo textarea:disabled { cursor: not-allowed; }

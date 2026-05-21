@@ -1,10 +1,17 @@
 <template>
-  <div class="an-shell">
+  <div class="an-shell" :class="{ 'side-collapsed': !sideOpen }">
     <div class="body">
       <aside class="filter">
-        <RouterLink to="/" class="brand">
-          Traffic <em>AS</em>
-        </RouterLink>
+        <div class="side-top">
+          <RouterLink to="/" class="brand" v-if="sideOpen">
+            Traffic <em>AS</em>
+          </RouterLink>
+          <button class="side-toggle" @click="sideOpen = !sideOpen"
+            :aria-label="sideOpen ? '사이드바 접기' : '사이드바 펼치기'"
+            :title="sideOpen ? '사이드바 접기' : '사이드바 펼치기'">
+            <i :class="sideOpen ? 'bi bi-arrow-left-short' : 'bi bi-arrow-right-short'"></i>
+          </button>
+        </div>
         <nav class="snav">
           <button v-for="m in analysisMenu" :key="m.id" class="snav-i" :class="{ on: anaTab === m.id }" @click="anaTab = m.id">
             <i :class="m.icon"></i>{{ m.label }}
@@ -593,6 +600,7 @@ const incidents = [
 ];
 const anaTab = ref("dashboard");
 const autoRefresh = ref(true);
+const sideOpen = ref(true);
 function goHome() {
   anaTab.value = "dashboard";
   window.scrollTo({ top: 0, behavior: "smooth" });
