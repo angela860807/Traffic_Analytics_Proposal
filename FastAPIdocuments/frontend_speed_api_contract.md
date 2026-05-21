@@ -78,28 +78,19 @@ flowchart LR
 
 현재 Spring enum 기준 매핑:
 
-| 프론트 탭 | 현재 사용 가능 상태 | 의미 |
+| 프론트 탭 | 상태 | 의미 |
 | --- | --- | --- |
 | 보류 | `UNPROCESSED` | 과속 후보가 들어왔지만 사람이 아직 확정하지 않음 |
 | 과속 확정 | `NOTIFIED` | 과속으로 확정하고 고지/처리 완료 |
-| 종결 | `CLOSED` | 처리 종료 |
+| 미과속 | `REJECTED` | 과속 후보였지만 사람이 검토 후 과속 아님으로 판정 |
+| 종결/보관 | `CLOSED` | 처리 종료 |
 
-문제:
+적용 완료:
 
-- 현재 enum에는 "미과속" 또는 "반려" 상태가 없다.
-- 따라서 프론트에서 미과속 탭을 제대로 운영하려면 백엔드 상태값 추가가 필요하다.
+- 백엔드 enum과 상태 변경 API는 `REJECTED`를 포함한다.
+- 프론트는 백엔드 필드명을 유지하고 표시 모델로 변환해 사용한다.
 
-권장 추가 상태:
-
-```text
-REJECTED
-```
-
-권장 의미:
-
-- `REJECTED`: 측정값은 과속 후보로 들어왔지만, 사람이 검토 후 과속 아님으로 판정한 상태
-
-권장 최종 탭 매핑:
+최종 탭 매핑:
 
 | 프론트 탭 | 권장 상태 |
 | --- | --- |
@@ -147,6 +138,9 @@ Authorization: Bearer <token>
       "measuredSpeed": 72.35,
       "speedLimit": 50.0,
       "violationImagePath": "storage/detections/2026/05/21/CAM_001_frame.jpg",
+      "confidenceScore": 0.9321,
+      "plateCropImagePath": "storage/detections/2026/05/21/CAM_001_plate_crop.jpg",
+      "plateCropImageUrl": "/static/detections/2026/05/21/CAM_001_plate_crop.jpg",
       "violationStatus": "UNPROCESSED",
       "violatedAt": "2026-05-21T15:20:00",
       "createdAt": "2026-05-21T15:20:01"
@@ -166,9 +160,17 @@ Authorization: Bearer <token>
 | `cameraName` | 카메라 표시명 |
 | `measuredSpeed` | 표시 속도 |
 | `speedLimit` | 제한 속도 |
+| `confidenceScore` | OCR 신뢰도 원본값, DB와 API는 0~1 유지 |
+| `plateCropImagePath` / `plateCropImageUrl` | 번호판 crop 이미지 표시 |
 | `violationStatus` | 처리 상태 badge |
 | `violatedAt` | 발생 시각 |
 | `violationImagePath` | 증거 이미지 경로, URL 필드는 아직 응답에 없음 |
+
+OCR 신뢰도 프론트 표시:
+
+- `confidenceScore * 100` 후 소수점 1자리까지만 표시한다.
+- 예: `0.9321` -> `93.2%`
+- 원본 소수점 값은 DB/API에서만 유지하고 화면에는 노출하지 않는다.
 
 현재 보안 상태:
 
@@ -206,6 +208,7 @@ Authorization: Bearer <token>
 ```text
 UNPROCESSED
 NOTIFIED
+REJECTED
 CLOSED
 ```
 
@@ -213,9 +216,10 @@ CLOSED
 
 | 값 | 표시 라벨 |
 | --- | --- |
-| `UNPROCESSED` | 미처리 |
-| `NOTIFIED` | 고지 완료 |
-| `CLOSED` | 종결 |
+| `UNPROCESSED` | 보류 |
+| `NOTIFIED` | 과속 확정 |
+| `REJECTED` | 미과속 |
+| `CLOSED` | 종결/보관 |
 
 ### 과속 심사 상태 변경
 
@@ -248,6 +252,9 @@ Content-Type: application/json
     "measuredSpeed": 72.35,
     "speedLimit": 50.0,
     "violationImagePath": "storage/detections/2026/05/21/CAM_001_frame.jpg",
+    "confidenceScore": 0.9321,
+    "plateCropImagePath": "storage/detections/2026/05/21/CAM_001_plate_crop.jpg",
+    "plateCropImageUrl": "/static/detections/2026/05/21/CAM_001_plate_crop.jpg",
     "violationStatus": "REJECTED",
     "violatedAt": "2026-05-21T15:20:00",
     "createdAt": "2026-05-21T15:20:01"

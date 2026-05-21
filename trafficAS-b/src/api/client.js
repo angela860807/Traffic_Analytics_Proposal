@@ -15,3 +15,8 @@ export async function apiGet(path, config) {
   const response = await apiClient.get(path, config)
   return response.data
 }
+
+export async function apiPatch(path, data, config) {
+  const response = await apiClient.patch(path, data, config)
+  return response.data
+}

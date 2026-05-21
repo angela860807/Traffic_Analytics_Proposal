@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -317,12 +318,18 @@ class DetectionLogControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.plateNumber").value(plateNumber))
                 .andExpect(jsonPath("$.data.measuredSpeed").value(72.35))
                 .andExpect(jsonPath("$.data.speedLimit").value(50.0))
+                .andExpect(jsonPath("$.data.confidenceScore").value(0.95))
                 .andExpect(jsonPath("$.data.violationStatus").value("UNPROCESSED"))
                 .andReturn();
 
         Integer violationId = JsonPath.read(
                 speedViolationResult.getResponse().getContentAsString(),
                 "$.data.violationId");
+
+        mockMvc.perform(get("/api/speed-violations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray());
 
         assertThat(speedViolationRepository.count()).isEqualTo(violationCountBefore + 1);
         assertThat(vehicleFlowEventRepository.findById(flowEventId.longValue()))
@@ -364,6 +371,7 @@ class DetectionLogControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.violationId").value(violationId))
+                .andExpect(jsonPath("$.data.confidenceScore").value(0.95))
                 .andExpect(jsonPath("$.data.violationStatus").value("REJECTED"));
     }
 }
