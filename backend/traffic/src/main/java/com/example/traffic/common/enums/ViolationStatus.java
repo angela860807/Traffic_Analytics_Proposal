@@ -4,9 +4,10 @@ import lombok.Getter;
 
 @Getter
 public enum ViolationStatus {
-    UNPROCESSED("미처리"),
-    NOTIFIED("고지완료"),
-    CLOSED("종결");
+    UNPROCESSED("Pending review"),
+    NOTIFIED("Speed violation confirmed"),
+    REJECTED("Rejected as non-violation"),
+    CLOSED("Closed");
 
     private final String description;
 

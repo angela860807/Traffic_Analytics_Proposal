@@ -6,6 +6,7 @@ import com.example.traffic.domain.SpeedViolation;
 import com.example.traffic.domain.Vehicle;
 import com.example.traffic.domain.VehicleFlowEvent;
 import com.example.traffic.dto.request.SpeedViolationCreateRequest;
+import com.example.traffic.dto.request.SpeedViolationStatusRequest;
 import com.example.traffic.dto.response.SpeedViolationResponse;
 import com.example.traffic.etc.BusinessException;
 import com.example.traffic.repository.CameraRepository;
@@ -107,6 +108,17 @@ public class SpeedViolationService {
         return speedViolationRepository.findByViolationStatusOrderByViolatedAtDesc(violationStatus).stream()
                 .map(SpeedViolationResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public SpeedViolationResponse updateViolationStatus(Long violationId,
+                                                        SpeedViolationStatusRequest request) {
+        SpeedViolation violation = speedViolationRepository.findById(violationId)
+                .orElseThrow(() -> new BusinessException("Speed violation not found: "
+                        + violationId, HttpStatus.NOT_FOUND));
+
+        violation.updateStatus(request.getViolationStatus());
+        return SpeedViolationResponse.from(violation);
     }
 
     public List<SpeedViolationResponse> getViolationsBetween(LocalDateTime start, LocalDateTime end) {
