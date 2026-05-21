@@ -33,7 +33,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import * as echarts from 'echarts'
+import echarts from '@/composables/echartsSetup'
 import { useDashboardData } from '@/composables/useDashboardData'
 
 const props = defineProps({ active: { type: Boolean, default: false } })

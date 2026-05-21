@@ -528,3 +528,240 @@ npm run dev -- --host
 출력의 `Network: http://192.168.x.x:5173/`를 같은 WiFi 팀원에게 공유. 외부망은 `npx cloudflared tunnel --url http://localhost:5173`.
 
 ---
+
+## 17. 사용법 제거 · 공지사항 단순화 · 시스템 소개 전면 개편 · 다크모드 제거 (2026-05-15 후속)
+
+### 17-1 라우트/네비게이션 변경
+- **사용법 페이지(`/sub/usage`) 통째 삭제** — UsageView.vue 파일 + 라우터 import + AppNav/AppFooter 링크 + light.css 전용 룰까지 정리
+- **고객 지원 → 공지사항** 명칭 변경 (URL `/sub/support` 유지). 페이지 내부도 Q&A·실시간 채팅 탭 제거하고 **BoardTab 단일 렌더**로 단순화
+
+### 17-2 시스템 소개(IntroView) 전면 재작성
+시안 기반으로 6개 섹션 구조:
+1. **HERO** — `SYSTEM INTRODUCTION` 라벨 / `시스템 소개` h1 / 2줄 카피 / 우측 일러스트 (그라데이션 풀블리드)
+2. **시스템 아키텍처** — 4개 카드(Camera·Edge AI → AI Detection → Data Platform → Dashboard/API), 카드 내부 `[01] | English/Korean` 헤더 + `[아이콘 좌 / 불릿 우]` 본문, 카드 사이 `<ChevronRight />` 연결
+3. **데이터 라이프사이클** — 5단계 원형 아이콘 + dashed 점선, 카드별 80~84px 원 안에 Lucide 아이콘
+4. **핵심 모듈** — 4개 카드 (가운데 정렬), 번호·제목·그래픽·설명·태그칩 3개
+5. **연동 및 배포** — 좌측 박스(Integration 4개: REST/WebSocket/SDK/Export) + ChevronRight + 우측 박스(Deployment 3개: Cloud/On-premise/Hybrid)
+6. **비즈니스 임팩트** (다크 네이비 배너) — 6개 KPI(97%+/50ms/90%/40%+/99.9%/무제한), 배경에 옅은 48×48 그리드 + radial mask 패턴, 카드 hover 시 lift + 값 색상 시안 블루로 변경
+
+### 17-3 SVG 일러스트 폴백 메커니즘
+`public/illustrations/` 폴더에 `hero.svg`/`arch-camera.svg`/`arch-ai.svg`/`arch-database.svg`/`arch-dashboard.svg`를 떨어뜨리면 자동으로 SVG 사용, 없으면 Lucide 아이콘으로 폴백:
+```vue
+<img v-if="a.svg && !a.svgBroken" :src="a.svg" @error="a.svgBroken = true" />
+<component v-else :is="a.lucide" :size="64" />
+```
+
+### 17-4 다크 모드 제거 / 라이트 모드 단일화
+- **`useTheme.js`**: `isDark = ref(false)` 고정, `toggle()`은 no-op 처리 (호환성 유지)
+- **`AppFab.vue`**: 채팅/테마 토글 버튼 제거 → **↑ 맨 위로** 버튼만
+- **`base.css`**: `scrollbar-gutter: stable` 제거(대시보드 양쪽 흰 공백 원인), html/body 라이트 톤(`#f1f5fb`) 직접 적용
+
+### 17-5 톤 통일 및 디테일 정리
+- 모든 페이지 `hero-tag` 폰트 → **14px / weight 700 / letter-spacing 0.16em**로 통일
+- 모든 `.sec` 패딩 → **80px 60px**로 통일 (페이지별 60/80/100 혼재 해결)
+- 푸터: `기술` 컬럼 제거(4→3 columns), 패딩 36/32 → **24/22**로 슬림화, `서비스`/`팀·산출물` 컬럼 **가운데 정렬**
+- 헤더 메뉴/사용자명/버튼: opacity 24% → 100%, weight 600으로 또렷하게
+- 푸터 링크: opacity 0.62로 보조 톤, 호버 시 `var(--a)` + opacity 1
+
+### 17-6 BoardTab 폰트 전반 상향
+공지사항 게시판 가독성 개선:
+- info 14.5/300 → 16/500, 글쓰기 버튼 12.5/9·18 → 14/11·22
+- 테이블 행 14 → 15.5px, 헤더 11 → 12.5px
+- 댓글 본문 14/`--t2` → 15/`--t` 85%, 페이지네이션 12.5/34px → 14/36px
+
+### 17-7 솔루션 개요 강화 (변주)
+4분할 카드 단조로움 해소를 위해 솔루션 개요만 다른 비례로:
+- 그리드 `1.25fr / 1fr` → **`1.5fr / 1fr`**로 대시보드 이미지 영역 확대
+- 이미지 그림자 강화(`24px 60px → 32px 80px`) + 호버 시 미세 lift
+
+### 17-8 메인 히어로 그라데이션·톤 다듬기
+- 마스크 그라데이션: 6-stop → **11-stop ease-in 페이드** (0~42% 점진적)
+- 이미지에 `filter: saturate(0.78) brightness(0.85)` 추가 → 톤다운
+
+### 17-9 Lucide 아이콘 도입 확대
+신규 사용: `Cctv`(데이터 수집/실시간 영상 분석), `BrainCircuit`(AI 엔진), `Database`(데이터 플랫폼), `LayoutDashboard`(대시보드), `Car`(차량 감지), `ArrowLeftRight`(IN/OUT), `BellRing`(이벤트 알림), `Plug`/`Radio`/`Code2`/`FileDown`(연동), `Cloud`/`Server`/`Network`(배포), `Crosshair`/`Zap`/`Bot`/`TrendingUp`/`ShieldCheck`/`Infinity`(KPI), `ChevronRight`(연결 화살표)
+
+### 17-10 코드 클린업
+- `src/components/HeroStats.vue` 삭제 — 사용처 0
+- `light.css`의 `.step-vline`, `.stats-band.cyan` 등 죽은 룰 제거
+- 모든 페이지의 dead import / 미사용 ref 점검 완료
+
+### 17-11 한글 표기 수정
+- "AI **검지** 엔진" → "AI **감지** 엔진" 일괄 수정 (4건)
+
+---
+
+## 18. 공지사항 상세보기 + 권한 분리 (2026-05-16)
+
+### 18-1 공지사항 상세 페이지
+목록에서 행 클릭 시 **목록 → 상세 페이지로 mutex 전환** (라우터 변경 없이 컴포넌트 내부 상태로 처리).
+
+상세 페이지 구성:
+- **상단 액션**: `← 목록으로` 버튼 + (관리자가 작성한 글에 한해) `삭제` 버튼
+- **제목** + NEW 배지
+- **메타 정보**: 작성자 · 날짜 · 조회수 · 댓글 수 (JetBrains Mono)
+- **본문 영역**: `white-space: pre-wrap`으로 줄바꿈/공백 보존, `font-size: 15px / line-height: 1.85`
+- **댓글 영역**: 기존 댓글 패널 구조 그대로 (목록 + 작성 폼 + 수정/삭제)
+
+`목록으로` 클릭 시 `detailPost = null` → 검색바·페이지네이션 포함 원래 목록 복귀.
+
+### 18-2 권한 매트릭스 정리
+| 액션 | 비로그인 | 일반 회원 | 관리자 |
+|---|---|---|---|
+| 게시글 목록/검색/상세 조회 | ✓ | ✓ | ✓ |
+| **글쓰기 버튼 노출** | ✗ | ✗ | ✓ |
+| 댓글 작성 | ✗ | ✓ | ✓ |
+| 본인 댓글 수정/삭제 | – | ✓ | ✓ |
+| **타인 댓글 수정/삭제** | – | ✗ | ✓ |
+| 관리자 작성 글 삭제 | – | – | ✓ |
+
+구현:
+- 글쓰기 버튼: `v-if="isAdmin"` (비관리자에게는 렌더링 자체 안 됨)
+- `canEdit(c)` 함수: 관리자면 모든 댓글 true, 일반 회원은 `currentUser.email === c.authorEmail` 일 때만 true
+
+### 18-3 시드 게시글 + 사용자 작성 글 분리
+- `seedPosts` (불변, 컴포넌트 내 고정 6개)
+- `customPosts` (reactive, `localStorage.tas_board_posts`에 영속화)
+- `posts = computed(() => [...customPosts, ...seedPosts])` — 새 글이 항상 최상단
+- 관리자 작성 글에만 삭제 권한 (`canEditPost`가 customPosts에 포함되는지 확인)
+
+### 18-4 글쓰기 모달
+관리자만 진입 가능한 인플레이스 모달:
+- 제목(`maxlength: 100`) + 본문(`textarea rows=10`) 입력
+- 등록 시 `Date.now()`를 id로 부여, 작성자=현재 로그인 사용자명, 날짜=`MM.DD`, isNew=true
+- 빈 입력 시 등록 버튼 비활성화
+
+### 18-5 메인 히어로 카피 수정
+- `서비스 소개` → **`시스템 소개`** (메인 hero `.btn-g` 버튼)
+
+### 18-6 주석 톤 정리
+ASCII 박스 주석(`═══════ HERO ═══════`)과 친절한 한국어 설명 주석을 **짧은 소문자 영문 라벨**(`/* hero */`, `/* search */`, `/* table */`)로 통일. dead CSS 룰(`.cpanel`, `.chv`, `.post-body`, `.pb-meta`, `.pb-text`) 제거.
+
+---
+
+## 19. 6개 부서 대시보드 전면 개편 (2026-05-20)
+
+운영기획팀 제거 → 5개 부서 체제로 재편하면서 각 부서의 핵심 역할에 맞춰 IA를 다듬었습니다.
+
+### 19-1 운영기획팀(ReportsView) 제거 + 기능 분산
+- **삭제**: `ReportsView.vue`, `/admin/reports` 라우트, DeptSwitcher/AppNav 메뉴, `reports/1234` 로컬 계정
+- **흡수**:
+  - 월간 운영성과 / 분기 KPI / 감사 로그 보고서 → **경영전략본부(SuperView) `reports` 탭**
+  - 보고서 예약 / 자동 발행 / 최근 발행 목록 → **교통분석팀(AnalyticsView) `보고서 관리` 탭**
+- 옛 `/admin/reports` 링크는 `/admin/super`로 redirect
+
+### 19-2 부서별 보고서 다운로드 시스템
+- 신규 `src/composables/useReportDownload.js` — 6개 부서별 보고서 템플릿(제목/헤더/샘플 데이터) 내장
+- `downloadDeptReport(deptKey, reportKey, { date, endDate })` — CSV + UTF-8 BOM(한글 엑셀 호환)
+- 헤더에 기간 자동 삽입, 파일명에 선택 날짜 반영
+- ReviewView 헤더에 `<input type="date">` + 일일/주간 버튼, ControlView 보고서 탭에 `기준 날짜` 입력
+
+### 19-3 단속관리팀(ReviewView) — 2차 검증 워크플로
+관제센터 영상 → 캡처 이미지 전달 → 사람이 2차 검증 → 최종 결정 흐름으로 재설계:
+- **STEP 1** — 실제 과속인가? 두 버튼(실제 과속 / 시스템 오류)으로 양자택일
+- **STEP 2** — 선택값에 따라 사유 옵션이 동적으로 바뀜
+- **STEP 3** — 단속 확정 / 단속 무효 결정
+- 검토 히스토리에 시스템 자동 감지 → 관제센터 캡처 이미지 전달 → 단속관리팀 결정 3단계 출처 추적
+
+### 19-4 관제센터 → 단속관리팀 위반 전송 (큐 패턴)
+- 신규 `src/composables/useViolationQueue.js` — localStorage 기반 위반 큐 (최대 20건 자동 cap)
+- 관제센터 카메라 컨트롤바에 **빨간 단속 전송 버튼** — 클릭 시 현재 프레임 캡처 + 메타데이터(번호판/감지속도/제한속도/카메라ID) 생성 → 큐에 push
+- 단속관리팀이 마운트 시 큐를 흡수해 이벤트 목록 상단에 표시 (`source: 'control'` 뱃지 + `CTRL` 표식)
+- 이미지 이벤트는 비디오 대신 정지 이미지를 보여주고, OCR 캡처 슬롯에도 그 이미지 자동 채움
+
+### 19-5 OCR 캡처 자동화 (선명도 휴리스틱)
+ReviewView의 OCR 캡처 워크플로:
+- **자동** 버튼 — 1.6초 구간 8프레임 샘플링 → 각 프레임의 엣지 강도 계산 → 가장 선명한 프레임 자동 선택
+- **순간 캡처** — 영상 일시정지 + 그 프레임 크롭 (번호판 추정 영역만 480px로 확대)
+- **프레임 스텝** — 0.1초씩 정밀 조정 후 자동 재캡처
+- 외부 라이브러리 0, 캔버스 기반, ~40줄
+
+### 19-6 교통정보센터(ControlView) — 메인 대시보드 핵심화
+"관제센터가 메인 대시보드"라는 컨셉에 맞춰 흐름 중심으로 재정렬:
+- **제거** (이관·삭제):
+  - 긴급 처리 큐 / 선택 구간 속도 추이 / 선택 이벤트 상세 / 관제 가이드 / 빠른 작업 / 최근 이벤트 로그
+  - 교통통계 탭 + 내용은 **교통분석팀 `교통통계` 탭**으로 이관
+- **추가**:
+  - **ITS Open API 실시간 지표 카드** (서울 한정 + zoom-gate)
+  - 지도에 CCTV 마커 + 클릭 시 HLS 라이브 비디오 모달 (hls.js lazy load, 클릭 전 다운로드 0)
+  - **🚨 실시간 알림 패널** → 헤더 🔔 종 아이콘 + 드롭다운으로 이동 (critical 시 빨간 펄스)
+  - **📢 VMS 도로 전광판 제어** — 메시지 입력/템플릿 4종(사고/정체/기상/초기화)/송출 + LED 디스플레이 미리보기
+- **레이아웃 (한 페이지 fit)**:
+  - 좌측: 실시간 교통 흐름 지도 (1.4fr)
+  - 우측 상단: 선택 카메라 (큰, 세로)
+  - 우측 하단: VMS 전광판 제어 (콤팩트)
+- 헤더에 날씨 칩 + 알림 종 인라인 배치
+
+### 19-7 ECharts 트리쉐이킹 (성능)
+- 신규 `src/composables/echartsSetup.js` — 사용 차트(Line/Bar/Gauge/Pie) + 컴포넌트(Grid/Tooltip/Legend/MarkLine/MarkArea/MarkPoint) + CanvasRenderer만 등록
+- OpsView / AnalyticsView / RoadDashboardView / StatsTab 4파일이 공유
+- 번들 ~53% 절감 (gzip 376kB → **200kB**), RoadDashboardView 688 → **88kB**
+- 화면 출력은 1픽셀도 변화 없음
+
+### 19-8 OSM 도로 모듈 통합
+RoadDashboardView가 가지고 있던 로컬 `loadOSMRoads`/`renderOSMRoads`/`congestionColor` 구현을 공용 `src/composables/useOSMRoads.js`로 일원화. 도로 이름 hash 기반 안정 혼잡도 — 같은 도로의 모든 OSM way 조각이 같은 색으로 표시됨(이전 `Math.random()` 방식은 조각마다 색이 끊겨 보였음).
+
+### 19-9 공용 비디오/시간 유틸
+중복 코드 정리 — 신규 `src/composables/useVideoUtils.js`:
+- `padNum`, `fmtDateTime`, `fmtDate`, `fmtTime`
+- `enterFullscreen(el)` — brower prefix 호환
+- `captureFrameDataURL(videoEl, { outWidth, crop, quality })` — 옵션 크롭 캡처
+- `seekVideo(videoEl, t)` — Promise 기반 seek
+
+ControlView · ReviewView 두 곳에서 사용 (~75줄 중복 제거)
+
+### 19-10 디자인 / 통일
+- 6개 부서 사이드바 폰트 통일 (시설운영팀 기준 — 16px 본문, 17px 아이콘)
+- `Traffic AS` 브랜드에서 파란 dot 모두 제거 (5개 파일 일괄)
+- 부서 셸 베이스 폰트: Inter + Pretendard Variable + 시스템 폰트 fallback, `font-feature-settings: tnum cv11 ss01`
+- 헤더 날씨 칩 — 날씨 상태별 아이콘 자동 매핑 (맑음=태양, 흐림=구름, 비=빗방울 등)
+- 시설운영팀 사이드바 토글 버튼 — 파란 36×36 둥근 박스 + `arrow-bar-left/right` 아이콘
+
+---
+
+## 20. 파일 크기 정리 — CSS 외부화 + dead 룰 제거 (2026-05-20 후속)
+
+대시보드 Vue 파일들이 너무 비대해져 IDE 인지 부하가 컸음. 안전한 방식으로 단계적 분리.
+
+### 20-1 Vue SFC CSS 외부화 — `<style scoped src="...">` 패턴
+Vue SFC가 `<style scoped src="./X.css"></style>` 패턴을 지원해, 스타일을 외부 CSS 파일로 빼면서도 **scoped 동작(데이터 attribute 자동 부착)은 그대로 유지**. 동작/렌더링 0 차이, 빌드 결과 번들 크기 동일.
+
+| 파일 | Before | After (.vue) | + .css 파일 |
+|---|---|---|---|
+| OpsView | 6,284 | **2,996** (-52%) | OpsView.css 3,287 |
+| AnalyticsView | 1,597 | **845** (-47%) | AnalyticsView.css 751 |
+| ControlView | 1,302 | **691** (-47%) | ControlView.css 610 |
+| ReviewView | 1,005 | **638** (-37%) | ReviewView.css 366 |
+
+추출 절차:
+```bash
+sed -n '<style 시작줄>,<끝줄-1>p' X.vue > X.css
+head -<script 끝줄> X.vue > /tmp/x.txt
+cat /tmp/x.txt > X.vue
+echo '<style scoped src="./X.css"></style>' >> X.vue
+```
+
+### 20-2 admin-shared.css — dead `.admin-shell` 룰 제거
+운영기획팀(ReportsView) 제거 후 `.admin-shell` 셀렉터는 모든 Vue 파일에서 0회 사용. 그러나 admin-shared.css에는 464회 등장 → 전부 dead.
+
+Python 스크립트로 안전하게 제거:
+1. **Solo 룰** (`.admin-shell .xxx { ... }`): 블록 전체 삭제
+2. **멀티셀렉터의 줄 단위 항목** (`.admin-shell .xxx,` 단독 라인): 라인 삭제
+3. **`@media` / `@keyframes` / `@supports` 블록**: 보존 (regex 사고 방지)
+4. **인라인 멀티셀렉터** (`.cc-shell, .admin-shell { ... }`): **건드리지 않음** — 이걸 regex로 정제하려다 한 번 라이트 테마 override를 깨뜨려서 검은 배경 나옴, 즉시 원복
+
+**결과**: 2,897 → **2,333줄** (-564줄, -20%). 동작 변화 0.
+
+### 20-3 전체 정리 효과
+| 합계 | Before | After | 감소 |
+|---|---|---|---|
+| 5개 파일 합산 | 13,085줄 | **7,503줄** | **-43%** |
+
+- 개발자 경험: IDE 스크롤·검색·점프 부담 절반 이하
+- 런타임: 변화 0 (사용자 체감 차이 없음. 진짜 무게는 ECharts 트리쉐이킹·hls.js lazy load로 이미 줄였음)
+
+### 20-4 시도했다가 원복한 것
+- admin-shared.css **인라인 멀티셀렉터 정제** (`[^{}]+?` regex): CSS 블록 경계를 정확히 못 잡아 라이트 테마 override 블록까지 망가뜨림 → `git checkout` 원복
+- 교훈: regex로 CSS 정제는 위험. 멀티셀렉터에서 한 토큰만 빼려면 proper CSS parser 사용해야 함
+
+---
