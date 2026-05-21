@@ -110,6 +110,12 @@ public class SpeedViolationService {
                 .toList();
     }
 
+    public List<SpeedViolationResponse> getAllViolations() {
+        return speedViolationRepository.findAllByOrderByViolatedAtDesc().stream()
+                .map(SpeedViolationResponse::from)
+                .toList();
+    }
+
     @Transactional
     public SpeedViolationResponse updateViolationStatus(Long violationId,
                                                         SpeedViolationStatusRequest request) {
@@ -122,6 +128,13 @@ public class SpeedViolationService {
     }
 
     public List<SpeedViolationResponse> getViolationsBetween(LocalDateTime start, LocalDateTime end) {
+        if (start == null && end == null) {
+            return getAllViolations();
+        }
+        if (start == null || end == null) {
+            throw new BusinessException("Both start and end query parameters are required when filtering by date.",
+                    HttpStatus.BAD_REQUEST);
+        }
         return speedViolationRepository.findByViolatedAtBetweenOrderByViolatedAtDesc(start, end).stream()
                 .map(SpeedViolationResponse::from)
                 .toList();

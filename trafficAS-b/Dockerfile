@@ -3,7 +3,8 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 COPY trafficAS-b/package*.json ./
-RUN npm ci
+
+RUN npm install
 
 COPY trafficAS-b/ .
 
