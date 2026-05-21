@@ -2,8 +2,8 @@
 .an-shell .body { flex: 1; min-height: 0; overflow: hidden; }
 .an-shell .content {
   flex: 1; min-height: 0; overflow: hidden;
-  display: flex !important; flex-direction: column !important; gap: 10px !important;
-  padding: 12px 16px !important;
+  display: flex !important; flex-direction: column !important; gap: 6px !important;
+  padding: 4px 16px 12px !important;
 }
 .an-shell .row-cmp { flex: 1;    min-height: 0; gap: 12px !important; order: 2; }
 .an-shell .row-mid { flex: 1.2;  min-height: 0; gap: 12px !important; order: 1; }
@@ -366,7 +366,7 @@
   width: 22px; height: 22px; accent-color: #2563eb;
 }
 
-.an-shell .insight-strip { padding: 12px 16px !important; }
+.an-shell .insight-strip { padding: 8px 16px !important; }
 
 /* 비교 설정 컨텍스트 바 */
 .an-shell .ctx-bar {
@@ -374,8 +374,8 @@
   background: #ffffff;
   border: 1px solid #c9d4e3;
   border-radius: 4px;
-  padding: 10px 16px;
-  margin-bottom: 10px;
+  padding: 8px 16px;
+  margin-bottom: 0;
   flex-wrap: wrap;
 }
 .an-shell .ctx-grp { display: inline-flex; align-items: center; gap: 8px; }
