@@ -1251,3 +1251,560 @@ React용은 `lucide-react`, Vue 3용은 `lucide-vue-next`, Vue 2용은 `lucide-v
 ### 교훈
 "이미지 위치 조정"은 패딩보다 grid `align-self` 가 자연스럽다.
 
+
+## 32. 대시보드 양옆에 흰 공백 라인이 보이는 문제
+
+### 증상
+관리자 대시보드(`/dashboard`)를 열면 좌·우 끝에 가는 흰색 띠가 보임. 다른 페이지에선 안 보이는데 대시보드에서만 두드러짐.
+
+### 원인
+`html { scrollbar-gutter: stable }`이 우측에 스크롤바 공간(약 17px)을 예약. 대시보드는 `height: 100vh; overflow: hidden`이라 자체 스크롤바가 없으니 그 예약 공간이 body 기본 흰 배경으로 노출.
+
+### 해결
+`base.css`에서 `scrollbar-gutter: stable` 제거하고 html/body에 명시적 배경 지정:
+```css
+html { overflow-x: hidden; background: #f1f5fb; }
+body { background: #f1f5fb; }
+```
+
+### 교훈
+`scrollbar-gutter: stable`은 페이지 간 스크롤바 유무 차이로 발생하는 레이아웃 시프트를 막아주지만, **`overflow: hidden`을 쓰는 풀스크린 페이지에서는 빈 공백을 만든다**. 양쪽이 공존하는 프로젝트면 페이지별 전략을 분리하거나 단일 정책으로 통일해야 한다.
+
+---
+
+## 33. Vite proxy http error — `/api/v1/...`
+
+### 증상
+개발 서버 콘솔에 `[vite] http proxy error: /api/v1/detection-logs` 같은 빨간 로그가 반복.
+
+### 원인
+`vite.config.js`의 proxy 설정이 `/api` 요청을 `http://127.0.0.1:8080`(Spring Boot)으로 포워드하려는데 백엔드 서버가 안 떠 있어서 연결 실패.
+
+### 해결 3가지
+1. **백엔드 켜기**: `cd ../backend/traffic && ./gradlew bootRun`
+2. **무시**: 프론트는 fetch 실패 시 데모 데이터로 폴백되도록 이미 설계됨. 콘솔 로그만 보이고 UI는 정상
+3. **로그만 끄기**:
+   ```js
+   proxy: {
+     '/api': {
+       target: 'http://127.0.0.1:8080',
+       configure: (proxy) => { proxy.on('error', () => {}); }
+     }
+   }
+   ```
+
+### 교훈
+프록시 에러는 "연결 실패"일 뿐 프론트 자체 동작에는 영향 없다. 데모 모드/폴백이 잘 구현돼 있으면 안전하게 무시 가능.
+
+---
+
+## 34. `object-fit: cover`로 이미지가 잘리는 문제 (히어로 박스 vs 이미지 비율 불일치)
+
+### 증상
+시스템 소개 페이지에서 일러스트(1672×941 = 16:9)는 히어로 박스에 자연스럽게 들어가는데, 공지사항에서 다른 일러스트(`sub3.png`)를 같은 박스에 cover로 넣으니 주체(확성기 등)가 잘려 보임.
+
+### 원인
+박스 비율과 이미지 비율의 불일치:
+- 히어로 박스: 약 1200×320px = **3.75:1**
+- 이미지: 1672×941 = **1.78:1 (16:9)**
+- `cover` 시 가로(1200)에 맞춰 이미지를 1200×675로 확대 → 박스 세로(320)보다 큰 355px만큼 상하 잘림
+
+### 해결
+1. **박스를 16:9에 가깝게**: `height: 320 → 540px`로 늘리면 cover 잘림 거의 없음
+2. **`object-fit: contain` + `object-position: right`**: 이미지 자연 비율 유지, 좌측 빈 공간은 그라데이션이 자연스럽게 덮음
+3. **이미지 자체를 와이드한 비율로 교체**
+
+### 교훈
+`cover`는 만능이 아니다. **박스 비율과 이미지 비율의 차이가 1.5배 이상**이면 잘림이 눈에 띄게 발생한다. 디자인 시안과 자산 비율을 먼저 정렬한 뒤 CSS로 들어가야 한다.
+
+---
+
+## 35. main 머지 시 QnaTab 충돌 — 양쪽 변경 모두 살리는 패턴
+
+### 증상
+yoon → main PR에서 `src/components/QnaTab.vue` 머지 충돌.
+- yoon: 비회원 차단(`:disabled="!isLoggedIn"`, `onWrite()` 핸들러)
+- main: 질문 등록 폼 + API 연동(`openQuestionForm`, `createQuestion`)
+
+### 해결
+두 변경 모두 살리는 통합:
+- 버튼은 yoon의 비회원 차단 패턴 유지(`:disabled` + `@click="onWrite"`)
+- `onWrite()`에서 로그인 체크 후 main의 `openQuestionForm()` 호출
+```js
+function onWrite() {
+  if (!isLoggedIn.value) { openLogin(); return; }
+  openQuestionForm();
+}
+```
+- main의 폼 UI/저장 로직은 그대로 보존
+
+### 교훈
+"한쪽 ours / 다른 쪽 theirs"로 끝내지 말고, **두 변경의 의도가 다른 영역(UI 차단 vs 백엔드 연동)이면 합쳐 살리는 게 정답**. `onWrite()` 같은 게이트 함수 한 줄로 우아하게 결합 가능.
+
+---
+
+## 36. 다크 모드 제거 후에도 `.theme-navy.light` 분기 유지하는 이유
+
+### 증상
+다크 모드 토글을 없애고 라이트 모드로 통일했는데, 굳이 `:class="{ light: !isDark }"` 같은 조건문이 남아있음.
+
+### 결정
+**컴포넌트별 클래스 분기 코드는 그대로 유지**. 대신 `useTheme.js`에서 `isDark = ref(false)` 고정 + `toggle()` no-op 처리.
+
+### 이유
+1. 모든 페이지의 템플릿/스타일을 `.theme-navy.light` 기반으로 작성해놨음
+2. 분기 자체를 지우면 CSS 룰의 `:root` 변수 적용이 깨질 수 있음
+3. 나중에 다크 모드 다시 켜야 할 때 `toggle()` 한 곳만 살리면 전부 복구
+
+### 교훈
+**기능 제거 ≠ 코드 삭제**. 토글 UI/액션만 비활성화하고 내부 분기 메커니즘은 보존하면, 미래 복원 비용이 0에 가까워진다.
+
+
+## 37. 인라인 expand 패턴 → 상세 페이지 mutex 전환
+
+### 증상
+공지사항 행을 클릭하면 그 자리에서 본문/댓글이 펼쳐지는 inline expand 방식이었는데, 본문이 길거나 댓글이 많으면 시각적 흐름이 어지러움. 사용자가 "상세 페이지로 진입"하는 형태를 원함.
+
+### 해결
+컴포넌트 내부 상태 `detailPost`(`ref(null) | post 객체`) 도입, 템플릿에서 `v-if="detailPost"` / `v-else`로 **mutex 전환**:
+```vue
+<div v-if="detailPost" class="detail-view">...</div>
+<template v-else>
+  <div class="search-bar">...</div>
+  <div class="tbl">...</div>
+</template>
+```
+라우터 분리 없이 같은 컴포넌트에서 두 뷰를 토글하므로 백엔드 / 라우트 변경 0.
+
+### 교훈
+- "상세 페이지"는 꼭 새 라우트일 필요 없음. 컴포넌트 상태만으로 충분히 페이지처럼 느껴진다
+- 빠르게 만들 땐 라우트 추가보다 mutex 패턴이 더 단순 (URL 공유 필요 없으면)
+
+---
+
+## 38. 권한 매트릭스 — `v-if` vs `:disabled`
+
+### 증상
+글쓰기 버튼을 `:disabled="!isAdmin"`으로 설정하니, 일반 회원에게도 회색 비활성 버튼이 보임. "있긴 한데 안 눌리는" 어색한 UX.
+
+### 해결
+**완전히 숨기려면 `v-if`, 있되 막으려면 `:disabled`** — 의도에 맞게 선택.
+```vue
+<!-- 관리자에게만 노출 -->
+<button v-if="isAdmin" class="wbtn" @click="onWrite">글쓰기</button>
+```
+댓글 수정/삭제 액션도 권한 없는 사용자 입장에서는 존재 자체가 안 보이는 게 맞다 → `v-if="canEdit(c)"`로 컨테이너 자체를 숨김.
+
+### 교훈
+- `:disabled`: 권한은 있지만 일시적으로 막힌 상태 (네트워크 진행 중 등)
+- `v-if`: 권한 자체가 없는 상태 (UI에서 존재할 이유 없음)
+둘은 의미가 다르고 사용자에게 주는 인상도 다름. 권한 분기는 보통 `v-if` 쪽이 더 깔끔.
+
+---
+
+## 39. 댓글 권한 — `canEdit` 한 함수에 두 케이스 통합
+
+### 증상
+"관리자는 모든 댓글, 일반 회원은 본인 댓글만" 권한 분리하려는데, 수정·삭제 버튼을 각각 두 번 체크하면 코드가 지저분.
+
+### 해결
+한 함수 `canEdit(c)`에 권한 로직 통합 + 템플릿에서 부모 컨테이너에만 v-if 적용:
+```js
+function canEdit(c) {
+  if (!isLoggedIn.value) return false;
+  if (isAdmin.value) return true;
+  return currentUser.value?.email === c.authorEmail;
+}
+```
+```vue
+<div class="cacts" v-if="canEdit(c)">
+  <button @click="startEdit(c)">수정</button>
+  <button @click="removeComment(p.id, c.id)">삭제</button>
+</div>
+```
+권한 로직 한 곳, 버튼 그룹 한 번. 새 권한 추가도 함수 한 줄만 고치면 끝.
+
+### 교훈
+같은 권한을 공유하는 액션은 **한 분기로 묶기** — DRY + 일관성. 권한이 분리되어야 할 때만 `canEdit`과 `canDelete`로 쪼개면 됨.
+
+---
+
+## 40. 시드 데이터 + 사용자 작성 데이터 — `computed`로 합치는 패턴
+
+### 증상
+기본 게시글 6개는 코드에 박혀 있어야 하고, 관리자가 새로 작성한 글은 localStorage에 저장돼야 함. 둘을 분리하면서도 목록은 합쳐 보여야 함.
+
+### 해결
+```js
+const seedPosts = [/* 불변 데모 데이터 */];
+const customPosts = ref(JSON.parse(localStorage.getItem("tas_board_posts") || "[]"));
+
+const posts = computed(() => [...customPosts.value, ...seedPosts]);
+```
+- 새 글 추가: `customPosts.value.unshift(...)` + `persistPosts()` → 자동으로 `posts` 갱신
+- 삭제 권한: customPosts에 포함된 글만 (`canEditPost`), 시드는 보호
+- 검색·페이지네이션은 합쳐진 `posts.value` 기준
+
+### 교훈
+**가변 데이터와 불변 데이터를 한 컴퓨티드로 합치는 패턴**은 데모/MVP에서 매우 유용. 백엔드 연동 시엔 customPosts를 API 응답으로 교체만 하면 끝.
+
+---
+
+## 41. ECharts zombie 인스턴스 — `v-if` 탭 전환 후 차트 안 그려짐
+
+### 증상
+OpsView에서 `tab !== 'status'`인 다른 탭에 갔다가 status로 돌아오면 네트워크 ECharts가 비어 보임.
+
+### 원인
+`v-if`로 DOM이 제거됐다가 다시 마운트되는데, 모듈 스코프의 `let netChart = null`은 옛 인스턴스를 들고 있음. `if (!netChart)` 가드 때문에 재초기화 스킵.
+
+### 해결
+`watch(tab)`로 status 재진입 시 명시적으로 dispose + 재init:
+```js
+watch(tab, (v) => {
+  if (v === "status") {
+    if (netChart) { netChart.dispose(); netChart = null; }
+    nextTick(() => initNetChart());
+  }
+});
+```
+
+### 교훈
+ECharts + Vue `v-if` 조합은 항상 dispose 라이프사이클을 신경 써야 함.
+
+---
+
+## 42. `echarts.init(el, null, { width, height })` 후 resize 불일치
+
+### 증상
+ResizeObserver로 `chart.resize()`를 부르는데도 컨테이너 변경에 따라오지 않음.
+
+### 원인
+init에 픽셀 값을 고정하면 `resize()`도 그 값을 유지함.
+
+### 해결
+init에 width/height 전달하지 않음:
+```js
+const chart = echarts.init(el, null, { renderer: "canvas" });
+new ResizeObserver(() => chart.resize()).observe(el);
+```
+
+### 교훈
+ECharts init의 width/height 옵션은 컨테이너에서 크기를 못 가져올 때만 쓰는 escape hatch.
+
+---
+
+## 43. OSM way 단편으로 도로 색이 끊겨 보임
+
+### 증상
+강변북로 같은 긴 도로가 leaflet 폴리라인으로 그려질 때 색이 중간에 바뀌어 끊겨 보임.
+
+### 원인
+OSM Overpass가 한 도로를 수십~수백 way로 쪼개서 줌. 코드가 조각마다 `Math.random()`으로 따로 혼잡도를 매김.
+
+### 해결
+도로 이름 hash로 안정 혼잡도 + 캐시:
+```js
+function nameHash01(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return ((h % 1000) + 1000) % 1000 / 1000;
+}
+const congByName = new Map();
+ways.forEach(w => {
+  const name = w.tags["name:ko"] || w.tags.name || `${w.tags.highway} #${w.id}`;
+  if (!congByName.has(name)) {
+    congByName.set(name, baseCong(w.tags.highway) + (nameHash01(name) - 0.5) * 0.4);
+  }
+  // 폴리라인 생성
+});
+```
+
+### 교훈
+지도 시각화는 의미 단위(도로명)로 그룹화. `Math.random()`을 시각화에 쓰지 말 것 — 새로고침마다 색이 바뀌는 부작용도 있음.
+
+---
+
+## 44. ECharts 트리쉐이킹 — 번들 절반 이하로
+
+### 증상
+빌드 결과 `installMarkLine-*.js` 526 kB(gzip 178 kB) + index 안에 ECharts 가 또 들어가 600 kB 추가.
+
+### 원인
+`import * as echarts from "echarts"` — 전체 차트 100여 종 + 컴포넌트가 통째로 들어옴.
+
+### 해결
+공용 setup 파일로 사용 모듈만 등록:
+```js
+// src/composables/echartsSetup.js
+import * as echarts from "echarts/core";
+import { LineChart, BarChart, GaugeChart, PieChart } from "echarts/charts";
+import {
+  GridComponent, TooltipComponent, LegendComponent,
+  MarkLineComponent, MarkAreaComponent, MarkPointComponent,
+} from "echarts/components";
+import { CanvasRenderer } from "echarts/renderers";
+
+echarts.use([
+  LineChart, BarChart, GaugeChart, PieChart,
+  GridComponent, TooltipComponent, LegendComponent,
+  MarkLineComponent, MarkAreaComponent, MarkPointComponent,
+  CanvasRenderer,
+]);
+export default echarts;
+```
+
+### 결과
+- 번들 53% 감소 (gzip 376 → 200 kB)
+- RoadDashboardView 688 → 88 kB
+- 화면 출력 변화 없음
+
+### 교훈
+ECharts처럼 거대한 라이브러리는 **반드시 트리쉐이킹**. 한 줄 import로 수백 kB 낭비.
+
+---
+
+## 45. HLS 라이브 스트림(.m3u8) Chrome 재생 — hls.js lazy load
+
+### 증상
+ITS Open API CCTV `cctvurl`이 `.m3u8`. Safari/iOS는 native 지원하지만 Chrome/Edge는 못 재생.
+
+### 해결
+hls.js를 **lazy import** — 클릭할 때만 다운로드:
+```js
+async function attachHls(videoEl, url) {
+  if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {
+    videoEl.src = url;  // Safari
+    return;
+  }
+  const Hls = (await import("hls.js")).default;
+  if (Hls.isSupported()) {
+    const hls = new Hls();
+    hls.loadSource(url);
+    hls.attachMedia(videoEl);
+  }
+}
+```
+
+빌드 시 `hls-*.js`(525 kB / gzip 162 kB)는 별도 청크로 분리. CCTV 안 누르면 다운로드도 안 됨.
+
+### 교훈
+특정 액션에서만 필요한 무거운 의존성은 **dynamic import**로 1차 페이로드에서 빼는 게 좋음.
+
+---
+
+## 46. ITS Open API CORS — Vite dev proxy
+
+### 증상
+`fetch('https://openapi.its.go.kr:9443/cctvInfo?...')` 직접 호출 시 CORS 차단.
+
+### 해결
+`vite.config.js`에 proxy:
+```js
+server: {
+  proxy: {
+    '/its': {
+      target: 'https://openapi.its.go.kr:9443',
+      changeOrigin: true,
+      rewrite: (p) => p.replace(/^\/its/, ''),
+      secure: false,
+    },
+  },
+},
+```
+
+환경별 분기:
+```js
+const CCTV_BASE = import.meta.env.DEV
+  ? "/its/cctvInfo"
+  : "https://openapi.its.go.kr:9443/cctvInfo";
+```
+
+### 교훈
+공공 API CORS는 백엔드 미수정 제약 하에서도 Vite proxy로 dev는 풀 수 있음. 운영은 별도 reverse proxy 필요.
+
+---
+
+## 47. 큰 bbox로 외부 API 호출 폭주 — zoom-gate + clamp
+
+### 증상
+지도 줌아웃하면 전국 단위 bbox로 ITS API 호출 → 마커 폭주.
+
+### 해결
+1. **Zoom-gate**: `flowMap.getZoom() < 11`이면 호출 자체 스킵
+2. **Bbox clamp**: 서울 행정구역 bbox로 교집합
+3. **마커 상한**: 50개로 cap
+
+```js
+const SEOUL_BBOX = { minX: 126.76, maxX: 127.18, minY: 37.41, maxY: 37.70 };
+const minX = Math.max(b.getWest(), SEOUL_BBOX.minX).toFixed(6);
+if (all.length > 50) all = all.slice(0, 50);
+```
+
+### 교훈
+외부 API는 가능한 **좁게 호출**. 사용자 viewport에 맡기지 말고 비즈니스 제약(서울만)을 코드에 박을 것.
+
+---
+
+## 48. localStorage 큐 — 부서간 데이터 전달 (백엔드 없이)
+
+### 증상
+관제센터(ControlView) → 단속관리팀(ReviewView) 이벤트 전달 필요. 백엔드 못 건드림.
+
+### 해결
+localStorage 기반 큐 composable:
+```js
+// useViolationQueue.js
+const STORAGE_KEY = "tas_violation_queue";
+const queue = ref(loadFromStorage());
+
+function submitViolation(payload) {
+  queue.value.unshift({ id: `RT-${Date.now()}`, ...payload, st: "검토 대기" });
+  if (queue.value.length > 20) queue.value.length = 20;
+  saveToStorage();
+}
+```
+
+ControlView가 push → ReviewView가 mount 시 흡수 + 옛 이벤트와 병합. 새로고침 후에도 유지됨.
+
+### 교훈
+부서간 흐름 시연은 **localStorage + reactive ref**로 충분. 실서비스는 큐 부분만 API로 교체.
+
+---
+
+## 49. 비디오 프레임 자동 캡처 — 선명도 휴리스틱
+
+### 증상
+"가장 선명한 프레임 자동 캡처"가 필요한데 OCR/CV 모델은 부담.
+
+### 해결
+캔버스로 후보 프레임들의 엣지 강도(|dx|+|dy|) 측정 → 최댓값 선택:
+```js
+async function autoCapture() {
+  for (let i = 0; i < 8; i++) {
+    const t = startT + i * step;
+    await seekVideo(v, t);
+    aCtx.drawImage(v, 0, 0, aw, ah);
+    const data = aCtx.getImageData(0, 0, aw, ah).data;
+    let score = 0;
+    for (let y = 1; y < ah - 1; y += 2) {
+      for (let x = 1; x < aw - 1; x += 2) {
+        const idx = y * aw * 4 + x * 4;
+        const lum = data[idx]*299 + data[idx+1]*587 + data[idx+2]*114;
+        const lumR = data[idx+4]*299 + ...;
+        const lumB = data[idx+aw*4]*299 + ...;
+        score += Math.abs(lum-lumR) + Math.abs(lum-lumB);
+      }
+    }
+    if (score > best.score) best = { score, time: t };
+  }
+  await seekVideo(v, best.time);
+  captureSnapshot();
+}
+```
+
+### 교훈
+ML 없이도 픽셀 통계로 "꽤 선명한 프레임"을 고를 수 있음. 240×135 다운스케일 + 2픽셀 stride로 ~30ms.
+
+---
+
+## 50. CSV BOM과 한글 엑셀 호환
+
+### 증상
+JS로 CSV blob을 다운로드받으면 한글이 깨져 보임 (엑셀에서 mojibake).
+
+### 해결
+UTF-8 BOM(`﻿`)을 CSV 맨 앞에 붙임:
+```js
+function downloadCSV(filename, rows) {
+  const csv = "﻿" + rowsToCSV(rows);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  // a.href = URL.createObjectURL(blob); a.download = filename;
+}
+```
+
+### 교훈
+엑셀(Windows)은 UTF-8 BOM이 있어야 한글 인식. 다수 사용자가 윈도우 엑셀이라 BOM 붙이는 게 안전.
+
+---
+
+## 51. Vue SFC `<style>` 외부 파일로 빼기 — scoped 유지하면서 파일 분리
+
+### 증상
+OpsView.vue가 6,284줄(CSS 3,287줄 포함)로 비대. IDE 검색/스크롤이 무거움. 컴포넌트로 분할하면 scoped CSS 깨질 위험.
+
+### 해결
+Vue SFC는 `<style scoped src="./file.css">` 패턴을 지원. 외부 파일로 빼도 scoped 동작(컴파일러가 자동으로 `[data-v-xxx]` 부착) 그대로 유지.
+
+```vue
+<!-- OpsView.vue -->
+<script setup>
+// ...
+</script>
+
+<style scoped src="./OpsView.css"></style>
+```
+
+```css
+/* OpsView.css */
+.ops-shell .main { /* scoped 처리됨 */ }
+```
+
+### 절차
+```bash
+sed -n '<style 시작줄>,<끝줄>p' X.vue > X.css
+head -<script 끝줄> X.vue > /tmp/x.txt
+cat /tmp/x.txt > X.vue
+echo '<style scoped src="./X.css"></style>' >> X.vue
+```
+
+### 결과
+- OpsView: 6,284 → 2,996 (-52%)
+- 동작/번들 크기 변화 0
+- 디자인 작업 시 .css만, 로직 작업 시 .vue만 열어서 진행 가능
+
+### 교훈
+컴포넌트 분할 전에 **`<style scoped src>` 패턴**부터 시도. 위험도 0이고 파일 크기 절반 즉시 감소.
+
+---
+
+## 52. CSS regex 정제 함정 — 인라인 멀티셀렉터에서 한 토큰만 제거
+
+### 증상
+admin-shared.css에서 사용 안 하는 `.admin-shell`을 제거하려고 regex로 인라인 멀티셀렉터(`.cc-shell, .admin-shell, .ops-shell { ... }`) 안에서 `.admin-shell` 부분만 빼는 스크립트 작성. 빌드는 통과했지만 배경이 검정색으로 나오는 등 시각 깨짐.
+
+### 원인
+```python
+pattern = re.compile(r"([^{}]+?)(\{[^{}]*\})", re.DOTALL)
+```
+- `[^{}]+?` 비탐욕 매치로 셀렉터 추출 시 **`@media` 블록 안에 또 다른 `{ }`가 있으면 경계 오인**
+- `data:image/svg+xml;...{...}` 같은 url() 안 값에도 `{`가 포함될 수 있음
+- 라이트 테마 override 블록의 일부를 통째로 삼키거나 잘못 자르는 사례 발생
+
+### 해결
+즉시 `git checkout src/styles/admin-shared.css`로 원복.
+
+대신 보수적 접근:
+- ✅ Solo 룰 (`.admin-shell .xxx { ... }`): 블록 단위로 정확히 식별 가능 → 안전 제거
+- ✅ 멀티셀렉터의 **줄 단위** 항목 (`.admin-shell .xxx,` 단독 라인): 라인 단위로 매치 가능 → 안전 제거
+- ❌ **인라인 정제** (`.cc-shell, .admin-shell, .ops-shell {`에서 `.admin-shell`만 빼기): regex로는 위험
+
+`@media`/`@keyframes`/`@supports` 블록은 통째로 skip해서 보호:
+```python
+if re.match(r"^@(media|supports|keyframes)", stripped):
+    out.append(line)
+    i += 1
+    depth = line.count("{") - line.count("}")
+    while depth > 0 and i < len(lines):
+        out.append(lines[i])
+        depth += lines[i].count("{") - lines[i].count("}")
+        i += 1
+    continue
+```
+
+### 교훈
+- **CSS는 정규 언어가 아님** — `[^{}]` 같은 단순 regex로 안 풀림
+- regex 정제는 **줄 단위·블록 단위**로 명확한 경계만 다룰 것
+- 인라인 셀렉터 토큰 단위 정제가 필요하면 **proper CSS parser**(postcss 등) 사용
+- 정제 작업은 **백업 + 빌드 + 시각 확인** 3단계 검증 필수
+
