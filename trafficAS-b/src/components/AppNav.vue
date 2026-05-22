@@ -3,8 +3,7 @@
   <nav class="appnav">
     <div class="ni">
       <RouterLink to="/" class="logo">
-        <span class="ls"></span>
-        Traffic<em>AS</em>
+        <img src="/TAS.png" alt="TAS" class="logo-img" />
       </RouterLink>
       <div class="links">
         <RouterLink to="/sub/intro">시스템 소개</RouterLink>
@@ -24,8 +23,6 @@
               <RouterLink to="/admin/review"    class="ap-i" @click="open = false"><i class="bi bi-check2-square"></i><div><strong>단속관리팀</strong><span>위반 검토 · 판정</span></div></RouterLink>
               <RouterLink to="/admin/analytics" class="ap-i" @click="open = false"><i class="bi bi-bar-chart"></i><div><strong>교통분석팀</strong><span>구간 · 시간대 분석</span></div></RouterLink>
               <RouterLink to="/admin/ops"       class="ap-i" @click="open = false"><i class="bi bi-hdd-rack"></i><div><strong>시설운영팀</strong><span>카메라 · 서버 · 네트워크</span></div></RouterLink>
-              <div class="ap-sep"></div>
-              <RouterLink to="/dashboard" class="ap-i" @click="open = false"><i class="bi bi-grid"></i><div><strong>기존 대시보드</strong><span>통합 관제</span></div></RouterLink>
             </div>
           </div>
           <button class="btn-out" @click="logout">로그아웃</button>
@@ -73,6 +70,12 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
   display: flex;
   align-items: center;
   gap: 10px;
+  text-decoration: none;
+}
+.logo-img {
+  height: 56px;
+  width: auto;
+  display: block;
   margin-right: 32px;
   white-space: nowrap;
   text-decoration: none;
@@ -209,7 +212,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 .btn-admin i { font-size: 11px; }
 .admin-pop {
   position: absolute; top: calc(100% + 8px); right: 0;
-  min-width: 240px;
+  min-width: 290px;
   background: var(--bg2);
   border: 1px solid var(--b);
   border-radius: 10px;
@@ -219,8 +222,8 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 }
 .theme-navy.light .admin-pop { background: #fff; box-shadow: 0 18px 50px rgba(15, 40, 90, 0.15); }
 .ap-i {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 12px;
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 14px;
   border-radius: 6px;
   color: var(--t); text-decoration: none;
   transition: background 0.15s;
@@ -228,17 +231,16 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 .ap-i:hover { background: rgba(96, 165, 250, 0.08); }
 .theme-navy.light .ap-i:hover { background: rgba(37, 99, 235, 0.06); }
 .ap-i > i {
-  width: 28px; height: 28px; border-radius: 7px;
+  width: 32px; height: 32px; border-radius: 8px;
   background: rgba(96, 165, 250, 0.12);
   display: inline-flex; align-items: center; justify-content: center;
-  color: var(--a); font-size: 14px; flex-shrink: 0;
+  color: var(--a); font-size: 16px; flex-shrink: 0;
 }
 .theme-navy.light .ap-i > i { background: rgba(37, 99, 235, 0.1); }
-.ap-i > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.ap-i strong { font-size: 13.5px; font-weight: 700; }
-.ap-i span { font-size: 11.5px; opacity: 0.78; }
+.ap-i > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ap-i strong { font-size: 15px; font-weight: 700; }
+.ap-i span { font-size: 12.5px; opacity: 0.78; }
 .theme-navy.light .ap-i span { color: rgba(12,31,64,.78); opacity: 1; }
-.ap-i strong { font-size: 13px; }
 .theme-navy.light .ap-i strong { color: #0c1f40; }
 .ap-sep { height: 1px; background: var(--b); margin: 4px 8px; }
 

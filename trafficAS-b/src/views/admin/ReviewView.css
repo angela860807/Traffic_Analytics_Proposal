@@ -7,7 +7,7 @@
 .t-sub { font-weight: 500; opacity: .8; }
 .t-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .hdr-kpi {
-  display: inline-flex; align-items: center; gap: 10px;
+  display: inline-flex; align-items: center; gap: 9px;
   margin-left: 0px; flex-wrap: wrap;
 }
 .kpi-chip {
@@ -320,3 +320,139 @@
 .tbl-audit th, .tbl-audit td { padding: 8px; text-align: left; border-bottom: 1px solid #1a2a45; }
 .tbl-audit th { font-weight: 600; opacity: .55; font-size: 11px; }
 .tbl-audit .mono { font-family: "JetBrains Mono", monospace; }
+
+/* 본문 상단 툴바 (헤더에서 분리된 KPI + 보고서 다운로드) */
+.rev-shell .rev-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  background: #f5f8fd;
+  border-bottom: 1px solid #e3eaf4;
+  flex-wrap: wrap;
+}
+.rev-shell .rev-toolbar .hdr-kpi {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.rev-shell .rev-toolbar .kpi-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #ffffff;
+  border: 1px solid #d8dfeb;
+  color: #2c3a52;
+  padding: 5px 11px;
+  border-radius: 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.rev-shell .rev-toolbar .kpi-chip strong {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0c1f40;
+}
+.rev-shell .rev-toolbar .kpi-chip.bl i { color: #2563eb; }
+.rev-shell .rev-toolbar .kpi-chip.gr i { color: #059669; }
+.rev-shell .rev-toolbar .kpi-chip.rd i { color: #dc2626; }
+.rev-shell .rev-toolbar .kpi-chip.pl .kc-ocr {
+  background: #7c3aed; color: #fff;
+  font-size: 10px; font-weight: 700;
+  padding: 1px 5px; border-radius: 3px;
+}
+.rev-shell .rev-toolbar .rev-dl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 헤더 시간 표시 축소 */
+.rev-shell .top .hdr-time {
+  font-size: 12px;
+  color: #4a5b78;
+}
+.rev-shell .top .hdr-time strong {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+}
+
+/* 라이트 툴바 내부 입력/버튼 (기존 다크 스타일 오버라이드) */
+.rev-shell .rev-toolbar .rev-dl-date {
+  background: #ffffff;
+  border: 1px solid #d8dfeb;
+  color: #0c1f40;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+}
+.rev-shell .rev-toolbar .rev-dl-date::-webkit-calendar-picker-indicator {
+  filter: none;
+  cursor: pointer;
+}
+.rev-shell .rev-toolbar .rev-dl-btn {
+  background: #2563eb;
+  color: #fff;
+  border: 0;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.rev-shell .rev-toolbar .rev-dl-btn:hover { background: #1d4ed8; }
+
+/* 기간 지정 다운로드 패널 */
+.rev-shell .rev-toolbar .rev-dl-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: #ffffff;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.15);
+  animation: revRangeIn 0.18s ease-out;
+}
+@keyframes revRangeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.rev-shell .rev-toolbar .rev-dl-range-lab {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563eb;
+}
+.rev-shell .rev-toolbar .rev-dl-range-sep {
+  color: #94a3b8;
+  font-weight: 600;
+  margin: 0 2px;
+}
+.rev-shell .rev-toolbar .rev-dl-btn.alt {
+  background: #ffffff;
+  color: #2563eb;
+  border: 1px solid #2563eb;
+}
+.rev-shell .rev-toolbar .rev-dl-btn.alt:hover {
+  background: #eff6ff;
+}
+.rev-shell .rev-toolbar .rev-dl-btn.alt.on {
+  background: #2563eb;
+  color: #fff;
+}
+.rev-shell .rev-toolbar .rev-dl-btn.ok {
+  background: #059669;
+}
+.rev-shell .rev-toolbar .rev-dl-btn.ok:hover {
+  background: #047857;
+}
+.rev-shell .rev-toolbar .rev-dl-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

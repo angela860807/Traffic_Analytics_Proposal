@@ -2,7 +2,7 @@
   <div class="cc-shell" :class="{ 'side-collapsed': !sideOpen }">
     <aside class="side">
       <div class="side-top">
-        <RouterLink to="/" class="brand" v-if="sideOpen">Traffic <em>AS</em></RouterLink>
+        <RouterLink to="/" class="brand" v-if="sideOpen"><img src="/TAS.png" alt="TAS" class="brand-img" /></RouterLink>
         <button
           class="side-toggle"
           @click="sideOpen = !sideOpen"
@@ -91,6 +91,10 @@
               </div>
             </div>
           </div>
+          <button class="km-toggle guide-btn-trigger" @click="guideOpen = true" title="사용자 가이드">
+            <i class="bi bi-question-circle"></i>
+            <span class="km-lab">가이드</span>
+          </button>
           <DeptSwitcher />
           <div class="t-user">
             <i class="bi bi-person-circle"></i> 교통정보센터 매니저
@@ -98,6 +102,12 @@
           </div>
         </div>
       </header>
+
+      <GuideOverlay
+        v-model="guideOpen"
+        :steps="guideSteps"
+        :on-step-enter="onGuideStep"
+      />
 
       <template v-if="tab === 'center'">
         <section class="stat-row api-row">
@@ -199,9 +209,69 @@
             </div>
           </div>
 
-          <!-- 우측 컬럼: 단속 카메라(상) + 흐름 분석 카메라(하) 5:5 -->
+          <!-- 우측 컬럼: 흐름 분석 카메라(상) + 단속 카메라(하) 5:5 -->
           <div class="right-stack">
-            <!-- 1. 과속 단속 카메라 (단속관리팀 전송용) -->
+            <!-- 1. 교통 흐름 분석 카메라 -->
+            <div class="bot-card cam flow-cam">
+              <div class="bc-head">
+                <h3>
+                  <i class="bi bi-activity"></i> 교통 흐름 분석 카메라
+                  <span class="bc-sub">{{ flowCam.title }}</span>
+                </h3>
+                <span class="live"><span class="dot-live"></span> LIVE</span>
+              </div>
+              <div class="cam-main">
+                <video
+                  ref="flowCamEl"
+                  :src="flowCam.src"
+                  autoplay
+                  muted
+                  loop
+                  playsinline
+                  preload="auto"
+                  :key="flowCam.src"
+                  @loadedmetadata="applyCameraPlaybackRate"
+                  @canplay="applyCameraPlaybackRate"
+                  @play="applyCameraPlaybackRate"
+                ></video>
+                <span class="cam-ts">{{ camNowTime }}</span>
+                <span class="cam-loc">{{ flowCam.loc }}</span>
+                <div class="flow-overlay">
+                  <div class="fov-row">
+                    <span class="fov-l">차량 통과율</span>
+                    <strong class="fov-v"
+                      >{{ flowMetrics.flowRate }}<small>대/h</small></strong
+                    >
+                  </div>
+                  <div class="fov-row">
+                    <span class="fov-l">평균 속도</span>
+                    <strong class="fov-v"
+                      >{{ flowMetrics.avgSpeed }}<small>km/h</small></strong
+                    >
+                  </div>
+                  <div class="fov-row">
+                    <span class="fov-l">혼잡 레벨</span>
+                    <span class="fov-tag" :class="flowMetrics.congTone">{{
+                      flowMetrics.congLabel
+                    }}</span>
+                  </div>
+                </div>
+                <div class="cam-controls">
+                  <button class="cam-ctl" @click="toggleFlowMute" title="소리">
+                    <i :class="flowMuted ? 'bi bi-volume-mute' : 'bi bi-volume-up'"></i>
+                  </button>
+                  <button
+                    class="cam-zoom"
+                    @click="enterFullscreen(flowCamEl)"
+                    title="전체화면"
+                  >
+                    <i class="bi bi-arrows-fullscreen"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. 과속 단속 카메라 (단속관리팀 전송용) -->
             <div class="bot-card cam">
               <div class="bc-head">
                 <h3>
@@ -266,66 +336,6 @@
               <div v-if="sendToast" class="send-toast">
                 <i class="bi bi-check-circle-fill"></i>
                 <span>{{ sendToast }}</span>
-              </div>
-            </div>
-
-            <!-- 2. 교통 흐름 분석 카메라 -->
-            <div class="bot-card cam flow-cam">
-              <div class="bc-head">
-                <h3>
-                  <i class="bi bi-activity"></i> 교통 흐름 분석 카메라
-                  <span class="bc-sub">{{ flowCam.title }}</span>
-                </h3>
-                <span class="live"><span class="dot-live"></span> LIVE</span>
-              </div>
-              <div class="cam-main">
-                <video
-                  ref="flowCamEl"
-                  :src="flowCam.src"
-                  autoplay
-                  muted
-                  loop
-                  playsinline
-                  preload="auto"
-                  :key="flowCam.src"
-                  @loadedmetadata="applyCameraPlaybackRate"
-                  @canplay="applyCameraPlaybackRate"
-                  @play="applyCameraPlaybackRate"
-                ></video>
-                <span class="cam-ts">{{ camNowTime }}</span>
-                <span class="cam-loc">{{ flowCam.loc }}</span>
-                <div class="flow-overlay">
-                  <div class="fov-row">
-                    <span class="fov-l">차량 통과율</span>
-                    <strong class="fov-v"
-                      >{{ flowMetrics.flowRate }}<small>대/h</small></strong
-                    >
-                  </div>
-                  <div class="fov-row">
-                    <span class="fov-l">평균 속도</span>
-                    <strong class="fov-v"
-                      >{{ flowMetrics.avgSpeed }}<small>km/h</small></strong
-                    >
-                  </div>
-                  <div class="fov-row">
-                    <span class="fov-l">혼잡 레벨</span>
-                    <span class="fov-tag" :class="flowMetrics.congTone">{{
-                      flowMetrics.congLabel
-                    }}</span>
-                  </div>
-                </div>
-                <div class="cam-controls">
-                  <button class="cam-ctl" @click="toggleFlowMute" title="소리">
-                    <i :class="flowMuted ? 'bi bi-volume-mute' : 'bi bi-volume-up'"></i>
-                  </button>
-                  <button
-                    class="cam-zoom"
-                    @click="enterFullscreen(flowCamEl)"
-                    title="전체화면"
-                  >
-                    <i class="bi bi-arrows-fullscreen"></i>
-                  </button>
-                </div>
               </div>
             </div>
           </div>
@@ -436,7 +446,7 @@
         <div v-if="setMsg" class="set-msg">{{ setMsg }}</div>
       </section>
 
-      <footer class="foot">Traffic AS · v2.1.0</footer>
+      <footer class="foot">TAS · v2.1.0</footer>
     </div>
 
     <!-- CCTV 라이브 모달 -->
@@ -487,6 +497,15 @@ const { downloadDeptReport } = useReportDownload();
 const { submitViolation } = useViolationQueue();
 import SideWeather from "@/components/dashboard/SideWeather.vue";
 import { INITIAL_DISTRICTS_WEATHER, DISTRICT_LIST } from "@/data/weather";
+import GuideOverlay from "@/components/GuideOverlay.vue";
+import guideSteps from "@/data/guides/control.js";
+
+const guideOpen = ref(false);
+async function onGuideStep(step) {
+  if (step?.tab && step.tab !== tab.value) {
+    tab.value = step.tab;
+  }
+}
 
 const tab = ref("center");
 const autoRefresh = ref(true);
@@ -857,7 +876,7 @@ async function loadTodaySpeedViolations() {
 
 // 교통 흐름 분석 카메라
 const flowCam = {
-  src: videoSrc(""),
+  src: videoSrc("1_web.mp4"),
   title: "교통 흐름 분석",
   loc: "AI 교통 흐름 분석 스트림",
 };

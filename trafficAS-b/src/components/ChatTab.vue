@@ -25,7 +25,7 @@
       <div v-for="m in msgs" :key="m.id" class="msg" :class="{ mine: m.mine }">
         <div class="av">{{ m.mine ? '😀' : '🤖' }}</div>
         <div class="body">
-          <div class="name">{{ m.mine ? '나' : 'TrafficAS' }}</div>
+          <div class="name">{{ m.mine ? '나' : 'TAS' }}</div>
           <div class="bubble" :class="{ 'data-bubble': m.isData }">
             <span v-html="m.text"></span>
           </div>
@@ -117,9 +117,8 @@ const liveAnswers = [
 const staticAnswers = [
   { kw: ['안녕', 'hello', '하이'], a: '안녕하세요! 실시간 관제 어시스턴트입니다. 위 빠른 명령을 누르거나 "지금 가동 카메라", "혼잡 도로" 같이 물어보세요.' },
   { kw: ['로그인', '계정'], a: '관리자 계정: admin@trafficAS.com / admin1234' },
-  { kw: ['대시보드 사용', '대시보드 어디', '사용법'], a: '관리자 로그인 후 헤더 "대시보드" 또는 /dashboard. 6개 탭(대시보드/모니터링/이벤트/검색/통계/설정)이 있습니다.' },
-  { kw: ['검색', '필터'], a: '검색 탭에서 7가지 조건(날짜·시간·차량번호·카메라·방향·상태·신뢰도)으로 OCR 로그 검색 가능. 결과 행 클릭 시 모달 표시.' },
-  { kw: ['지도', '히트맵', '도로'], a: '강남권 도로 혼잡도를 Leaflet 지도에 색상으로 표시. OSM 실제 도로 데이터 사용 (3초마다 갱신).' },
+  { kw: ['대시보드 사용', '대시보드 어디', '사용법'], a: '관리자 로그인 후 헤더의 부서별 대시보드(교통정보센터/단속관리팀/교통분석팀/시설운영팀/경영전략본부)로 진입하세요.' },
+  { kw: ['지도', '히트맵', '도로'], a: '교통정보센터 등 부서 대시보드에서 Leaflet 기반 실시간 혼잡도 지도를 제공합니다. OSM 도로 데이터 사용.' },
   { kw: ['기술', '스택'], a: 'Vue 3 + Vite, Spring Boot, FastAPI, YOLO·OCR, Leaflet, ECharts. 외부 의존성 4개로 최소화.' },
   { kw: ['연락', '문의', '이메일'], a: '문의: chlehdgb123@naver.com / GitHub: angela860807/Traffic_Analytics_Proposal' },
   { kw: ['감사', '고마', 'thank'], a: '도움이 되었다면 다행입니다 😊' },

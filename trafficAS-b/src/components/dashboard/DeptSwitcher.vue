@@ -20,12 +20,6 @@
         <span v-if="route.path === d.to" class="ds-cur">현재</span>
         <i v-else class="bi bi-arrow-right ds-arr"></i>
       </RouterLink>
-      <div class="ds-sep"></div>
-      <RouterLink to="/dashboard" class="ds-i sm" @click="open = false">
-        <i class="bi bi-house-door"></i>
-        <div class="ds-body"><div class="ds-t">기존 대시보드</div></div>
-        <i class="bi bi-arrow-right ds-arr"></i>
-      </RouterLink>
     </div>
   </div>
 </template>

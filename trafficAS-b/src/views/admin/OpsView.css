@@ -658,26 +658,22 @@
 .ops-shell :deep(.top h1) {
   color: #0c1f40 !important;
   margin: 0;
-  font-size: 13.5px !important;
-  font-weight: 700 !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  opacity: 1 !important;
 }
 .ops-shell :deep(.t-sub) {
   color: #0c1f40 !important;
+  opacity: 1 !important;
 }
 .ops-shell :deep(.t-main) {
   color: #0c1f40 !important;
   text-decoration: none !important;
-  font-size: 13.5px !important;
+  font-size: 22px !important;
   font-weight: 700 !important;
-  letter-spacing: -0.01em;
-  cursor: pointer;
-  padding: 2px 0;
-  border-bottom: 2px solid transparent;
-  display: inline-block;
-}
-.ops-shell :deep(.t-main:hover) {
-  color: #0c1f40 !important;
-  border-bottom-color: transparent !important;
+  letter-spacing: -0.01em !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
 }
 .ops-shell :deep(.t-bell),
 .ops-shell :deep(.t-user) {
@@ -829,14 +825,14 @@
   min-width: 18px;
 }
 .ops-shell :deep(.top h1) {
-  font-size: 13.5px;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 .ops-shell :deep(.t-sub) {
-  font-size: 13.5px;
+  font-size: 14px;
   margin-left: 8px;
-  opacity: 0.75;
+  opacity: 1;
 }
 .ops-shell :deep(.t-bell),
 .ops-shell :deep(.t-user) {
@@ -3285,4 +3281,85 @@
 .ops-shell .srv-meta i {
   color: #2563eb;
   margin-right: 4px;
+}
+
+/* 시설운영 설정 탭 */
+.ops-shell .ops-set-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-top: 8px;
+}
+.ops-shell .ops-set-blk {
+  background: #f5f8fd;
+  border: 1px solid #e3eaf4;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.ops-shell .ops-set-blk h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0c1f40;
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e3eaf4;
+}
+.ops-shell .ops-set-blk .set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: #4a5b78;
+}
+.ops-shell .ops-set-blk .set-row label {
+  font-weight: 600;
+  color: #2c3a52;
+}
+.ops-shell .ops-set-blk .set-row input[type="number"],
+.ops-shell .ops-set-blk .set-row select {
+  padding: 5px 8px;
+  border: 1px solid #c9d4e3;
+  border-radius: 4px;
+  font-size: 12.5px;
+  background: #fff;
+  color: #0c1f40;
+  max-width: 160px;
+}
+.ops-shell .ops-set-blk .set-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+.ops-shell .ops-set-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #e3eaf4;
+}
+.ops-shell .ops-set-save {
+  background: #2563eb;
+  color: #fff;
+  border: 0;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ops-shell .ops-set-save:hover { background: #1d4ed8; }
+.ops-shell .ops-set-msg {
+  font-size: 12.5px;
+  color: #059669;
+  font-weight: 600;
+}
+@media (max-width: 900px) {
+  .ops-shell .ops-set-grid { grid-template-columns: 1fr; }
 }

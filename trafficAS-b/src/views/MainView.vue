@@ -9,7 +9,7 @@
           <div class="hero-tag">AI 기반 교통 데이터 솔루션</div>
           <h1>번호판 인식 데이터로<br />도시의 <em>교통 흐름</em>을 분석합니다.</h1>
           <p class="hero-sub">
-            Traffic AS는 AI 영상 분석과 실시간 데이터 처리 기술로<br />
+            TAS는 AI 영상 분석과 실시간 데이터 처리 기술로<br />
             교통 흐름을 정확하게 이해하고, 더 안전한 도시를 만듭니다.
           </p>
           <div class="hero-btns">
@@ -110,7 +110,7 @@
       <div class="sw">
         <div class="cta-card">
           <div class="cta-text">
-            <h2>Traffic AS로 더 안전한 교통 환경을 시작하세요.</h2>
+            <h2>TAS로 더 안전한 교통 환경을 시작하세요.</h2>
             <p>데모 신청 또는 상담 문의를 통해 맞춤 솔루션을 경험해보세요.</p>
           </div>
           <div class="cta-btns">
