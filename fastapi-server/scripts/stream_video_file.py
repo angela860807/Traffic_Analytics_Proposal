@@ -15,6 +15,7 @@ import numpy as np
 import requests
 
 STREAM_FRAME_PATH = "/api/detections/stream-frame"
+HIGHRES_OCR_PATH = "/api/detections/stream-frame/highres-ocr"
 WINDOW_NAME = "Traffic Stream + BBox Preview"
 SPEED_ZONE_WINDOW_NAME = "Speed Zone Config"
 
@@ -24,6 +25,8 @@ class UploadTask:
     frame_number: int
     captured_at: datetime
     frame_bytes: bytes
+    high_res_crop_bytes: bytes | None = None
+    high_res_crop_frame_number: int | None = None
 
 
 @dataclass
@@ -124,6 +127,23 @@ def build_parser() -> argparse.ArgumentParser:
             "Resize frames before upload to reduce server YOLO load. "
             "1.0 uploads original resolution."
         ),
+    )
+    parser.add_argument(
+        "--highres-ocr-crop",
+        action="store_true",
+        help="Attach a high-resolution vehicle crop for OCR when a recent bbox is available.",
+    )
+    parser.add_argument(
+        "--highres-crop-padding",
+        type=float,
+        default=0.25,
+        help="Padding ratio around the original-resolution bbox crop sent for OCR.",
+    )
+    parser.add_argument(
+        "--highres-jpeg-quality",
+        type=int,
+        default=85,
+        help="JPEG quality for high-resolution OCR crops.",
     )
     parser.add_argument(
         "--timeout",
@@ -293,6 +313,7 @@ def summarize_response(frame_number: int, response_body: dict[str, Any]) -> str:
         f"streamStatus={response_body.get('streamStatus')} "
         f"eventId={response_body.get('eventId') or '-'} "
         f"frameCount={response_body.get('frameCount')} "
+        f"bestFrame={response_body.get('bestCandidateFrameNumber') or '-'} "
         f"analysisStatus={response_body.get('analysisStatus') or '-'} "
         f"speed={speed_text} "
         f"overSpeed={over_speed} "
@@ -313,23 +334,38 @@ def post_frame(
     url: str,
     camera_code: str,
     captured_at: datetime,
+    frame_number: int | None,
     frame_bytes: bytes,
     timeout: float,
     speed_config_json: str | None = None,
+    high_res_crop_bytes: bytes | None = None,
+    high_res_crop_frame_number: int | None = None,
 ) -> dict[str, Any]:
     data = {
         "cameraCode": camera_code,
         "capturedAt": captured_at.isoformat(timespec="milliseconds"),
     }
+    if frame_number is not None:
+        data["frameNumber"] = str(frame_number)
     if speed_config_json is not None:
         data["speedConfigJson"] = speed_config_json
+
+    files = {
+        "image": ("video-frame.jpg", frame_bytes, "image/jpeg"),
+    }
+    if high_res_crop_bytes is not None:
+        if high_res_crop_frame_number is not None:
+            data["highResCropFrameNumber"] = str(high_res_crop_frame_number)
+        files["highResCrop"] = (
+            "highres-crop.jpg",
+            high_res_crop_bytes,
+            "image/jpeg",
+        )
 
     response = requests.post(
         url,
         data=data,
-        files={
-            "image": ("video-frame.jpg", frame_bytes, "image/jpeg"),
-        },
+        files=files,
         timeout=timeout,
     )
 
@@ -345,6 +381,43 @@ def post_frame(
         body = response.text[:500]
         raise RuntimeError(
             f"request failed: status={response.status_code}, body={body}"
+        ) from exc
+
+    return response.json()
+
+
+def post_highres_ocr(
+    *,
+    url: str,
+    camera_code: str,
+    captured_at: str,
+    frame_number: int,
+    high_res_crop_bytes: bytes,
+    timeout: float,
+) -> dict[str, Any]:
+    response = requests.post(
+        url,
+        data={
+            "cameraCode": camera_code,
+            "capturedAt": captured_at,
+            "frameNumber": str(frame_number),
+        },
+        files={
+            "highResCrop": (
+                "best-frame-highres-crop.jpg",
+                high_res_crop_bytes,
+                "image/jpeg",
+            ),
+        },
+        timeout=timeout,
+    )
+
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        body = response.text[:500]
+        raise RuntimeError(
+            f"high-res OCR request failed: status={response.status_code}, body={body}"
         ) from exc
 
     return response.json()
@@ -1052,6 +1125,186 @@ def select_response_bbox(
     return (x1, y1, x2, y2), float(response_body.get("bboxConfidenceScore", 0.0))
 
 
+def encode_highres_crop_from_bbox(
+    frame,
+    *,
+    bbox: tuple[int, int, int, int],
+    padding_ratio: float,
+    jpeg_quality: int,
+) -> bytes | None:
+    height, width = frame.shape[:2]
+    x1, y1, x2, y2 = bbox
+    bbox_w = max(1, x2 - x1)
+    bbox_h = max(1, y2 - y1)
+    pad_x = round(bbox_w * padding_ratio)
+    pad_y = round(bbox_h * padding_ratio)
+
+    left = max(0, x1 - pad_x)
+    top = max(0, y1 - pad_y)
+    right = min(width, x2 + pad_x)
+    bottom = min(height, y2 + pad_y)
+
+    if right <= left or bottom <= top:
+        return None
+
+    crop = frame[top:bottom, left:right]
+    success, buffer = cv2.imencode(
+        ".jpg",
+        crop,
+        [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality],
+    )
+
+    if not success:
+        return None
+
+    return buffer.tobytes()
+
+
+def encode_highres_crop_from_video(
+    *,
+    video_path: Path,
+    frame_number: int,
+    bbox: tuple[int, int, int, int],
+    padding_ratio: float,
+    jpeg_quality: int,
+) -> bytes | None:
+    capture = cv2.VideoCapture(str(video_path))
+    try:
+        if not capture.isOpened():
+            return None
+
+        capture.set(cv2.CAP_PROP_POS_FRAMES, max(0, frame_number - 1))
+        ok, frame = capture.read()
+
+        if not ok:
+            return None
+
+        return encode_highres_crop_from_bbox(
+            frame,
+            bbox=bbox,
+            padding_ratio=padding_ratio,
+            jpeg_quality=jpeg_quality,
+        )
+    finally:
+        capture.release()
+
+
+def build_finalized_highres_crop(
+    *,
+    video_path: Path,
+    response_body: dict[str, Any],
+    response_coord_scale: float,
+    padding_ratio: float,
+    jpeg_quality: int,
+) -> tuple[bytes | None, int | None, str | None]:
+    frame_number = response_body.get("bestCandidateFrameNumber")
+    bbox = response_body.get("bestCandidateBbox")
+    captured_at = response_body.get("bestCandidateCapturedAt")
+
+    if not isinstance(frame_number, int) or bbox is None or captured_at is None:
+        return None, None, None
+
+    original_bbox = tuple(
+        int(round(float(value) * response_coord_scale))
+        for value in bbox
+    )
+
+    crop_bytes = encode_highres_crop_from_video(
+        video_path=video_path,
+        frame_number=frame_number,
+        bbox=original_bbox,
+        padding_ratio=padding_ratio,
+        jpeg_quality=jpeg_quality,
+    )
+
+    return crop_bytes, frame_number, str(captured_at)
+
+
+def should_run_finalized_highres_ocr(response_body: dict[str, Any] | None) -> bool:
+    if not isinstance(response_body, dict):
+        return False
+
+    return (
+        response_body.get("streamStatus") == "FINALIZED"
+        and isinstance(response_body.get("bestCandidateFrameNumber"), int)
+        and response_body.get("bestCandidateBbox") is not None
+        and response_body.get("bestCandidateCapturedAt") is not None
+    )
+
+
+def summarize_highres_response(
+    frame_number: int,
+    response_body: dict[str, Any],
+) -> str:
+    data = response_body.get("data") or {}
+    return (
+        f"highresFrame={frame_number} "
+        f"analysisStatus={response_body.get('analysisStatus') or '-'} "
+        f"plateNumber={data.get('plateNumber') or '-'} "
+        f"detectionType={data.get('detectionType') or '-'}"
+    )
+
+
+def build_highres_crop_for_upload(
+    *,
+    enabled: bool,
+    use_async_upload: bool,
+    upload_state: UploadState,
+    source_frame_history: deque[tuple[int, Any]],
+    latest_response_frame_number: int | None,
+    latest_response_body: dict[str, Any] | None,
+    response_coord_scale: float,
+    padding_ratio: float,
+    jpeg_quality: int,
+) -> tuple[bytes | None, int | None]:
+    if not enabled:
+        return None, None
+
+    if use_async_upload:
+        response_frame_number, response_body = get_latest_response_packet(upload_state)
+    else:
+        response_frame_number = latest_response_frame_number
+        response_body = latest_response_body
+
+    if response_frame_number is None:
+        return None, None
+
+    bbox, _ = select_response_bbox(
+        response_body,
+        response_coord_scale=response_coord_scale,
+    )
+
+    if bbox is None:
+        return None, None
+
+    source_frame = find_frame_by_number(
+        source_frame_history,
+        response_frame_number,
+    )
+    if source_frame is None:
+        return None, None
+
+    high_res_crop_bytes = encode_highres_crop_from_bbox(
+        source_frame,
+        bbox=bbox,
+        padding_ratio=padding_ratio,
+        jpeg_quality=jpeg_quality,
+    )
+
+    return high_res_crop_bytes, response_frame_number
+
+
+def find_frame_by_number(
+    frame_history: deque[tuple[int, Any]],
+    frame_number: int,
+):
+    for current_frame_number, frame in reversed(frame_history):
+        if current_frame_number == frame_number:
+            return frame
+
+    return None
+
+
 def xyxy_to_xywh(bbox: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
     x1, y1, x2, y2 = bbox
     return (x1, y1, max(1, x2 - x1), max(1, y2 - y1))
@@ -1169,9 +1422,15 @@ def upload_worker(
     stop_event: threading.Event,
     upload_state: UploadState,
     url: str,
+    highres_ocr_url: str,
+    video_path: Path,
     camera_code: str,
     timeout: float,
     stop_after_finalized: int,
+    highres_ocr_enabled: bool,
+    response_coord_scale: float,
+    highres_crop_padding: float,
+    highres_jpeg_quality: int,
     speed_config_json: str | None = None,
 ) -> None:
     while True:
@@ -1188,10 +1447,49 @@ def upload_worker(
                 url=url,
                 camera_code=camera_code,
                 captured_at=task.captured_at,
+                frame_number=task.frame_number,
                 frame_bytes=task.frame_bytes,
                 timeout=timeout,
                 speed_config_json=speed_config_json,
+                high_res_crop_bytes=task.high_res_crop_bytes,
+                high_res_crop_frame_number=task.high_res_crop_frame_number,
             )
+
+            if highres_ocr_enabled and should_run_finalized_highres_ocr(response_body):
+                (
+                    crop_bytes,
+                    best_frame_number,
+                    best_captured_at,
+                ) = build_finalized_highres_crop(
+                    video_path=video_path,
+                    response_body=response_body,
+                    response_coord_scale=response_coord_scale,
+                    padding_ratio=highres_crop_padding,
+                    jpeg_quality=highres_jpeg_quality,
+                )
+                if (
+                    crop_bytes is None
+                    or best_frame_number is None
+                    or best_captured_at is None
+                ):
+                    raise RuntimeError(
+                        "failed to capture original best frame for high-res OCR"
+                    )
+
+                highres_response_body = post_highres_ocr(
+                    url=highres_ocr_url,
+                    camera_code=camera_code,
+                    captured_at=best_captured_at,
+                    frame_number=best_frame_number,
+                    high_res_crop_bytes=crop_bytes,
+                    timeout=timeout,
+                )
+                print(
+                    summarize_highres_response(
+                        best_frame_number,
+                        highres_response_body,
+                    )
+                )
 
             with upload_state.lock:
                 upload_state.latest_response_body = response_body
@@ -1241,6 +1539,12 @@ def main() -> None:
     if args.upload_scale <= 0:
         raise SystemExit("--upload-scale must be greater than 0")
 
+    if args.highres_crop_padding < 0:
+        raise SystemExit("--highres-crop-padding must be greater than or equal to 0")
+
+    if args.highres_jpeg_quality < 1 or args.highres_jpeg_quality > 100:
+        raise SystemExit("--highres-jpeg-quality must be between 1 and 100")
+
     if args.window_width <= 0 or args.window_height <= 0:
         raise SystemExit("--window-width and --window-height must be greater than 0")
 
@@ -1284,6 +1588,7 @@ def main() -> None:
     base_url = args.fastapi_base_url.rstrip("/")
     check_stream_endpoint(base_url, args.timeout)
     url = f"{base_url}{STREAM_FRAME_PATH}"
+    highres_ocr_url = f"{base_url}{HIGHRES_OCR_PATH}"
     capture = cv2.VideoCapture(str(video_path))
 
     if not capture.isOpened():
@@ -1313,8 +1618,12 @@ def main() -> None:
     video_height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT) or 480)
     stopped_early = False
     latest_response_body: dict[str, Any] | None = None
+    latest_response_frame_number: int | None = None
     upload_state = UploadState()
     upload_queue: queue.Queue[UploadTask] | None = None
+    source_frame_history: deque[tuple[int, Any]] = deque(
+        maxlen=max(30, round(source_fps * 12))
+    )
     frame_history: deque[tuple[int, Any]] = deque(maxlen=max(30, round(source_fps * 6)))
     preview_buffer: deque[PreviewFrame] = deque(
         maxlen=max(30, preview_delay_frames + round(source_fps * 2))
@@ -1334,9 +1643,15 @@ def main() -> None:
                 "stop_event": stop_event,
                 "upload_state": upload_state,
                 "url": url,
+                "highres_ocr_url": highres_ocr_url,
+                "video_path": video_path,
                 "camera_code": args.camera_code,
                 "timeout": args.timeout,
                 "stop_after_finalized": args.stop_after_finalized,
+                "highres_ocr_enabled": args.highres_ocr_crop,
+                "response_coord_scale": response_coord_scale,
+                "highres_crop_padding": args.highres_crop_padding,
+                "highres_jpeg_quality": args.highres_jpeg_quality,
                 "speed_config_json": speed_config_json,
             },
             daemon=True,
@@ -1363,6 +1678,9 @@ def main() -> None:
                 "bboxHoldSeconds": args.bbox_hold_seconds,
                 "displayScale": args.scale,
                 "uploadScale": args.upload_scale,
+                "highresOcrCrop": args.highres_ocr_crop,
+                "highresCropPadding": args.highres_crop_padding,
+                "highresJpegQuality": args.highres_jpeg_quality,
                 "windowWidth": args.window_width,
                 "windowHeight": args.window_height,
                 "asyncUpload": use_async_upload,
@@ -1408,6 +1726,7 @@ def main() -> None:
                 break
 
             read_count += 1
+            source_frame_history.append((read_count, frame.copy()))
             preview_buffer.append(PreviewFrame(read_count, frame.copy()))
             should_preview_frame = (
                 args.preview_bbox
@@ -1430,6 +1749,20 @@ def main() -> None:
                     if frame_bytes is None:
                         print(f"frame={read_count} encode_failed")
                     else:
+                        (
+                            high_res_crop_bytes,
+                            high_res_crop_frame_number,
+                        ) = build_highres_crop_for_upload(
+                            enabled=args.highres_ocr_crop,
+                            use_async_upload=use_async_upload,
+                            upload_state=upload_state,
+                            source_frame_history=source_frame_history,
+                            latest_response_frame_number=latest_response_frame_number,
+                            latest_response_body=latest_response_body,
+                            response_coord_scale=response_coord_scale,
+                            padding_ratio=args.highres_crop_padding,
+                            jpeg_quality=args.highres_jpeg_quality,
+                        )
                         captured_at = base_time + timedelta(
                             seconds=uploaded_count
                             * args.video_speed_ratio
@@ -1442,6 +1775,10 @@ def main() -> None:
                                 frame_number=read_count,
                                 captured_at=captured_at,
                                 frame_bytes=frame_bytes,
+                                high_res_crop_bytes=high_res_crop_bytes,
+                                high_res_crop_frame_number=(
+                                    high_res_crop_frame_number
+                                ),
                             ),
                         )
                         uploaded_count += 1
@@ -1598,6 +1935,21 @@ def main() -> None:
                 print(f"frame={read_count} encode_failed")
                 continue
 
+            (
+                high_res_crop_bytes,
+                high_res_crop_frame_number,
+            ) = build_highres_crop_for_upload(
+                enabled=args.highres_ocr_crop,
+                use_async_upload=use_async_upload,
+                upload_state=upload_state,
+                source_frame_history=source_frame_history,
+                latest_response_frame_number=latest_response_frame_number,
+                latest_response_body=latest_response_body,
+                response_coord_scale=response_coord_scale,
+                padding_ratio=args.highres_crop_padding,
+                jpeg_quality=args.highres_jpeg_quality,
+            )
+
             captured_at = base_time + timedelta(
                 seconds=uploaded_count * args.video_speed_ratio / args.fps
             )
@@ -1610,6 +1962,8 @@ def main() -> None:
                         frame_number=read_count,
                         captured_at=captured_at,
                         frame_bytes=frame_bytes,
+                        high_res_crop_bytes=high_res_crop_bytes,
+                        high_res_crop_frame_number=high_res_crop_frame_number,
                     ),
                 )
                 uploaded_count += 1
@@ -1620,11 +1974,52 @@ def main() -> None:
                     url=url,
                     camera_code=args.camera_code,
                     captured_at=captured_at,
+                    frame_number=read_count,
                     frame_bytes=frame_bytes,
                     timeout=args.timeout,
                     speed_config_json=speed_config_json,
+                    high_res_crop_bytes=high_res_crop_bytes,
+                    high_res_crop_frame_number=high_res_crop_frame_number,
                 )
+                if args.highres_ocr_crop and should_run_finalized_highres_ocr(
+                    response_body
+                ):
+                    (
+                        crop_bytes,
+                        best_frame_number,
+                        best_captured_at,
+                    ) = build_finalized_highres_crop(
+                        video_path=video_path,
+                        response_body=response_body,
+                        response_coord_scale=response_coord_scale,
+                        padding_ratio=args.highres_crop_padding,
+                        jpeg_quality=args.highres_jpeg_quality,
+                    )
+                    if (
+                        crop_bytes is None
+                        or best_frame_number is None
+                        or best_captured_at is None
+                    ):
+                        raise RuntimeError(
+                            "failed to capture original best frame for high-res OCR"
+                        )
+
+                    highres_response_body = post_highres_ocr(
+                        url=highres_ocr_url,
+                        camera_code=args.camera_code,
+                        captured_at=best_captured_at,
+                        frame_number=best_frame_number,
+                        high_res_crop_bytes=crop_bytes,
+                        timeout=args.timeout,
+                    )
+                    print(
+                        summarize_highres_response(
+                            best_frame_number,
+                            highres_response_body,
+                        )
+                    )
                 latest_response_body = response_body
+                latest_response_frame_number = read_count
                 uploaded_count += 1
 
                 print(summarize_response(read_count, response_body))
@@ -1703,6 +2098,7 @@ def main() -> None:
                 url=url,
                 camera_code=args.camera_code,
                 captured_at=captured_at,
+                frame_number=None,
                 frame_bytes=blank_frame_bytes,
                 timeout=args.timeout,
                 speed_config_json=speed_config_json,

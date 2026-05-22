@@ -61,6 +61,10 @@ def crop_plate_with_padding(
 
 
 def preprocess_plate_for_ocr(plate_crop: np.ndarray) -> np.ndarray:
+    return build_plate_ocr_variants(plate_crop)[-1][1]
+
+
+def build_plate_ocr_variants(plate_crop: np.ndarray) -> list[tuple[str, np.ndarray]]:
     resized = cv2.resize(
         plate_crop,
         None,
@@ -70,6 +74,20 @@ def preprocess_plate_for_ocr(plate_crop: np.ndarray) -> np.ndarray:
     )
 
     gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    clahe_gray = clahe.apply(gray)
+
+    sharpen_kernel = np.array(
+        [
+            [0, -1, 0],
+            [-1, 5, -1],
+            [0, -1, 0],
+        ],
+        dtype=np.float32,
+    )
+    sharpened = cv2.filter2D(resized, -1, sharpen_kernel)
+    sharpened_gray = cv2.filter2D(clahe_gray, -1, sharpen_kernel)
+
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
     block_size = OCR_ADAPTIVE_BLOCK_SIZE
@@ -85,4 +103,18 @@ def preprocess_plate_for_ocr(plate_crop: np.ndarray) -> np.ndarray:
         OCR_ADAPTIVE_C,
     )
 
-    return cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
+    _, otsu = cv2.threshold(
+        clahe_gray,
+        0,
+        255,
+        cv2.THRESH_BINARY + cv2.THRESH_OTSU,
+    )
+
+    return [
+        ("resized", resized),
+        ("clahe", cv2.cvtColor(clahe_gray, cv2.COLOR_GRAY2BGR)),
+        ("sharpened", sharpened),
+        ("clahe_sharpened", cv2.cvtColor(sharpened_gray, cv2.COLOR_GRAY2BGR)),
+        ("otsu", cv2.cvtColor(otsu, cv2.COLOR_GRAY2BGR)),
+        ("adaptive", cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)),
+    ]
