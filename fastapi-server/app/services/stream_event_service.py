@@ -14,7 +14,6 @@ from app.core.config import (
     MAX_EVENT_SECONDS,
     POST_MISS_FRAMES,
     SAVE_EVENT_DEBUG,
-    TOP_N_OCR_FRAMES,
 )
 from app.schemas.detection import DetectionResult
 from app.schemas.speed import SpeedMeasurementResult
@@ -55,6 +54,9 @@ class StreamProcessingResult:
     bbox: tuple[int, int, int, int] | None = None
     bboxes: list[tuple[int, int, int, int]] | None = None
     bbox_confidence_score: float = 0.0
+    best_candidate_frame_number: int | None = None
+    best_candidate_bbox: tuple[int, int, int, int] | None = None
+    best_candidate_captured_at: datetime | None = None
     event_age_seconds: float = 0.0
     speed_measurements: list[SpeedMeasurementResult] = field(default_factory=list)
     speed_violation: SpeedMeasurementResult | None = None
@@ -85,6 +87,10 @@ class StreamEventService:
         captured_at: datetime,
         content_type: str,
         image_bytes: bytes,
+        frame_number: int | None = None,
+        high_res_crop_bytes: bytes | None = None,
+        high_res_crop_content_type: str | None = None,
+        high_res_crop_frame_number: int | None = None,
         speed_camera_config: SpeedCameraConfig | None = None,
     ) -> StreamProcessingResult:
         received_monotonic = time.monotonic()
@@ -112,6 +118,19 @@ class StreamEventService:
             captured_at=captured_at,
             content_type=content_type,
             image_bytes=image_bytes,
+            frame_number=frame_number,
+            high_res_crop_bytes=(
+                high_res_crop_bytes
+                if high_res_crop_frame_number is None
+                or high_res_crop_frame_number == frame_number
+                else None
+            ),
+            high_res_crop_content_type=(
+                high_res_crop_content_type
+                if high_res_crop_frame_number is None
+                or high_res_crop_frame_number == frame_number
+                else None
+            ),
             image=image,
             bbox=detection.bbox,
             bboxes=bboxes,
@@ -124,6 +143,18 @@ class StreamEventService:
             and frame.confidence_score >= DETECTION_CONFIDENCE_THRESHOLD
         )
         event = self._events_by_camera.get(camera_code)
+
+        if (
+            event is not None
+            and high_res_crop_bytes is not None
+            and high_res_crop_frame_number is not None
+        ):
+            self._attach_high_res_crop_to_event_frame(
+                event=event,
+                frame_number=high_res_crop_frame_number,
+                high_res_crop_bytes=high_res_crop_bytes,
+                high_res_crop_content_type=high_res_crop_content_type,
+            )
 
         if event is None:
             if not has_trigger:
@@ -156,7 +187,7 @@ class StreamEventService:
         event_age_seconds = self._calculate_event_age_seconds(event, received_monotonic)
 
         if self._should_finalize_event(event, event_age_seconds):
-            result = await self._finalize_event(event)
+            result, best_candidate = await self._finalize_event(event)
             del self._events_by_camera[camera_code]
             logger.info(
                 "vehicle event finalized: eventId=%s cameraCode=%s frames=%s ageSeconds=%.2f resultPlate=%s resultType=%s",
@@ -175,6 +206,15 @@ class StreamEventService:
                 bbox=frame.bbox,
                 bboxes=frame.bboxes,
                 bbox_confidence_score=frame.confidence_score,
+                best_candidate_frame_number=(
+                    best_candidate.frame_number if best_candidate is not None else None
+                ),
+                best_candidate_bbox=(
+                    best_candidate.bbox if best_candidate is not None else None
+                ),
+                best_candidate_captured_at=(
+                    best_candidate.captured_at if best_candidate is not None else None
+                ),
                 event_age_seconds=event_age_seconds,
                 speed_measurements=self._build_event_speed_measurements(
                     event,
@@ -203,6 +243,27 @@ class StreamEventService:
     def clear(self) -> None:
         self._events_by_camera.clear()
         self.speed_tracker.clear()
+
+    def _attach_high_res_crop_to_event_frame(
+        self,
+        *,
+        event: StreamEvent,
+        frame_number: int,
+        high_res_crop_bytes: bytes,
+        high_res_crop_content_type: str | None,
+    ) -> None:
+        for frame in event.frames:
+            if frame.frame_number == frame_number:
+                frame.high_res_crop_bytes = high_res_crop_bytes
+                frame.high_res_crop_content_type = high_res_crop_content_type
+                return
+
+        logger.debug(
+            "high-res crop target frame not found: eventId=%s cameraCode=%s frameNumber=%s",
+            event.event_id,
+            event.camera_code,
+            frame_number,
+        )
 
     def _build_event_speed_measurements(
         self,
@@ -280,7 +341,7 @@ class StreamEventService:
     async def _finalize_event(
         self,
         event: StreamEvent,
-    ) -> DetectionResult | None:
+    ) -> tuple[DetectionResult | None, BufferedFrame | None]:
         candidates = [
             frame
             for frame in event.frames
@@ -295,15 +356,14 @@ class StreamEventService:
                 event.camera_code,
                 len(event.frames),
             )
-            return None
+            return None, None
 
         sorted_candidates = sorted(
             candidates,
             key=lambda frame: frame.candidate_score,
             reverse=True,
         )
-        top_candidates = sorted_candidates[: max(1, TOP_N_OCR_FRAMES)]
-        best_candidate = top_candidates[0]
+        best_candidate = sorted_candidates[0]
 
         logger.info(
             "vehicle event OCR candidates selected: eventId=%s cameraCode=%s candidates=%s bestScore=%.4f bestConfidence=%.4f bestBlur=%.2f",
@@ -323,25 +383,24 @@ class StreamEventService:
 
         best_result: DetectionResult | None = None
 
-        for candidate in top_candidates:
-            result = await self.inference_service.detect_from_image_bytes(
-                camera_code=candidate.camera_code,
-                captured_at=candidate.captured_at,
-                image_bytes=candidate.image_bytes,
-                vehicle_detection=VehicleDetection(
-                    detection_type="VEHICLE",
-                    confidence_score=candidate.confidence_score,
-                    bbox=candidate.bbox,
-                ),
-            )
+        detection_kwargs = {
+            "camera_code": best_candidate.camera_code,
+            "captured_at": best_candidate.captured_at,
+            "image_bytes": best_candidate.image_bytes,
+            "vehicle_detection": VehicleDetection(
+                detection_type="VEHICLE",
+                confidence_score=best_candidate.confidence_score,
+                bbox=best_candidate.bbox,
+            ),
+        }
+        if best_candidate.high_res_crop_bytes is not None:
+            detection_kwargs["high_res_crop_bytes"] = best_candidate.high_res_crop_bytes
 
-            if best_result is None:
-                best_result = result
+        best_result = await self.inference_service.detect_from_image_bytes(
+            **detection_kwargs,
+        )
 
-            if result.detection_type == "PLATE" and result.plate_number:
-                return result
-
-        return best_result
+        return best_result, best_candidate
 
     def _save_debug_frames(
         self,
@@ -383,6 +442,9 @@ class StreamEventService:
         captured_at: datetime,
         content_type: str,
         image_bytes: bytes,
+        frame_number: int | None,
+        high_res_crop_bytes: bytes | None,
+        high_res_crop_content_type: str | None,
         image: np.ndarray,
         bbox: tuple[int, int, int, int] | None,
         bboxes: list[tuple[int, int, int, int]],
@@ -406,8 +468,11 @@ class StreamEventService:
             captured_at=captured_at,
             content_type=content_type,
             image_bytes=image_bytes,
+            frame_number=frame_number,
             bbox=bbox,
             bboxes=bboxes,
+            high_res_crop_bytes=high_res_crop_bytes,
+            high_res_crop_content_type=high_res_crop_content_type,
             confidence_score=confidence_score,
             candidate_score=candidate_score,
             blur_score=blur_score,
