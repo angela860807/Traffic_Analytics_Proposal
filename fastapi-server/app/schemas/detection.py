@@ -150,6 +150,21 @@ class StreamFrameResponse(BaseModel):
         le=1,
         examples=[0.9321],
     )
+    best_candidate_frame_number: int | None = Field(
+        default=None,
+        alias="bestCandidateFrameNumber",
+        examples=[156],
+    )
+    best_candidate_bbox: list[int] | None = Field(
+        default=None,
+        alias="bestCandidateBbox",
+        examples=[[120, 180, 240, 220]],
+    )
+    best_candidate_captured_at: datetime | None = Field(
+        default=None,
+        alias="bestCandidateCapturedAt",
+        examples=["2026-04-30T10:30:00"],
+    )
     event_age_seconds: float = Field(
         default=0.0,
         alias="eventAgeSeconds",
