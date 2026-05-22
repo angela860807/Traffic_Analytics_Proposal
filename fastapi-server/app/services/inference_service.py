@@ -9,9 +9,9 @@ from app.schemas.detection import DetectionResult, RaspberryFrameRequest
 from app.services.image_decoder import ImageDecoder
 from app.services.image_storage_service import ImageStorageService
 from app.services.image_preprocessor import (
+    build_plate_ocr_variants,
     crop_plate_with_padding,
     preprocess_frame_for_detection,
-    preprocess_plate_for_ocr,
 )
 from app.services.plate_detector import PlateDetector
 from app.services.plate_detector import PlateDetection
@@ -46,14 +46,21 @@ class InferenceService:
         camera_code: str,
         captured_at: datetime,
         image_bytes: bytes,
+        high_res_crop_bytes: bytes | None = None,
         vehicle_detection: VehicleDetection | None = None,
     ) -> DetectionResult:
         image = self.image_decoder.decode_image_bytes(image_bytes)
+        high_res_ocr_image = (
+            self.image_decoder.decode_image_bytes(high_res_crop_bytes)
+            if high_res_crop_bytes is not None
+            else None
+        )
 
         return self._detect(
             image=image,
             camera_code=camera_code,
             captured_at=captured_at,
+            high_res_ocr_image=high_res_ocr_image,
             vehicle_detection=vehicle_detection,
         )
 
@@ -90,6 +97,7 @@ class InferenceService:
         camera_code: str,
         captured_at: datetime,
         existing_image_path: str | None = None,
+        high_res_ocr_image=None,
         vehicle_detection: VehicleDetection | None = None,
     ) -> DetectionResult:
         if existing_image_path is None:
@@ -116,7 +124,12 @@ class InferenceService:
             detection_type = "UNKNOWN"
             confidence_score = 0.0
         else:
-            plate_detection = self.detect_plate_bbox_from_image(image)
+            ocr_source_image = (
+                high_res_ocr_image
+                if high_res_ocr_image is not None
+                else image
+            )
+            plate_detection = self.detect_plate_bbox_from_image(ocr_source_image)
             confidence_score = vehicle_detection.confidence_score
 
             if (
@@ -126,7 +139,10 @@ class InferenceService:
                 plate_number = None
                 detection_type = "VEHICLE"
             else:
-                plate_crop = crop_plate_with_padding(image, plate_detection.bbox)
+                plate_crop = crop_plate_with_padding(
+                    ocr_source_image,
+                    plate_detection.bbox,
+                )
 
                 if SAVE_PLATE_CROP:
                     plate_crop_image_path = (
@@ -143,7 +159,17 @@ class InferenceService:
                         )
                     )
 
-                ocr_image = preprocess_plate_for_ocr(plate_crop)
+                ocr_variants = build_plate_ocr_variants(plate_crop)
+                recognition = (
+                    self.plate_recognizer.recognize_best(ocr_variants)
+                    if hasattr(self.plate_recognizer, "recognize_best")
+                    else self.plate_recognizer.recognize(ocr_variants[-1][1])
+                )
+                ocr_image = (
+                    recognition.variant_image
+                    if recognition.variant_image is not None
+                    else ocr_variants[-1][1]
+                )
 
                 if SAVE_OCR_PREPROCESSED_IMAGE:
                     ocr_image_path = self.image_storage_service.save_detection_image(
@@ -155,8 +181,6 @@ class InferenceService:
                     ocr_image_url = self.image_storage_service.build_detection_image_url(
                         ocr_image_path,
                     )
-
-                recognition = self.plate_recognizer.recognize(ocr_image)
 
                 plate_number = recognition.text
                 detection_type = "PLATE" if plate_number else "VEHICLE"

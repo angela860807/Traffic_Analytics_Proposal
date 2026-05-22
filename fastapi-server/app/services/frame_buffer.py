@@ -11,12 +11,15 @@ class LatestFrame:
     captured_at: datetime
     content_type: str
     image_bytes: bytes
+    frame_number: int | None = None
 
 
 @dataclass
 class BufferedFrame(LatestFrame):
     bbox: tuple[int, int, int, int] | None = None
     bboxes: list[tuple[int, int, int, int]] | None = None
+    high_res_crop_bytes: bytes | None = None
+    high_res_crop_content_type: str | None = None
     confidence_score: float = 0.0
     candidate_score: float = 0.0
     blur_score: float = 0.0
