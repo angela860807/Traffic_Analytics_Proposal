@@ -6,7 +6,6 @@ const IntroView         = () => import('@/views/IntroView.vue')
 const SupportView       = () => import('@/views/SupportView.vue')
 const LoginView         = () => import('@/views/LoginView.vue')
 const SignupView        = () => import('@/views/SignupView.vue')
-const RoadDashboardView = () => import('@/views/RoadDashboardView.vue')
 
 const ControlView   = () => import('@/views/admin/ControlView.vue')
 const ReviewView    = () => import('@/views/admin/ReviewView.vue')
@@ -23,7 +22,6 @@ const router = createRouter({
     { path: '/sub/support',   component: SupportView       },
     { path: '/login',         component: LoginView         },
     { path: '/signup',        component: SignupView        },
-    { path: '/dashboard',     component: RoadDashboardView },
     { path: '/admin',         redirect: '/admin/super'     },
     { path: '/admin/reports',   redirect: '/admin/super'    },
     { path: '/admin/control',   component: ControlView   },
@@ -36,7 +34,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  const protectedPaths = ['/dashboard', '/admin']
+  const protectedPaths = ['/admin']
   if (protectedPaths.some(p => to.path.startsWith(p))) {
     const { isLoggedIn, isAdmin } = useAuth()
     if (!isLoggedIn.value) return '/login'

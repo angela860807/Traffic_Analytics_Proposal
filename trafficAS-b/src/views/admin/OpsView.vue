@@ -3,7 +3,7 @@
     <aside class="side">
       <div class="side-top">
         <RouterLink to="/" class="brand" v-if="sideOpen">
-          Traffic <em>AS</em>
+          <img src="/TAS.png" alt="TAS" class="brand-img" />
         </RouterLink>
         <button
           class="side-toggle"
@@ -36,7 +36,7 @@
 
     <div class="main">
       <header class="top">
-        <h1><a class="t-sub t-main" @click="goHome">시설운영팀</a></h1>
+        <h1><a class="t-main" @click="goHome">시설운영팀</a></h1>
         <div class="t-right">
           <span class="hdr-time"
             ><i class="bi bi-clock"></i> 마지막 업데이트 <strong>10:32:18</strong></span
@@ -62,6 +62,38 @@
             <span class="km-lab">자동 새로고침</span>
             <span class="km-state">{{ autoRefresh ? "ON" : "OFF" }}</span>
           </button>
+          <div class="hdr-bell-wrap" @click.stop>
+            <button class="hdr-bell" :class="{ critical: hasCritical, on: showAlerts }" @click="showAlerts = !showAlerts">
+              <i class="bi bi-bell-fill"></i>
+              <span v-if="liveAlerts.length" class="hdr-bell-c">{{ liveAlerts.length }}</span>
+            </button>
+            <div v-if="showAlerts" class="hdr-bell-pop" @click.stop>
+              <div class="hbp-h">
+                <i class="bi bi-exclamation-octagon-fill"></i>
+                <strong>실시간 알림</strong>
+                <span class="hbp-c">{{ liveAlerts.length }}건</span>
+                <button class="hbp-x" @click="showAlerts = false"><i class="bi bi-x-lg"></i></button>
+              </div>
+              <div class="hbp-list">
+                <div v-for="a in liveAlerts" :key="a.id" class="ac-row" :class="a.sev" @click="showAlerts = false">
+                  <div class="ac-sev"><i :class="a.icon"></i></div>
+                  <div class="ac-body">
+                    <div class="ac-t">{{ a.title }}</div>
+                    <div class="ac-d">{{ a.detail }}</div>
+                    <div class="ac-meta">
+                      <span class="ac-loc"><i class="bi bi-geo-alt"></i> {{ a.place }}</span>
+                      <span class="ac-time">{{ a.time }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="!liveAlerts.length" class="ac-empty">활성 알림이 없습니다.</div>
+              </div>
+            </div>
+          </div>
+          <button class="km-toggle guide-btn-trigger" @click="guideOpen = true" title="사용자 가이드">
+            <i class="bi bi-question-circle"></i>
+            <span class="km-lab">가이드</span>
+          </button>
           <DeptSwitcher />
           <div class="t-user">
             <i class="bi bi-person-circle"></i> 시설운영팀 매니저
@@ -69,6 +101,12 @@
           </div>
         </div>
       </header>
+
+      <GuideOverlay
+        v-model="guideOpen"
+        :steps="guideSteps"
+        :on-step-enter="onGuideStep"
+      />
 
       <template v-if="tab === 'status'">
         <!-- ============ 메인 그리드 (좌 2x2 + 우 풀세로 장애상세) ============ -->
@@ -1386,6 +1424,49 @@
         </div>
 
       </section>
+
+      <!-- ============ 설정 탭 ============ -->
+      <section v-if="tab === 'settings'" class="card pnl">
+        <h3><i class="bi bi-gear"></i> 시설운영 환경 설정</h3>
+        <div class="ops-set-grid">
+          <div class="ops-set-blk">
+            <h4>자동 새로고침 · 알림</h4>
+            <div class="set-row"><label>자동 새로고침</label><input type="checkbox" v-model="autoRefresh" /></div>
+            <div class="set-row"><label>갱신 주기 (초)</label><input type="number" v-model.number="setRefreshSec" min="10" max="600" /></div>
+            <div class="set-row"><label>알림 사운드</label><input type="checkbox" v-model="setSound" /></div>
+            <div class="set-row"><label>심각도 critical만 팝업</label><input type="checkbox" /></div>
+          </div>
+          <div class="ops-set-blk">
+            <h4>장애 임계값</h4>
+            <div class="set-row"><label>네트워크 지연 경보 (ms ≥)</label><input type="number" value="200" /></div>
+            <div class="set-row"><label>CPU 사용률 경보 (% ≥)</label><input type="number" value="85" /></div>
+            <div class="set-row"><label>디스크 경보 (% ≥)</label><input type="number" value="90" /></div>
+            <div class="set-row"><label>RTSP 타임아웃 (분 ≥)</label><input type="number" value="5" /></div>
+          </div>
+          <div class="ops-set-blk">
+            <h4>점검 · 로그</h4>
+            <div class="set-row"><label>장비 점검 주기</label>
+              <select><option>매일</option><option>주 1회</option><option>월 1회</option></select>
+            </div>
+            <div class="set-row"><label>장애 로그 보관</label>
+              <select><option>30일</option><option>60일</option><option>90일</option><option>1년</option></select>
+            </div>
+            <div class="set-row"><label>정기 점검 알림</label><input type="checkbox" checked /></div>
+          </div>
+          <div class="ops-set-blk">
+            <h4>현장 출동</h4>
+            <div class="set-row"><label>기본 담당자</label>
+              <select><option>김기사</option><option>이엔지</option><option>박기사</option></select>
+            </div>
+            <div class="set-row"><label>출동 SMS 발송</label><input type="checkbox" checked /></div>
+            <div class="set-row"><label>예비 부품 부족 알림</label><input type="checkbox" checked /></div>
+          </div>
+        </div>
+        <div class="ops-set-foot">
+          <button class="ops-set-save" @click="saveSettings"><i class="bi bi-check2"></i> 저장</button>
+          <span v-if="setMsg" class="ops-set-msg">{{ setMsg }}</span>
+        </div>
+      </section>
     </div>
     <!-- ============ 카메라 상세 모달 ============ -->
     <div v-if="camModal" class="cam-modal-bg" @click="camModal = null">
@@ -1650,8 +1731,17 @@ import { RouterLink } from "vue-router";
 import DeptSwitcher from "@/components/dashboard/DeptSwitcher.vue";
 import SideWeather from "@/components/dashboard/SideWeather.vue";
 import { INITIAL_DISTRICTS_WEATHER, DISTRICT_LIST } from "@/data/weather";
+import GuideOverlay from "@/components/GuideOverlay.vue";
+import guideSteps from "@/data/guides/ops.js";
+
+const guideOpen = ref(false);
 
 const tab = ref("status");
+async function onGuideStep(step) {
+  if (step?.tab && step.tab !== tab.value) {
+    tab.value = step.tab;
+  }
+}
 const autoRefresh = ref(true);
 
 // 헤더 날씨 칩 + 팝오버
@@ -2265,9 +2355,35 @@ const nav = [
   { id: "cams", icon: "bi bi-camera-video", label: "카메라" },
   { id: "srv", icon: "bi bi-hdd-stack", label: "서버" },
   { id: "net", icon: "bi bi-diagram-3", label: "네트워크" },
-  { id: "alarm", icon: "bi bi-bell", label: "알람/이벤트", bdg: 3 },
   { id: "fault", icon: "bi bi-exclamation-triangle", label: "장애 관리", bdg: 3 },
+  { id: "settings", icon: "bi bi-gear", label: "설정" },
 ];
+
+/* ── 헤더 실시간 알림 ── */
+const showAlerts = ref(false);
+const liveAlerts = ref([
+  { id: 1, sev: "critical", icon: "bi bi-camera-video-off", title: "카메라 RTSP 타임아웃", detail: "NSN-N-0023 — 12분간 무신호. 현장 점검 필요", place: "내부순환로 03K+150", time: "14:18" },
+  { id: 2, sev: "serious",  icon: "bi bi-hdd-network",      title: "엣지 서버 디스크 90% 도달", detail: "EDGE-02 디스크 용량 임계치 초과", place: "정릉터널",         time: "13:50" },
+  { id: 3, sev: "caution",  icon: "bi bi-wifi-off",         title: "네트워크 지연 상승",      detail: "강남 권역 평균 지연 286ms (정상 100ms 대비)", place: "강남 권역", time: "13:32" },
+  { id: 4, sev: "info",     icon: "bi bi-check-circle-fill",title: "정기 점검 완료",          detail: "OCR 서버 4대 정상 재가동 확인",        place: "OCR 클러스터",      time: "10:00" },
+]);
+const hasCritical = computed(() => liveAlerts.value.some(a => a.sev === "critical"));
+
+/* ── 설정 ── */
+const setSound = ref(true);
+const setRefreshSec = ref(30);
+const setMsg = ref("");
+function saveSettings() {
+  setMsg.value = "설정 저장 완료";
+  setTimeout(() => { setMsg.value = ""; }, 1800);
+}
+
+function closeAlertsOnOutside(e) {
+  if (showAlerts.value && !e.target.closest(".hdr-bell-wrap")) showAlerts.value = false;
+}
+if (typeof document !== "undefined") {
+  document.addEventListener("click", closeAlertsOnOutside);
+}
 
 const cams = Object.freeze([
   {

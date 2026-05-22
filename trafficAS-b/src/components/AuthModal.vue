@@ -5,7 +5,7 @@
         <div class="modal">
           <button class="close" @click="closeModal">✕</button>
 
-          <div class="logo">Traffic<em>AS</em></div>
+          <div class="logo"><img src="/TAS.png" alt="TAS" class="logo-img" /></div>
 
           <div class="tabs">
             <button :class="{ on: modalMode === 'login' }" @click="modalMode = 'login'">
@@ -194,7 +194,10 @@ const handleSignup = async () => {
   color: var(--t);
   text-align: center;
   margin-bottom: 24px;
+  display: flex;
+  justify-content: center;
 }
+.logo-img { height: 56px; width: auto; display: block; }
 .logo em {
   color: var(--a);
   font-style: normal;

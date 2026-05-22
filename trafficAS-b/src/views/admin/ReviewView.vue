@@ -2,9 +2,57 @@
   <div class="rev-shell">
     <header class="top">
       <RouterLink to="/" class="brand" title="홈으로">
-        Traffic <em>AS</em>
+        <img src="/TAS.png" alt="TAS" class="brand-img" />
       </RouterLink>
       <h1><a class="t-main" @click="goHome">단속관리팀</a></h1>
+      <div class="t-right">
+        <span class="hdr-time"><i class="bi bi-clock"></i> <strong>{{ lastUpdated || nowTime }}</strong></span>
+        <button class="km-toggle" :class="{ on: autoRefresh }" @click="autoRefresh = !autoRefresh" :aria-pressed="autoRefresh">
+          <span class="km-dot"></span>
+          <span class="km-lab">자동 새로고침</span>
+          <span class="km-state">{{ autoRefresh ? 'ON' : 'OFF' }}</span>
+        </button>
+        <div class="hdr-bell-wrap" @click.stop>
+          <button class="hdr-bell" :class="{ critical: hasCritical, on: showAlerts }" @click="showAlerts = !showAlerts">
+            <i class="bi bi-bell-fill"></i>
+            <span v-if="liveAlerts.length" class="hdr-bell-c">{{ liveAlerts.length }}</span>
+          </button>
+          <div v-if="showAlerts" class="hdr-bell-pop" @click.stop>
+            <div class="hbp-h">
+              <i class="bi bi-exclamation-octagon-fill"></i>
+              <strong>실시간 알림</strong>
+              <span class="hbp-c">{{ liveAlerts.length }}건</span>
+              <button class="hbp-x" @click="showAlerts = false"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="hbp-list">
+              <div v-for="a in liveAlerts" :key="a.id" class="ac-row" :class="a.sev" @click="showAlerts = false">
+                <div class="ac-sev"><i :class="a.icon"></i></div>
+                <div class="ac-body">
+                  <div class="ac-t">{{ a.title }}</div>
+                  <div class="ac-d">{{ a.detail }}</div>
+                  <div class="ac-meta">
+                    <span class="ac-loc"><i class="bi bi-geo-alt"></i> {{ a.place }}</span>
+                    <span class="ac-time">{{ a.time }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-if="!liveAlerts.length" class="ac-empty">활성 알림이 없습니다.</div>
+            </div>
+          </div>
+        </div>
+        <button class="km-toggle guide-btn-trigger" @click="guideOpen = true" title="사용자 가이드">
+          <i class="bi bi-question-circle"></i>
+          <span class="km-lab">가이드</span>
+        </button>
+        <DeptSwitcher />
+        <div class="t-user"><i class="bi bi-person-circle"></i> 단속관리팀 매니저 <i class="bi bi-chevron-down"></i></div>
+      </div>
+    </header>
+
+    <GuideOverlay v-model="guideOpen" :steps="guideSteps" />
+
+    <!-- 본문 상단 툴바: KPI + 보고서 다운로드 -->
+    <div class="rev-toolbar">
       <div class="hdr-kpi">
         <span class="kpi-chip bl" title="아직 최종 판정 전인 과속 후보"><i class="bi bi-hourglass-split"></i> 검토 대기 <strong>{{ waitCount }}</strong></span>
         <span class="kpi-chip gr" title="과속으로 최종 확정된 건"><i class="bi bi-check-circle-fill"></i> 과속 확정 <strong>{{ approveCount }}</strong></span>
@@ -12,22 +60,24 @@
         <span class="kpi-chip bl" title="종결/보관 처리된 건"><i class="bi bi-archive-fill"></i> 종결 <strong>{{ closedCount }}</strong></span>
         <span class="kpi-chip pl" title="목록 내 OCR 평균 신뢰도"><span class="kc-ocr">OCR</span> <strong>{{ avgConfLabel }}</strong></span>
       </div>
-      <div class="t-right">
-        <span class="hdr-time"><i class="bi bi-clock"></i> 마지막 업데이트 <strong>{{ lastUpdated || nowTime }}</strong></span>
-        <button class="km-toggle" :class="{ on: autoRefresh }" @click="autoRefresh = !autoRefresh" :aria-pressed="autoRefresh">
-          <span class="km-dot"></span>
-          <span class="km-lab">자동 새로고침</span>
-          <span class="km-state">{{ autoRefresh ? 'ON' : 'OFF' }}</span>
-        </button>
-        <div class="rev-dl">
-          <input type="date" class="rev-dl-date" v-model="reportDate" />
-          <button class="rev-dl-btn" @click="downloadDeptReport('review', 'daily', { date: reportDate })" title="일일 단속 보고서"><i class="bi bi-download"></i> 일일</button>
-          <button class="rev-dl-btn" @click="downloadDeptReport('review', 'weekly', { date: weekStart, endDate: reportDate })" title="주간 단속 통계 (선택 날짜 기준 직전 7일)"><i class="bi bi-download"></i> 주간</button>
+      <div class="rev-dl">
+        <button class="rev-dl-btn" @click="downloadDeptReport('review', 'daily', { date: reportDate })" title="오늘자 일일 단속 보고서"><i class="bi bi-download"></i> 일일</button>
+        <button class="rev-dl-btn" @click="downloadDeptReport('review', 'weekly', { date: weekStart, endDate: reportDate })" title="오늘 기준 직전 7일 주간 단속 통계"><i class="bi bi-download"></i> 주간</button>
+        <div class="rev-dl-range" v-if="rangeOpen" @click.stop>
+          <span class="rev-dl-range-lab">기간 :</span>
+          <input type="date" class="rev-dl-date" v-model="rangeStart" :max="rangeEnd" />
+          <span class="rev-dl-range-sep">~</span>
+          <input type="date" class="rev-dl-date" v-model="rangeEnd" :min="rangeStart" />
+          <button class="rev-dl-btn ok" @click="downloadRangeReport" :disabled="!rangeStart || !rangeEnd" title="기간 보고서 다운로드">
+            <i class="bi bi-download"></i> 받기
+          </button>
         </div>
-        <DeptSwitcher />
-        <div class="t-user"><i class="bi bi-person-circle"></i> 단속관리팀 매니저 <i class="bi bi-chevron-down"></i></div>
+        <button class="rev-dl-btn alt" @click="rangeOpen = !rangeOpen" :class="{ on: rangeOpen }" title="기간 지정 다운로드">
+          <i class="bi" :class="rangeOpen ? 'bi-x-lg' : 'bi-calendar-range'"></i>
+          {{ rangeOpen ? '닫기' : '기간' }}
+        </button>
       </div>
-    </header>
+    </div>
 
     <section class="grid">
       <div class="card list-card">
@@ -270,6 +320,26 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { RouterLink } from "vue-router";
 import DeptSwitcher from "@/components/dashboard/DeptSwitcher.vue";
+import GuideOverlay from "@/components/GuideOverlay.vue";
+import guideSteps from "@/data/guides/review.js";
+
+const guideOpen = ref(false);
+
+/* ── 헤더 실시간 알림 ── */
+const showAlerts = ref(false);
+const liveAlerts = ref([
+  { id: 1, sev: "critical", icon: "bi bi-speedometer2",          title: "신규 과속 후보 5건",         detail: "교통정보센터에서 일괄 전송됨 — 검토 대기 큐 추가",  place: "강변북로 한남TG",      time: "14:32" },
+  { id: 2, sev: "serious",  icon: "bi bi-exclamation-octagon-fill", title: "OCR 신뢰도 임계 미만",       detail: "최근 3건의 OCR 신뢰도가 85% 미만 — 수동 확인 필요", place: "내부순환로 정릉",       time: "14:24" },
+  { id: 3, sev: "caution",  icon: "bi bi-clock-history",          title: "처리 마감 임박",            detail: "검토 대기 7건 중 2건이 오늘 마감 시한 도래",         place: "단속관리팀 큐",         time: "13:50" },
+  { id: 4, sev: "info",     icon: "bi bi-file-earmark-text",      title: "일일 보고서 자동 발행",      detail: "16:00 일일 단속 보고서가 자동 발행될 예정입니다",    place: "교통분석팀 · 경영본부", time: "13:00" },
+]);
+const hasCritical = computed(() => liveAlerts.value.some(a => a.sev === "critical"));
+function closeAlertsOnOutside(e) {
+  if (showAlerts.value && !e.target.closest(".hdr-bell-wrap")) showAlerts.value = false;
+}
+if (typeof document !== "undefined") {
+  document.addEventListener("click", closeAlertsOnOutside);
+}
 import { listSpeedViolations, updateSpeedViolationStatus } from "@/api/speedViolations";
 import { useReportDownload } from "@/composables/useReportDownload";
 import { fmtDateTime } from "@/composables/useVideoUtils";
@@ -288,6 +358,21 @@ const weekStart = computed(() => {
   const p = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 });
+
+/* ── 기간 지정 다운로드 ── */
+const rangeOpen = ref(false);
+const rangeStart = ref(weekStart.value);
+const rangeEnd = ref(reportDate.value);
+function downloadRangeReport() {
+  if (!rangeStart.value || !rangeEnd.value) return;
+  const start = rangeStart.value <= rangeEnd.value ? rangeStart.value : rangeEnd.value;
+  const end = rangeStart.value <= rangeEnd.value ? rangeEnd.value : rangeStart.value;
+  /* 기간이 7일 초과면 weekly 템플릿, 이내면 daily 템플릿 사용 */
+  const diff = (new Date(end) - new Date(start)) / 86400000;
+  const reportKey = diff >= 6 ? "weekly" : "daily";
+  downloadDeptReport("review", reportKey, { date: start, endDate: end });
+  rangeOpen.value = false;
+}
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 const FASTAPI_BASE_URL = (import.meta.env.VITE_FASTAPI_BASE_URL || "").replace(/\/+$/, "");
