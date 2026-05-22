@@ -3,6 +3,7 @@ package com.example.traffic.service;
 import com.example.traffic.common.enums.ViolationStatus;
 import com.example.traffic.domain.Camera;
 import com.example.traffic.domain.SpeedViolation;
+import com.example.traffic.domain.SpeedViolationReview;
 import com.example.traffic.domain.Vehicle;
 import com.example.traffic.domain.VehicleFlowEvent;
 import com.example.traffic.dto.request.SpeedViolationCreateRequest;
@@ -11,6 +12,7 @@ import com.example.traffic.dto.response.SpeedViolationResponse;
 import com.example.traffic.etc.BusinessException;
 import com.example.traffic.repository.CameraRepository;
 import com.example.traffic.repository.SpeedViolationRepository;
+import com.example.traffic.repository.SpeedViolationReviewRepository;
 import com.example.traffic.repository.VehicleRepository;
 import com.example.traffic.repository.VehicleFlowEventRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ import java.util.List;
 public class SpeedViolationService {
 
     private final SpeedViolationRepository speedViolationRepository;
+    private final SpeedViolationReviewRepository speedViolationReviewRepository;
     private final VehicleRepository vehicleRepository;
     private final CameraRepository cameraRepository;
     private final VehicleFlowEventRepository vehicleFlowEventRepository;
@@ -43,7 +46,7 @@ public class SpeedViolationService {
                 .orElse(null);
         if (existingViolation != null) {
             existingViolation.getFlowEvent().updateSpeed(existingViolation.getMeasuredSpeed());
-            return SpeedViolationResponse.from(existingViolation);
+            return toResponse(existingViolation);
         }
 
         VehicleFlowEvent flowEvent = vehicleFlowEventRepository.findById(request.getFlowEventId())
@@ -69,7 +72,7 @@ public class SpeedViolationService {
                 .build();
 
         flowEvent.updateSpeed(violation.getMeasuredSpeed());
-        return SpeedViolationResponse.from(speedViolationRepository.save(violation));
+        return toResponse(speedViolationRepository.save(violation));
     }
 
     private void validateFlowEventMatchesRequest(VehicleFlowEvent flowEvent,
@@ -91,7 +94,7 @@ public class SpeedViolationService {
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found."));
 
         return speedViolationRepository.findByVehicleOrderByViolatedAtDesc(vehicle).stream()
-                .map(SpeedViolationResponse::from)
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -100,19 +103,19 @@ public class SpeedViolationService {
                 .orElseThrow(() -> new IllegalArgumentException("Camera not found."));
 
         return speedViolationRepository.findByCameraOrderByViolatedAtDesc(camera).stream()
-                .map(SpeedViolationResponse::from)
+                .map(this::toResponse)
                 .toList();
     }
 
     public List<SpeedViolationResponse> getStatusViolations(ViolationStatus violationStatus) {
         return speedViolationRepository.findByViolationStatusOrderByViolatedAtDesc(violationStatus).stream()
-                .map(SpeedViolationResponse::from)
+                .map(this::toResponse)
                 .toList();
     }
 
     public List<SpeedViolationResponse> getAllViolations() {
         return speedViolationRepository.findAllByOrderByViolatedAtDesc().stream()
-                .map(SpeedViolationResponse::from)
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -123,8 +126,20 @@ public class SpeedViolationService {
                 .orElseThrow(() -> new BusinessException("Speed violation not found: "
                         + violationId, HttpStatus.NOT_FOUND));
 
+        ViolationStatus fromStatus = violation.getViolationStatus();
         violation.updateStatus(request.getViolationStatus());
-        return SpeedViolationResponse.from(violation);
+
+        SpeedViolationReview review = SpeedViolationReview.builder()
+                .speedViolation(violation)
+                .fromStatus(fromStatus)
+                .toStatus(request.getViolationStatus())
+                .reason(request.getReason())
+                .memo(request.getMemo())
+                .reviewedBy(request.getReviewer())
+                .build();
+        speedViolationReviewRepository.save(review);
+
+        return SpeedViolationResponse.from(violation, review);
     }
 
     public List<SpeedViolationResponse> getViolationsBetween(LocalDateTime start, LocalDateTime end) {
@@ -136,11 +151,18 @@ public class SpeedViolationService {
                     HttpStatus.BAD_REQUEST);
         }
         return speedViolationRepository.findByViolatedAtBetweenOrderByViolatedAtDesc(start, end).stream()
-                .map(SpeedViolationResponse::from)
+                .map(this::toResponse)
                 .toList();
     }
 
     public long countViolationsBetween(LocalDateTime start, LocalDateTime end) {
         return speedViolationRepository.countByViolatedAtBetween(start, end);
+    }
+
+    private SpeedViolationResponse toResponse(SpeedViolation violation) {
+        SpeedViolationReview latestReview = speedViolationReviewRepository
+                .findFirstBySpeedViolationOrderByReviewedAtDescReviewIdDesc(violation)
+                .orElse(null);
+        return SpeedViolationResponse.from(violation, latestReview);
     }
 }

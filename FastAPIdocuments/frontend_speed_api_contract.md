@@ -60,11 +60,13 @@ flowchart LR
 
 - 정상 속도 차량의 속도는 저장하지 않는다.
 - 따라서 프론트에서 전체 차량의 속도 목록이나 평균 속도를 보여주려면 추가 백엔드 정책이 필요하다.
+- 정상 속도 차량은 review 페이지에서 다루지 않는다.
+- 정상 속도 차량은 추후 별도 교통 흐름 분석 페이지에서 미과속/과속 차량과 함께 데이터로 다룬다.
 
 프론트 병합 전 권장:
 
-- 과속 차량만 속도/과속 UI에 표시한다.
-- 정상 차량은 기존 OCR/차량 흐름 UI에만 표시한다.
+- review 페이지는 `speed_violations` 기반 과속 후보만 표시한다.
+- 정상 차량은 추후 교통 흐름 분석 UI에서 다룬다.
 
 ## 과속 심사 탭 정책
 
@@ -233,7 +235,10 @@ Content-Type: application/json
 
 ```json
 {
-  "violationStatus": "REJECTED"
+  "violationStatus": "REJECTED",
+  "reason": "장비 오류로 인한 오탐",
+  "memo": "번호판과 속도 재검토 후 미과속 처리",
+  "reviewer": "단속관리팀"
 }
 ```
 
@@ -256,6 +261,12 @@ Content-Type: application/json
     "plateCropImagePath": "storage/detections/2026/05/21/CAM_001_plate_crop.jpg",
     "plateCropImageUrl": "/static/detections/2026/05/21/CAM_001_plate_crop.jpg",
     "violationStatus": "REJECTED",
+    "reviewedManually": true,
+    "latestReviewStatus": "REJECTED",
+    "latestReviewReason": "장비 오류로 인한 오탐",
+    "latestReviewMemo": "번호판과 속도 재검토 후 미과속 처리",
+    "latestReviewedBy": "단속관리팀",
+    "latestReviewedAt": "2026-05-21T15:25:00",
     "violatedAt": "2026-05-21T15:20:00",
     "createdAt": "2026-05-21T15:20:01"
   },
@@ -264,6 +275,13 @@ Content-Type: application/json
 ```
 
 프론트 탭에서 상태를 바꿀 때 이 API를 사용한다.
+
+명시 보류 처리:
+
+- `UNPROCESSED`를 다시 선택한 경우에도 PATCH를 호출한다.
+- 백엔드는 `speed_violation_reviews`에 검증 이력을 저장한다.
+- 프론트는 `reviewedManually=true`이고 `latestReviewStatus=UNPROCESSED`이면 목록 상태를 `보류`로 표시한다.
+- 더 이상 프론트 localStorage로 명시 보류 상태를 보정하지 않는다.
 
 ### 기간별 과속 개수
 
@@ -454,6 +472,7 @@ LIMIT 20;
 - 표시 속도는 과속 화면에서는 `measuredSpeed`를 사용한다.
 - 차량 흐름 이벤트의 `speed`는 과속 저장 성공 시에만 채워지는 값이다.
 - 정상 속도 차량의 속도는 현재 저장하지 않는다.
+- 정상 속도 차량은 review 페이지에 표시하지 않는다.
 - `stayTime`은 현재 미사용이므로 화면에서 제외한다.
 - 이벤트 테이블에서 과속 여부를 한 번에 보여야 하면 백엔드 join API 추가가 필요하다.
 - 현재 과속 조회 GET API는 인증이 필요하므로 JWT 연결 또는 임시 permitAll 협의가 필요하다.
