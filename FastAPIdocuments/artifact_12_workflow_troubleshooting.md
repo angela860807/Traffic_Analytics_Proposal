@@ -172,6 +172,17 @@ DB의 `detection_analysis_results.confidence_score`는 0~1 범위 값이다.
 - `시스템 오류` 검증을 거친 경우에도 `종결/보관(CLOSED)` 선택이 가능하다.
 - `CLOSED` 상태는 최종 종결 상태로 간주한다.
 - `CLOSED` 상태에서는 STEP 1, STEP 2, STEP 3 전체를 비활성화하고 더 이상 상태 변경을 허용하지 않는다.
+- `CLOSED`로 보낸 뒤 되돌리기 기능은 만들지 않는다.
+- `NOTIFIED`에서 `CLOSED`로 바로 가는 경우에는 사유를 받지 않는다.
+- `NOTIFIED` 상태에서는 `종결/보관(CLOSED)` 버튼만 바로 활성화한다.
+
+## 3.1 review 페이지 데이터 범위 최종 정책
+
+- review 페이지는 과속 후보만 다룬다.
+- 과속 후보의 기준 데이터는 `speed_violations`이다.
+- 정상 속도 차량은 review 페이지에 표시하지 않는다.
+- 정상 속도 차량은 추후 별도 교통 흐름 분석 페이지에서 미과속/과속 차량과 함께 데이터로 다룬다.
+- 따라서 review 페이지에서는 정상 차량 목록, 정상 차량 속도, `stay_time`을 표시하지 않는다.
 
 ## 4. Troubleshooting 요약
 
@@ -232,8 +243,11 @@ DB의 `detection_analysis_results.confidence_score`는 0~1 범위 값이다.
 
 해결:
 
-- 사용자가 명시적으로 선택한 보류 상태를 프론트 localStorage에 저장
-- 명시 보류 건은 `UNPROCESSED`라도 목록에서 `보류`로 표시
+- `speed_violation_reviews` 백엔드 검증 이력 테이블을 추가했다.
+- 상태 변경 PATCH가 호출될 때마다 `fromStatus`, `toStatus`, 사유, 메모, 검토자, 검토시각을 저장한다.
+- 응답 DTO에 `reviewedManually`, `latestReviewStatus`, `latestReviewReason`, `latestReviewMemo`, `latestReviewedBy`, `latestReviewedAt`을 포함한다.
+- 프론트는 더 이상 localStorage를 사용하지 않는다.
+- 최신 검증 이력이 `UNPROCESSED`인 건은 DB 상태가 `UNPROCESSED`라도 목록에서 명시적으로 `보류`로 표시한다.
 
 ### 미과속 클릭 시 데이터 제약조건 위반
 
@@ -278,5 +292,4 @@ cd C:\jwdev\Traffic_Analytics_Proposal\backend\traffic
 - DB 제약조건 갱신은 Spring 백엔드 재시작 이후에 적용된다.
 - 현재 `SpeedViolationStatusConstraintInitializer`는 Flyway가 없는 상황의 실용적 보완책이다.
 - 장기적으로는 DB schema 변경을 Flyway/Liquibase 같은 마이그레이션 도구로 옮기는 편이 좋다.
-- 프론트의 명시 보류 localStorage는 운영 편의용 UI 보정이다. 다중 사용자/서버 감사 이력까지 필요하면 백엔드에 별도 검증 이력 테이블을 두는 방향이 맞다.
-
+- 명시 보류 상태는 프론트 localStorage가 아니라 백엔드 `speed_violation_reviews` 검증 이력으로 저장한다.

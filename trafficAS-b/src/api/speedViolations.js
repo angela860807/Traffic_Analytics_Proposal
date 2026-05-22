@@ -11,9 +11,10 @@ export async function listSpeedViolations({ start, end }) {
   return unwrapData(body) || [];
 }
 
-export async function updateSpeedViolationStatus(violationId, violationStatus) {
+export async function updateSpeedViolationStatus(violationId, violationStatus, review = {}) {
   const body = await apiPatch(`/api/speed-violations/${violationId}/status`, {
     violationStatus,
+    ...review,
   });
   return unwrapData(body);
 }

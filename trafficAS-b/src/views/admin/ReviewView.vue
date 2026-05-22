@@ -6,10 +6,11 @@
       </RouterLink>
       <h1><a class="t-main" @click="goHome">단속관리팀</a></h1>
       <div class="hdr-kpi">
-        <span class="kpi-chip bl" title="검토 대기"><i class="bi bi-hourglass-split"></i> 대기 <strong>{{ waitCount }}</strong></span>
-        <span class="kpi-chip gr" title="승인"><i class="bi bi-check-circle-fill"></i> 승인 <strong>{{ approveCount }}</strong></span>
-        <span class="kpi-chip rd" title="반려"><i class="bi bi-x-circle-fill"></i> 반려 <strong>{{ rejectCount }}</strong></span>
-        <span class="kpi-chip pl" title="OCR 평균 신뢰도"><span class="kc-ocr">OCR</span> <strong>{{ avgConfLabel }}</strong></span>
+        <span class="kpi-chip bl" title="아직 최종 판정 전인 과속 후보"><i class="bi bi-hourglass-split"></i> 검토 대기 <strong>{{ waitCount }}</strong></span>
+        <span class="kpi-chip gr" title="과속으로 최종 확정된 건"><i class="bi bi-check-circle-fill"></i> 과속 확정 <strong>{{ approveCount }}</strong></span>
+        <span class="kpi-chip rd" title="검증 후 미과속으로 처리된 건"><i class="bi bi-x-circle-fill"></i> 미과속 <strong>{{ rejectCount }}</strong></span>
+        <span class="kpi-chip bl" title="종결/보관 처리된 건"><i class="bi bi-archive-fill"></i> 종결 <strong>{{ closedCount }}</strong></span>
+        <span class="kpi-chip pl" title="목록 내 OCR 평균 신뢰도"><span class="kc-ocr">OCR</span> <strong>{{ avgConfLabel }}</strong></span>
       </div>
       <div class="t-right">
         <span class="hdr-time"><i class="bi bi-clock"></i> 마지막 업데이트 <strong>{{ lastUpdated || nowTime }}</strong></span>
@@ -296,7 +297,6 @@ const STATUS_LABELS = {
   REJECTED: "미과속",
   CLOSED: "종결/보관",
 };
-const MANUAL_STATUS_KEY = "tas_review_manual_status";
 
 const speedEvents = ref([]);
 const isLoading = ref(false);
@@ -304,7 +304,6 @@ const isUpdatingStatus = ref(false);
 const loadError = ref("");
 const statusError = ref("");
 const lastUpdated = ref("");
-const manualStatusByViolationId = ref(loadManualStatus());
 
 const allEvents = computed(() => speedEvents.value);
 
@@ -392,41 +391,8 @@ function isOverSpeed(measuredSpeed, speedLimit) {
   return measured !== null && limit !== null && measured > limit;
 }
 
-function loadManualStatus() {
-  try {
-    return JSON.parse(localStorage.getItem(MANUAL_STATUS_KEY) || "{}");
-  } catch (_) {
-    return {};
-  }
-}
-
-function saveManualStatus() {
-  localStorage.setItem(MANUAL_STATUS_KEY, JSON.stringify(manualStatusByViolationId.value));
-}
-
-function manualStatusFor(violationId) {
-  return manualStatusByViolationId.value[String(violationId)] || "";
-}
-
-function applyManualStatus(violationId, code) {
-  const key = String(violationId || "");
-  if (!key) return;
-
-  if (code === "UNPROCESSED") {
-    manualStatusByViolationId.value = {
-      ...manualStatusByViolationId.value,
-      [key]: code,
-    };
-  } else {
-    const next = { ...manualStatusByViolationId.value };
-    delete next[key];
-    manualStatusByViolationId.value = next;
-  }
-  saveManualStatus();
-}
-
 function displayViolationStatus(row, measuredSpeed, speedLimit) {
-  if (row.violationStatus === "UNPROCESSED" && manualStatusFor(row.violationId) === "UNPROCESSED") {
+  if (row.violationStatus === "UNPROCESSED" && row.reviewedManually && row.latestReviewStatus === "UNPROCESSED") {
     return STATUS_LABELS.UNPROCESSED;
   }
   if (row.violationStatus === "UNPROCESSED") {
@@ -458,6 +424,12 @@ function mapSpeedViolation(row) {
     conf: row.confidenceScore ?? null,
     st: displayViolationStatus(row, measuredSpeed, speedLimit),
     stCode: row.violationStatus || "UNPROCESSED",
+    reviewedManually: Boolean(row.reviewedManually),
+    latestReviewStatus: row.latestReviewStatus || "",
+    latestReviewReason: row.latestReviewReason || "",
+    latestReviewMemo: row.latestReviewMemo || "",
+    latestReviewedBy: row.latestReviewedBy || "",
+    latestReviewedAt: row.latestReviewedAt || "",
     detectSpeed: measuredSpeed,
     limitSpeed: speedLimit,
     camera: row.cameraName || (row.cameraId ? `CAM-${row.cameraId}` : "미지정"),
@@ -576,6 +548,7 @@ const auditLog = ref([
 
 const approveCount = computed(() => allEvents.value.filter((e) => e.stCode === "NOTIFIED").length);
 const rejectCount  = computed(() => allEvents.value.filter((e) => e.stCode === "REJECTED").length);
+const closedCount  = computed(() => allEvents.value.filter((e) => e.stCode === "CLOSED").length);
 
 // 2차 검증 상태: 'valid' (실제 과속) | 'error' (시스템 오류) | ''
 const verification = ref("");
@@ -725,8 +698,11 @@ async function judge(verdict, code) {
   statusError.value = "";
   let updatedTarget = target;
   try {
-    const updated = await updateSpeedViolationStatus(target.violationId, code);
-    applyManualStatus(updated.violationId, code);
+    const updated = await updateSpeedViolationStatus(target.violationId, code, {
+      reason: reason.value,
+      memo: memo.value,
+      reviewer: "단속관리팀",
+    });
     updatedTarget = mapSpeedViolation(updated);
     const index = speedEvents.value.findIndex((e) => e.id === updatedTarget.id);
     if (index >= 0) speedEvents.value.splice(index, 1, updatedTarget);
