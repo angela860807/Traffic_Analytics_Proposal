@@ -12,6 +12,8 @@ import java.util.Optional;
 
 public interface SpeedViolationRepository extends JpaRepository<SpeedViolation, Long> {
 
+    List<SpeedViolation> findAllByOrderByViolatedAtDesc();
+
     Optional<SpeedViolation> findByFlowEvent_FlowEventId(Long flowEventId);
 
     List<SpeedViolation> findByVehicleOrderByViolatedAtDesc(Vehicle vehicle);
