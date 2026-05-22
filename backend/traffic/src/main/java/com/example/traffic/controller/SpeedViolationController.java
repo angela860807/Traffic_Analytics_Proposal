@@ -69,8 +69,8 @@ public class SpeedViolationController {
 
     @GetMapping
     public ResponseEntity<CommonResponse<List<SpeedViolationResponse>>> getViolationsBetween(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
         List<SpeedViolationResponse> violations = speedViolationService.getViolationsBetween(start, end);
         return ResponseEntity.ok(CommonResponse.success(violations, "기간별 속도위반 이력 조회 성공"));
     }

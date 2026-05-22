@@ -11,4 +11,10 @@ public class SpeedViolationStatusRequest {
 
     @NotNull
     private ViolationStatus violationStatus;
+
+    private String reason;
+
+    private String memo;
+
+    private String reviewer;
 }

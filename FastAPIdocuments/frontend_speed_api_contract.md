@@ -60,11 +60,13 @@ flowchart LR
 
 - 정상 속도 차량의 속도는 저장하지 않는다.
 - 따라서 프론트에서 전체 차량의 속도 목록이나 평균 속도를 보여주려면 추가 백엔드 정책이 필요하다.
+- 정상 속도 차량은 review 페이지에서 다루지 않는다.
+- 정상 속도 차량은 추후 별도 교통 흐름 분석 페이지에서 미과속/과속 차량과 함께 데이터로 다룬다.
 
 프론트 병합 전 권장:
 
-- 과속 차량만 속도/과속 UI에 표시한다.
-- 정상 차량은 기존 OCR/차량 흐름 UI에만 표시한다.
+- review 페이지는 `speed_violations` 기반 과속 후보만 표시한다.
+- 정상 차량은 추후 교통 흐름 분석 UI에서 다룬다.
 
 ## 과속 심사 탭 정책
 
@@ -78,28 +80,19 @@ flowchart LR
 
 현재 Spring enum 기준 매핑:
 
-| 프론트 탭 | 현재 사용 가능 상태 | 의미 |
+| 프론트 탭 | 상태 | 의미 |
 | --- | --- | --- |
 | 보류 | `UNPROCESSED` | 과속 후보가 들어왔지만 사람이 아직 확정하지 않음 |
 | 과속 확정 | `NOTIFIED` | 과속으로 확정하고 고지/처리 완료 |
-| 종결 | `CLOSED` | 처리 종료 |
+| 미과속 | `REJECTED` | 과속 후보였지만 사람이 검토 후 과속 아님으로 판정 |
+| 종결/보관 | `CLOSED` | 처리 종료 |
 
-문제:
+적용 완료:
 
-- 현재 enum에는 "미과속" 또는 "반려" 상태가 없다.
-- 따라서 프론트에서 미과속 탭을 제대로 운영하려면 백엔드 상태값 추가가 필요하다.
+- 백엔드 enum과 상태 변경 API는 `REJECTED`를 포함한다.
+- 프론트는 백엔드 필드명을 유지하고 표시 모델로 변환해 사용한다.
 
-권장 추가 상태:
-
-```text
-REJECTED
-```
-
-권장 의미:
-
-- `REJECTED`: 측정값은 과속 후보로 들어왔지만, 사람이 검토 후 과속 아님으로 판정한 상태
-
-권장 최종 탭 매핑:
+최종 탭 매핑:
 
 | 프론트 탭 | 권장 상태 |
 | --- | --- |
@@ -147,6 +140,9 @@ Authorization: Bearer <token>
       "measuredSpeed": 72.35,
       "speedLimit": 50.0,
       "violationImagePath": "storage/detections/2026/05/21/CAM_001_frame.jpg",
+      "confidenceScore": 0.9321,
+      "plateCropImagePath": "storage/detections/2026/05/21/CAM_001_plate_crop.jpg",
+      "plateCropImageUrl": "/static/detections/2026/05/21/CAM_001_plate_crop.jpg",
       "violationStatus": "UNPROCESSED",
       "violatedAt": "2026-05-21T15:20:00",
       "createdAt": "2026-05-21T15:20:01"
@@ -166,9 +162,17 @@ Authorization: Bearer <token>
 | `cameraName` | 카메라 표시명 |
 | `measuredSpeed` | 표시 속도 |
 | `speedLimit` | 제한 속도 |
+| `confidenceScore` | OCR 신뢰도 원본값, DB와 API는 0~1 유지 |
+| `plateCropImagePath` / `plateCropImageUrl` | 번호판 crop 이미지 표시 |
 | `violationStatus` | 처리 상태 badge |
 | `violatedAt` | 발생 시각 |
 | `violationImagePath` | 증거 이미지 경로, URL 필드는 아직 응답에 없음 |
+
+OCR 신뢰도 프론트 표시:
+
+- `confidenceScore * 100` 후 소수점 1자리까지만 표시한다.
+- 예: `0.9321` -> `93.2%`
+- 원본 소수점 값은 DB/API에서만 유지하고 화면에는 노출하지 않는다.
 
 현재 보안 상태:
 
@@ -206,6 +210,7 @@ Authorization: Bearer <token>
 ```text
 UNPROCESSED
 NOTIFIED
+REJECTED
 CLOSED
 ```
 
@@ -213,9 +218,10 @@ CLOSED
 
 | 값 | 표시 라벨 |
 | --- | --- |
-| `UNPROCESSED` | 미처리 |
-| `NOTIFIED` | 고지 완료 |
-| `CLOSED` | 종결 |
+| `UNPROCESSED` | 보류 |
+| `NOTIFIED` | 과속 확정 |
+| `REJECTED` | 미과속 |
+| `CLOSED` | 종결/보관 |
 
 ### 과속 심사 상태 변경
 
@@ -229,7 +235,10 @@ Content-Type: application/json
 
 ```json
 {
-  "violationStatus": "REJECTED"
+  "violationStatus": "REJECTED",
+  "reason": "장비 오류로 인한 오탐",
+  "memo": "번호판과 속도 재검토 후 미과속 처리",
+  "reviewer": "단속관리팀"
 }
 ```
 
@@ -248,7 +257,16 @@ Content-Type: application/json
     "measuredSpeed": 72.35,
     "speedLimit": 50.0,
     "violationImagePath": "storage/detections/2026/05/21/CAM_001_frame.jpg",
+    "confidenceScore": 0.9321,
+    "plateCropImagePath": "storage/detections/2026/05/21/CAM_001_plate_crop.jpg",
+    "plateCropImageUrl": "/static/detections/2026/05/21/CAM_001_plate_crop.jpg",
     "violationStatus": "REJECTED",
+    "reviewedManually": true,
+    "latestReviewStatus": "REJECTED",
+    "latestReviewReason": "장비 오류로 인한 오탐",
+    "latestReviewMemo": "번호판과 속도 재검토 후 미과속 처리",
+    "latestReviewedBy": "단속관리팀",
+    "latestReviewedAt": "2026-05-21T15:25:00",
     "violatedAt": "2026-05-21T15:20:00",
     "createdAt": "2026-05-21T15:20:01"
   },
@@ -257,6 +275,13 @@ Content-Type: application/json
 ```
 
 프론트 탭에서 상태를 바꿀 때 이 API를 사용한다.
+
+명시 보류 처리:
+
+- `UNPROCESSED`를 다시 선택한 경우에도 PATCH를 호출한다.
+- 백엔드는 `speed_violation_reviews`에 검증 이력을 저장한다.
+- 프론트는 `reviewedManually=true`이고 `latestReviewStatus=UNPROCESSED`이면 목록 상태를 `보류`로 표시한다.
+- 더 이상 프론트 localStorage로 명시 보류 상태를 보정하지 않는다.
 
 ### 기간별 과속 개수
 
@@ -447,6 +472,7 @@ LIMIT 20;
 - 표시 속도는 과속 화면에서는 `measuredSpeed`를 사용한다.
 - 차량 흐름 이벤트의 `speed`는 과속 저장 성공 시에만 채워지는 값이다.
 - 정상 속도 차량의 속도는 현재 저장하지 않는다.
+- 정상 속도 차량은 review 페이지에 표시하지 않는다.
 - `stayTime`은 현재 미사용이므로 화면에서 제외한다.
 - 이벤트 테이블에서 과속 여부를 한 번에 보여야 하면 백엔드 join API 추가가 필요하다.
 - 현재 과속 조회 GET API는 인증이 필요하므로 JWT 연결 또는 임시 permitAll 협의가 필요하다.

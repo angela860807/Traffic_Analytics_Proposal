@@ -7,6 +7,7 @@ import com.example.traffic.domain.DetectionLog;
 import com.example.traffic.repository.DetectionAnalysisResultRepository;
 import com.example.traffic.repository.DetectionLogRepository;
 import com.example.traffic.repository.SpeedViolationRepository;
+import com.example.traffic.repository.SpeedViolationReviewRepository;
 import com.example.traffic.repository.TrafficAnalysisIndexRepository;
 import com.example.traffic.repository.VehicleFlowEventRepository;
 import com.example.traffic.repository.VehicleRepository;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -55,6 +57,9 @@ class DetectionLogControllerIntegrationTest {
 
     @Autowired
     private SpeedViolationRepository speedViolationRepository;
+
+    @Autowired
+    private SpeedViolationReviewRepository speedViolationReviewRepository;
 
     @Test
     void processDetectionSavesLogAnalysisResultVehicleAndFlowEvent() throws Exception {
@@ -317,12 +322,18 @@ class DetectionLogControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.plateNumber").value(plateNumber))
                 .andExpect(jsonPath("$.data.measuredSpeed").value(72.35))
                 .andExpect(jsonPath("$.data.speedLimit").value(50.0))
+                .andExpect(jsonPath("$.data.confidenceScore").value(0.95))
                 .andExpect(jsonPath("$.data.violationStatus").value("UNPROCESSED"))
                 .andReturn();
 
         Integer violationId = JsonPath.read(
                 speedViolationResult.getResponse().getContentAsString(),
                 "$.data.violationId");
+
+        mockMvc.perform(get("/api/speed-violations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray());
 
         assertThat(speedViolationRepository.count()).isEqualTo(violationCountBefore + 1);
         assertThat(vehicleFlowEventRepository.findById(flowEventId.longValue()))
@@ -358,12 +369,24 @@ class DetectionLogControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "violationStatus": "REJECTED"
+                                  "violationStatus": "REJECTED",
+                                  "reason": "장비 오류로 인한 오탐",
+                                  "memo": "번호판과 속도 재검토 후 미과속 처리",
+                                  "reviewer": "단속관리팀"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.violationId").value(violationId))
-                .andExpect(jsonPath("$.data.violationStatus").value("REJECTED"));
+                .andExpect(jsonPath("$.data.confidenceScore").value(0.95))
+                .andExpect(jsonPath("$.data.violationStatus").value("REJECTED"))
+                .andExpect(jsonPath("$.data.reviewedManually").value(true))
+                .andExpect(jsonPath("$.data.latestReviewStatus").value("REJECTED"))
+                .andExpect(jsonPath("$.data.latestReviewReason").value("장비 오류로 인한 오탐"))
+                .andExpect(jsonPath("$.data.latestReviewMemo").value("번호판과 속도 재검토 후 미과속 처리"))
+                .andExpect(jsonPath("$.data.latestReviewedBy").value("단속관리팀"))
+                .andExpect(jsonPath("$.data.latestReviewedAt").exists());
+
+        assertThat(speedViolationReviewRepository.count()).isGreaterThan(0);
     }
 }
