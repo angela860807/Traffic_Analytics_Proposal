@@ -165,17 +165,16 @@ def test_plate_number_normalization_keeps_korean_plate_characters() -> None:
     recognizer = PlateRecognizer()
 
     cases = {
-        "서울 12가 3456": "서울12가3456",
-        "123가4567": "123가4567",
-        "ABC123가4567!!": "123가4567",
-        "  경기 78나 9012\n": "경기78나9012",
+        "\uc11c\uc6b8 12\uac00 3456": "\uc11c\uc6b812\uac003456",
+        "123\uac004567": "123\uac004567",
+        "ABC123\uac004567!!": "123\uac004567",
+        "  \uacbd\uae30 78\ub098 9012\n": "\uacbd\uae3078\ub0989012",
         None: None,
         "ABC-!!": None,
     }
 
     for raw_text, expected in cases.items():
         assert recognizer._normalize_plate_number(raw_text) == expected
-
 
 def test_vehicle_detector_returns_best_allowed_vehicle_class(
     monkeypatch,
@@ -1149,6 +1148,119 @@ def test_stream_event_service_finalizes_after_bbox_misses(
     assert len(list((tmp_path / "detections" / "debug").rglob("*.jpg"))) == 1
 
 
+def test_stream_event_service_uses_high_res_crop_for_finalized_ocr() -> None:
+    image_bytes = make_test_image_bytes()
+    high_res_crop_bytes = make_test_image_bytes()
+    detections = [
+        VehicleDetection("VEHICLE", 0.93, (20, 20, 120, 50)),
+        VehicleDetection("UNKNOWN", 0.0, None),
+        VehicleDetection("UNKNOWN", 0.0, None),
+        VehicleDetection("UNKNOWN", 0.0, None),
+        VehicleDetection("UNKNOWN", 0.0, None),
+        VehicleDetection("UNKNOWN", 0.0, None),
+    ]
+    captured = {}
+
+    class FakeInferenceService:
+        def detect_vehicle_bbox_from_image(self, image):
+            return detections.pop(0)
+
+        async def detect_from_image_bytes(self, **kwargs):
+            captured.update(kwargs)
+            return make_recognized_detection(detected_at=kwargs["captured_at"])
+
+    service = StreamEventService(
+        buffer=FrameBuffer(max_frames_per_camera=3),
+        inference_service=FakeInferenceService(),
+    )
+    captured_at = datetime(2026, 5, 14, 14, 30, 0)
+
+    tracking_result = asyncio.run(
+        service.process_frame(
+            camera_code="CAM_001",
+            captured_at=captured_at,
+            content_type="image/jpeg",
+            image_bytes=image_bytes,
+            high_res_crop_bytes=high_res_crop_bytes,
+            high_res_crop_content_type="image/jpeg",
+        )
+    )
+    assert tracking_result.stream_status == STREAM_STATUS_TRACKING
+
+    finalized_result = None
+    for index in range(5):
+        finalized_result = asyncio.run(
+            service.process_frame(
+                camera_code="CAM_001",
+                captured_at=captured_at + timedelta(milliseconds=200 * (index + 1)),
+                content_type="image/jpeg",
+                image_bytes=image_bytes,
+            )
+        )
+
+    assert finalized_result is not None
+    assert finalized_result.stream_status == STREAM_STATUS_FINALIZED
+    assert captured["high_res_crop_bytes"] == high_res_crop_bytes
+
+
+def test_stream_event_service_attaches_delayed_high_res_crop_by_frame_number() -> None:
+    image_bytes = make_test_image_bytes()
+    high_res_crop_bytes = make_test_image_bytes()
+    detections = [
+        VehicleDetection("VEHICLE", 0.93, (20, 20, 120, 50)),
+        VehicleDetection("UNKNOWN", 0.0, None),
+        VehicleDetection("UNKNOWN", 0.0, None),
+        VehicleDetection("UNKNOWN", 0.0, None),
+        VehicleDetection("UNKNOWN", 0.0, None),
+        VehicleDetection("UNKNOWN", 0.0, None),
+    ]
+    captured = {}
+
+    class FakeInferenceService:
+        def detect_vehicle_bbox_from_image(self, image):
+            return detections.pop(0)
+
+        async def detect_from_image_bytes(self, **kwargs):
+            captured.update(kwargs)
+            return make_recognized_detection(detected_at=kwargs["captured_at"])
+
+    service = StreamEventService(
+        buffer=FrameBuffer(max_frames_per_camera=3),
+        inference_service=FakeInferenceService(),
+    )
+    captured_at = datetime(2026, 5, 14, 14, 30, 0)
+
+    tracking_result = asyncio.run(
+        service.process_frame(
+            camera_code="CAM_001",
+            captured_at=captured_at,
+            content_type="image/jpeg",
+            image_bytes=image_bytes,
+            frame_number=1,
+        )
+    )
+    assert tracking_result.stream_status == STREAM_STATUS_TRACKING
+
+    finalized_result = None
+    for index in range(5):
+        finalized_result = asyncio.run(
+            service.process_frame(
+                camera_code="CAM_001",
+                captured_at=captured_at + timedelta(milliseconds=200 * (index + 1)),
+                content_type="image/jpeg",
+                image_bytes=image_bytes,
+                frame_number=index + 2,
+                high_res_crop_bytes=high_res_crop_bytes if index == 0 else None,
+                high_res_crop_content_type="image/jpeg" if index == 0 else None,
+                high_res_crop_frame_number=1 if index == 0 else None,
+            )
+        )
+
+    assert finalized_result is not None
+    assert finalized_result.stream_status == STREAM_STATUS_FINALIZED
+    assert captured["high_res_crop_bytes"] == high_res_crop_bytes
+
+
 def test_stream_frame_endpoint_returns_tracking(monkeypatch) -> None:
     class FakeStreamService:
         async def process_frame(self, *, camera_code, captured_at, content_type, image_bytes):
@@ -1191,6 +1303,120 @@ def test_stream_frame_endpoint_returns_tracking(monkeypatch) -> None:
     assert body["eventAgeSeconds"] == 1.5
     assert body["analysisStatus"] is None
     assert body["data"] is None
+
+
+def test_stream_frame_endpoint_accepts_high_res_crop(monkeypatch) -> None:
+    captured = {}
+
+    class FakeStreamService:
+        async def process_frame(self, **kwargs):
+            captured.update(kwargs)
+            return StreamProcessingResult(
+                stream_status=STREAM_STATUS_TRACKING,
+                camera_code=kwargs["camera_code"],
+            )
+
+    monkeypatch.setattr(
+        detection_route,
+        "stream_detection_service",
+        FakeStreamService(),
+    )
+
+    response = client.post(
+        "/api/detections/stream-frame",
+        data={
+            "cameraCode": "CAM_001",
+            "capturedAt": "2026-05-14T14:30:00",
+            "frameNumber": "7",
+            "highResCropFrameNumber": "6",
+        },
+        files={
+            "image": ("frame.jpg", make_test_image_bytes(), "image/jpeg"),
+            "highResCrop": ("crop.jpg", make_test_image_bytes(), "image/jpeg"),
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["frame_number"] == 7
+    assert captured["high_res_crop_frame_number"] == 6
+    assert captured["high_res_crop_bytes"]
+    assert captured["high_res_crop_content_type"] == "image/jpeg"
+
+
+def test_stream_frame_endpoint_rejects_invalid_high_res_crop_type() -> None:
+    response = client.post(
+        "/api/detections/stream-frame",
+        data={
+            "cameraCode": "CAM_001",
+            "capturedAt": "2026-05-14T14:30:00",
+        },
+        files={
+            "image": ("frame.jpg", make_test_image_bytes(), "image/jpeg"),
+            "highResCrop": ("crop.txt", b"bad", "text/plain"),
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "highResCrop must be jpeg or png"
+
+
+def test_high_res_stream_ocr_endpoint_sends_detection_to_backend(monkeypatch) -> None:
+    detection_route.duplicate_detection_guard.clear()
+    captured = {}
+    detected_at = datetime(2026, 5, 14, 14, 30, 0)
+
+    async def return_high_res_detection(
+        *,
+        camera_code,
+        captured_at,
+        image_bytes,
+        vehicle_detection=None,
+    ):
+        captured["camera_code"] = camera_code
+        captured["captured_at"] = captured_at
+        captured["image_bytes"] = image_bytes
+        captured["vehicle_detection"] = vehicle_detection
+        return make_recognized_detection(detected_at=captured_at)
+
+    async def record_backend_send(result, detection_status=None):
+        captured["backend_result"] = result
+        captured["backend_status"] = detection_status
+        return {"data": {"status": "FLOW_EVENT_CREATED", "flowEventId": 301}}
+
+    monkeypatch.setattr(
+        detection_route.inference_service,
+        "detect_from_image_bytes",
+        return_high_res_detection,
+    )
+    monkeypatch.setattr(
+        detection_route.backend_client,
+        "send_detection",
+        record_backend_send,
+    )
+
+    response = client.post(
+        "/api/detections/stream-frame/highres-ocr",
+        data={
+            "cameraCode": "CAM_001",
+            "capturedAt": detected_at.isoformat(),
+            "frameNumber": "123",
+        },
+        files={
+            "highResCrop": ("crop.jpg", make_test_image_bytes(), "image/jpeg"),
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["analysisStatus"] == "FLOW_EVENT_CREATED"
+    assert body["data"]["plateNumber"] == "123A4567"
+    assert captured["camera_code"] == "CAM_001"
+    assert captured["captured_at"] == detected_at
+    assert captured["image_bytes"]
+    assert captured["vehicle_detection"].detection_type == "VEHICLE"
+    assert captured["backend_status"] is None
+
+    detection_route.duplicate_detection_guard.clear()
 
 
 def test_stream_frame_endpoint_uses_speed_config_json_override(monkeypatch) -> None:

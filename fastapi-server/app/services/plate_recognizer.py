@@ -10,6 +10,8 @@ from app.core.config import OCR_LANG, OCR_MIN_CONFIDENCE
 class PlateRecognition:
     text: str | None
     confidence_score: float
+    variant_name: str | None = None
+    variant_image: np.ndarray | None = None
 
 
 class PlateRecognizer:
@@ -17,6 +19,41 @@ class PlateRecognizer:
         self._ocr = None
 
     def recognize(self, plate_image: np.ndarray) -> PlateRecognition:
+        return self._recognize_single(plate_image)
+
+    def recognize_best(
+        self,
+        variants: list[tuple[str, np.ndarray]],
+    ) -> PlateRecognition:
+        best_recognition: PlateRecognition | None = None
+
+        for variant_name, variant_image in variants:
+            recognition = self._recognize_single(
+                variant_image,
+                variant_name=variant_name,
+            )
+
+            if best_recognition is None:
+                best_recognition = recognition
+                continue
+
+            if self._is_better_recognition(recognition, best_recognition):
+                best_recognition = recognition
+
+        if best_recognition is None:
+            return PlateRecognition(
+                text=None,
+                confidence_score=0.0,
+            )
+
+        return best_recognition
+
+    def _recognize_single(
+        self,
+        plate_image: np.ndarray,
+        *,
+        variant_name: str | None = None,
+    ) -> PlateRecognition:
         ocr = self._load_ocr()
         ocr_result = ocr.ocr(plate_image)
 
@@ -27,12 +64,33 @@ class PlateRecognizer:
             return PlateRecognition(
                 text=None,
                 confidence_score=confidence_score,
+                variant_name=variant_name,
+                variant_image=plate_image,
             )
 
         return PlateRecognition(
             text=normalized_text,
             confidence_score=confidence_score,
+            variant_name=variant_name,
+            variant_image=plate_image,
         )
+
+    def _is_better_recognition(
+        self,
+        candidate: PlateRecognition,
+        current: PlateRecognition,
+    ) -> bool:
+        if candidate.text and not current.text:
+            return True
+        if not candidate.text and current.text:
+            return False
+
+        candidate_length = len(candidate.text or "")
+        current_length = len(current.text or "")
+        if candidate_length != current_length:
+            return candidate_length > current_length
+
+        return candidate.confidence_score > current.confidence_score
 
     def _load_ocr(self):
         if self._ocr is None:
@@ -134,6 +192,6 @@ class PlateRecognizer:
         if not text:
             return None
 
-        normalized = re.sub(r"[^0-9가-힣]", "", text)
+        normalized = re.sub(r"[^0-9\uac00-\ud7a3]", "", text)
 
         return normalized or None
