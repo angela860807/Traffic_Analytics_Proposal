@@ -765,3 +765,124 @@ Python 스크립트로 안전하게 제거:
 - 교훈: regex로 CSS 정제는 위험. 멀티셀렉터에서 한 토큰만 빼려면 proper CSS parser 사용해야 함
 
 ---
+
+## 21. 통합관제(/dashboard) 제거 + 부서 대시보드 전면 리뉴얼 (2026-05-22)
+
+기존 `/dashboard`(RoadDashboardView, 통합관제) 제거 및 5개 부서 대시보드(교통정보센터/교통분석팀/시설운영팀/단속관리팀/경영전략본부) 중심으로 IA 정리.
+
+### 21-1 통합관제 / RoadDashboardView 통째 삭제
+- **삭제 파일** (총 -5,497줄)
+  - `src/views/RoadDashboardView.vue` (1,500줄 본체)
+  - `src/components/dashboard/MonitoringTab.vue`, `EventsTab.vue`, `SearchTab.vue`, `StatsTab.vue`, `SettingsTab.vue`, `DataState.vue`
+  - `src/styles/dashboard.css` (2,170줄)
+  - `public/` 내 사용 안 하는 비디오/이미지 18개 (`hero-main.mp4`, `seoul_traffic1.mp4`, `*.png` 다수)
+- 라우터에서 `/dashboard` 경로 + import 제거, `protectedPaths`에서 제외
+- AppNav · AppFooter · DeptSwitcher · ChatTab의 `/dashboard` 링크/안내 일괄 정리
+
+### 21-2 브랜드 통일 — TAS 로고 + 텍스트
+- `public/TAS.png` 추가 → 헤더 텍스트 로고(`Traffic<em>AS</em>`)를 **이미지 로고로 일괄 교체** (10곳: AppNav, AppFooter, AuthModal, LoginView, SignupView, 5개 admin 뷰)
+- 로고 크기 56px로 통일, admin 사이드바엔 `.brand-img` 공통 클래스 (`admin-shared.css`)
+- 본문/푸터/모달의 `Traffic AS` 텍스트 → **`TAS`** 일괄 치환 (13곳)
+- 모든 `<img alt="TrafficAS">` → `alt="TAS"`로 통일 (10곳)
+- 로그인/회원가입 페이지 좌측 패널: `filter: brightness(0) invert(1)`로 로고 흰색 처리 → 어두운 hero-poster 배경 위에 또렷
+
+### 21-3 사용자 가이드 시스템 (GuideOverlay)
+신규 `src/components/GuideOverlay.vue` (~320줄) — 라이브러리 0개로 직접 구현한 강조 + 말풍선 오버레이.
+- `<Teleport to="body">` + `box-shadow` 트릭으로 강조 박스, 9999px 그림자로 외곽 어둡게
+- `requestAnimationFrame`로 타겟 요소 좌표 추적, 윈도우 리사이즈/스크롤 대응
+- 단계 진입 시 `onStepEnter(step)` 콜백으로 호출자가 탭 전환 가능
+- 자동 위치 계산 (위/아래/좌/우 공간 비교)
+- ESC, ←/→ 키보드, 외부 클릭 닫기, 단계 점 네비
+
+부서별 가이드 데이터 5종 — `src/data/guides/{analytics, control, ops, review, super}.js`. 각 5~16 step 구성.
+- "좌측 사이드 메뉴 전체 안내 → 대시보드 상세 → 끝" 패턴
+- 각 대시보드의 ? 버튼(`<button class="km-toggle guide-btn-trigger">`) 클릭 시 오버레이 활성화
+
+### 21-4 헤더 실시간 알림 벨 공통화
+- `admin-shared.css`에 `.hdr-bell-wrap` / `.hdr-bell-pop` / `.ac-row` 등 **공통 벨 스타일 정의**
+- 4개 admin 뷰(Analytics/Ops/Review/Super)에 벨 마크업 + `liveAlerts` mock 데이터 추가
+- ControlView는 기존 스코프 벨 CSS 제거(중복) → admin-shared.css의 공통 정의 사용
+- 부서별 알림 시나리오 (예: 분석팀 = 피크 악화/속도 저하, 운영팀 = RTSP 타임아웃/디스크 임계, 단속팀 = 신규 후보/OCR 신뢰도, 경영본부 = 결재/예산/SLA)
+- `critical` 알림 시 빨간 펄스 애니메이션 (`@keyframes bellPulse`)
+
+### 21-5 교통분석팀(AnalyticsView) 탭 재편
+**메뉴 9개 → 5개**로 슬림화, 각 탭에 의미 있는 콘텐츠 채움:
+
+| 메뉴 ID | 라벨 | 콘텐츠 |
+|---|---|---|
+| `dashboard` | 대시보드 | 4개 영역 통합 표시 (기존 그대로) |
+| `ctx` | 분석 기준 | ctx-bar + 현재 설정 요약 그리드 + 저장된 분석 프리셋 |
+| `insight` | 분석 인사이트 | insight-strip + 상세 인사이트 4종 (영향도/대상/변동률/권장조치) |
+| `cmp` | 구간 성능 비교 | row-cmp 차트 + 시간대별 표 + 구간별 상세 표 |
+| `map` | 혼잡 지도 · 지표 | row-mid(지도+KPI) + 교차로 분석 3종 + 사고/이벤트 로그 |
+| `settings` | 설정 | 분석 기본값/자동갱신/임계값/데이터 보관 4블록 |
+
+- 기존 8개 tab-panel 섹션(insight 상세/구간/교차로/시간대/통계/사고/보고서/설정) 통째로 제거
+- 각 sub-tab에선 `:has()` 셀렉터로 .content 스크롤 허용 (dashboard은 viewport-fit 유지)
+- ctx-bar 액션 버튼(통계/비교/리포트/CSV) **mock alert → 실제 동작**: 탭 전환 + `flashMsg` 토스트 + `downloadDeptReport` CSV 다운로드
+
+### 21-6 교통정보센터(ControlView) 미세 조정
+- 우측 컬럼 카메라 순서 스왑 — **교통 흐름 분석 카메라(상) ↔ 과속 단속 카메라(하)**
+- `flowCam`의 `src`가 빈 문자열이었던 버그 수정 → `1_web.mp4` 영상 적용
+- 헤더 가이드 버튼 + 알림 벨 추가, 푸터의 `Traffic AS · v2.1.0` → `TAS · v2.1.0`
+
+### 21-7 시설운영팀(OpsView) 메뉴/콘텐츠 추가
+- 사이드바 **알람/이벤트 메뉴 제거** (잔여 `tab === 'alarm'` 템플릿은 접근 경로만 차단)
+- **설정 메뉴 추가** + 4블록 패널 (자동 갱신/장애 임계값/점검 주기/현장 출동 설정)
+- 헤더 타이틀 (`.t-main`) 폰트 사이즈를 ControlView 기준(22px/700)으로 통일 — 이전엔 13.5px로 너무 작았음
+- `<a class="t-sub t-main">`에서 잉여 `t-sub` 클래스 제거(opacity:.85 영향 차단)
+
+### 21-8 단속관리팀(ReviewView) 헤더 정리
+- 헤더에 몰려있던 11개 요소 → **7개**로 슬림화
+- KPI 칩 5개 + 보고서 다운로드 → **본문 상단 툴바(`.rev-toolbar`)로 이동**, 라이트 톤(흰 배경 + 컬러 아이콘)으로 재스타일
+- 헤더 시간 표시 압축 ("마지막 업데이트" 라벨 제거, 시각만)
+- **기간 지정 다운로드 신규** — `기간` 버튼 클릭 시 시작일~종료일 입력창 슬라이드, `downloadDeptReport` 호출 (자동 daily/weekly 템플릿 선택)
+- 단일 날짜 입력은 제거 (일일/주간은 오늘 기준 즉시 다운로드)
+
+### 21-9 경영전략본부(SuperView) topNav 7개 탭 채움
+운영현황/지도/이벤트/카메라/OCR/통계/설정 — 이전엔 placeholder만 있던 7개 탭에 각 부서 데이터 통합 요약본 추가.
+
+| 탭 | 출처 | 내용 |
+|---|---|---|
+| 운영현황 | 시설운영팀 | KPI 4종(가동률/온라인/지연/장애) + 대표 서버 4대 상태 |
+| 지도 | 교통정보센터 | 5개 도로 실시간 속도/혼잡도/이벤트 표 + 지도 안내 카드 |
+| 이벤트 | 전 부서 통합 | 4부서 이벤트 시간순 통합 표 |
+| 카메라 | 전 부서 통합 | 전체 247대 KPI + 부서별 배분 + 최근 이슈 카메라 |
+| OCR | 단속관리팀 | 오늘 1,842건 처리 KPI + 최근 OCR 로그 5건 |
+| 통계 | 교통분석팀 | 통행 KPI 4종 + 7개 시간대 통행량 막대 |
+| 설정 | 전사 통합 | 알림·백업/로그·API/보안 3블록 |
+
+- 라이트모드 가독성 개선: `.pnl-tbl`, `.set-row`, `.su-rep` 등에 어두운 #06101e 배경 + 흰 글자 조합을 라이트 톤(#ffffff/#0c1f40)으로 일괄 교체
+- 글로벌 상태 요약 KPI 7개 아이콘 다양화 (check-circle → shield-check 등) + **아이콘 배경(연한 컬러 박스) 제거** → 깔끔한 모노톤
+
+### 21-10 헤더 타이틀 5개 대시보드 통일
+- 공통 스펙: `.top h1` 18px / weight 600 / `#0c1f40`, `.top .t-main` 22px / weight 700
+- 이전엔 Analytics 20/24, Ops 13.5/13.5, Super 19로 제각각 → 모두 18/22로 정렬
+
+### 21-11 로그인 / 회원가입 페이지 리뉴얼
+- **좌측 패널 배경에 `/hero-poster.jpg`** + 92~98% 어두운 그라데이션 오버레이
+- 로고 흰색 변환 (`filter: brightness(0) invert(1)`) + 미세 drop-shadow
+- 본문 텍스트 그림자(`text-shadow` 이중)와 가중치 ↑ → 배경 위 가독성 확보
+- 헤더 라벨(`AUTHENTICATION` / `CREATE ACCOUNT`) 제거, "← 메인 페이지로" 백 링크 제거
+- "또는" 디바이더 톤 정리 (var(--t2) / 12.5px / 500)
+- input 크기 14.5 → 16px (iOS 자동 줌 방지에도 도움)
+
+### 21-12 코드 정리
+- `ControlView.css`: 중복된 헤더 벨 CSS ~90줄 제거 (admin-shared.css로 이전됨)
+- `AnalyticsView.vue`: 미사용 데이터 제거 — `statsChartTabs/Tab/Data`, `statsLine/X/Avg`, `reservations`, `recentReports`, `autoPublish` (~25줄)
+- `SuperView.vue`: 미사용 `.map-stub` CSS 제거 (현재는 `.map-stub-card`만 사용)
+- ChatTab의 FAQ 문구 갱신 — `/dashboard` 안내를 부서별 대시보드 안내로 변경
+
+### 21-13 부하 변화 요약 (전체)
+| 항목 | 이전 | 현재 | 변화 |
+|---|---|---|---|
+| 동시 비디오 | 6개 (RoadDashboard 6분할) + 2개 | 0 + 2 → **2개** | -6 |
+| Leaflet 지도 | 2개 (Heatmap + 카메라) | 1개 (관제센터) | -1 |
+| OSM 폴리라인 | ~400개 | ~150개 | -60% |
+| ECharts 인스턴스 | 5개 (RoadDashboard 3 + 분석 2) | 2개 (분석) | -3 |
+| 3초 주기 setInterval | 1개 (KPI 갱신) | 0 | -1 |
+| FastAPI `/road-congestion` 호출 | 3초마다 | 호출 없음 | 백엔드 부하 ↓ |
+| `/api/v1/detection-logs` 호출 | 3초마다 | 호출 없음 | 백엔드 부하 ↓ |
+| 코드 총 라인 | (기준) | -3,500줄 (54파일 변경, +1,952 / -5,497) | 가벼움 |
+
+---
