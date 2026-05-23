@@ -21,6 +21,7 @@ from app.services.stream_event_service import (
     StreamEventService,
     StreamProcessingResult,
 )
+from app.services.vehicle_detector import VehicleDetection
 
 router = APIRouter(prefix="/api/detections", tags=["detections"])
 logger = logging.getLogger(__name__)
@@ -126,6 +127,13 @@ def build_stream_frame_response(
             for bbox in (stream_result.bboxes or [])
         ],
         bbox_confidence_score=stream_result.bbox_confidence_score,
+        best_candidate_frame_number=stream_result.best_candidate_frame_number,
+        best_candidate_bbox=(
+            list(stream_result.best_candidate_bbox)
+            if stream_result.best_candidate_bbox is not None
+            else None
+        ),
+        best_candidate_captured_at=stream_result.best_candidate_captured_at,
         event_age_seconds=stream_result.event_age_seconds,
         speed_measurements=stream_result.speed_measurements,
         speed_violation=stream_result.speed_violation,
@@ -398,7 +406,13 @@ async def process_stream_frame(
     camera_code: str = Form(..., alias="cameraCode"),
     captured_at: datetime = Form(..., alias="capturedAt"),
     speed_config_json: str | None = Form(default=None, alias="speedConfigJson"),
+    frame_number: int | None = Form(default=None, alias="frameNumber"),
+    high_res_crop_frame_number: int | None = Form(
+        default=None,
+        alias="highResCropFrameNumber",
+    ),
     image: UploadFile = File(...),
+    high_res_crop: UploadFile | None = File(default=None, alias="highResCrop"),
 ) -> StreamFrameResponse:
     if image.content_type not in {"image/jpeg", "image/png"}:
         raise HTTPException(
@@ -406,7 +420,21 @@ async def process_stream_frame(
             detail="image must be jpeg or png",
         )
 
+    if (
+        high_res_crop is not None
+        and high_res_crop.content_type not in {"image/jpeg", "image/png"}
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="highResCrop must be jpeg or png",
+        )
+
     image_bytes = await image.read()
+    high_res_crop_bytes = (
+        await high_res_crop.read()
+        if high_res_crop is not None
+        else None
+    )
     speed_camera_config = parse_speed_camera_config_override(
         camera_code=camera_code,
         raw_speed_config_json=speed_config_json,
@@ -419,6 +447,17 @@ async def process_stream_frame(
             "content_type": image.content_type,
             "image_bytes": image_bytes,
         }
+        if frame_number is not None:
+            process_frame_kwargs["frame_number"] = frame_number
+        if high_res_crop_bytes is not None:
+            process_frame_kwargs["high_res_crop_bytes"] = high_res_crop_bytes
+            process_frame_kwargs["high_res_crop_content_type"] = (
+                high_res_crop.content_type
+            )
+            if high_res_crop_frame_number is not None:
+                process_frame_kwargs["high_res_crop_frame_number"] = (
+                    high_res_crop_frame_number
+                )
         if speed_camera_config is not None:
             process_frame_kwargs["speed_camera_config"] = speed_camera_config
 
@@ -508,3 +547,70 @@ async def process_stream_frame(
         message=f"Vehicle event finalized and saved as {analysis_status}",
         analysis_status=analysis_status,
     )
+
+
+@router.post(
+    "/stream-frame/highres-ocr",
+    response_model=DetectionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def process_high_res_stream_ocr(
+    camera_code: str = Form(..., alias="cameraCode"),
+    captured_at: datetime = Form(..., alias="capturedAt"),
+    frame_number: int = Form(..., alias="frameNumber"),
+    high_res_crop: UploadFile = File(..., alias="highResCrop"),
+) -> DetectionResponse:
+    if high_res_crop.content_type not in {"image/jpeg", "image/png"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="highResCrop must be jpeg or png",
+        )
+
+    high_res_crop_bytes = await high_res_crop.read()
+
+    try:
+        result = await inference_service.detect_from_image_bytes(
+            camera_code=camera_code,
+            captured_at=captured_at,
+            image_bytes=high_res_crop_bytes,
+            vehicle_detection=VehicleDetection(
+                detection_type="VEHICLE",
+                confidence_score=1.0,
+                bbox=(0, 0, 1, 1),
+            ),
+        )
+        if not should_send_to_backend(result):
+            await backend_client.send_detection(result, "OCR_FAILED")
+            return DetectionResponse(
+                accepted=True,
+                message=(
+                    "High-resolution OCR result sent to backend as OCR_FAILED "
+                    f"for frame {frame_number}"
+                ),
+                analysis_status="OCR_FAILED",
+                data=result,
+            )
+        if duplicate_detection_guard.is_duplicate(result):
+            await backend_client.send_detection(result, "DUPLICATE_SKIPPED")
+            return build_duplicate_detection_response(result)
+        backend_response = await backend_client.send_detection(result)
+        duplicate_detection_guard.remember(result)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="highResCrop must be a valid jpg or png",
+        ) from exc
+    except httpx.HTTPStatusError as exc:
+        raise_spring_http_exception(exc)
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Spring Boot API is not reachable",
+        ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
+
+    return build_backend_success_response(result, backend_response)
