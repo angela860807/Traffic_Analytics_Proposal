@@ -29,6 +29,7 @@ fastapi-server/models
 fastapi-server/sample.jpg
 fastapi-server/capture.jpg
 fastapi-server/capture*.jpg
+trafficAS-b/local-tools
 no_plate.jpg
 plate.jpg
 *.docx

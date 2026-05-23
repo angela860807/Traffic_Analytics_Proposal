@@ -9,12 +9,6 @@ export default defineConfig({
     proxy: {
       '/api': 'http://127.0.0.1:8080',
       '/static/detections': 'http://127.0.0.1:8000',
-      '/its': {
-        target: 'https://openapi.its.go.kr:9443',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/its/, ''),
-        secure: false,
-      },
     },
   },
   test: {

@@ -151,12 +151,13 @@
 
 <script setup>
 import { ref } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import { useTheme } from "@/composables/useTheme";
 import { useAuth } from "@/composables/useAuth";
 
 const { isDark } = useTheme();
-const { login } = useAuth();
+const { login, isAdmin } = useAuth();
+const router = useRouter();
 
 const email = ref("");
 const password = ref("");
@@ -175,7 +176,7 @@ const handleLogin = async () => {
   await new Promise((r) => setTimeout(r, 600));
   try {
     await login(email.value, password.value);
-    // useAuth.login()이 내부적으로 홈으로 이동시킴
+    router.push(isAdmin.value ? '/dashboard' : '/');
   } catch (e) {
     error.value = e.message;
   } finally {
@@ -260,7 +261,7 @@ const feats = [
 }
 .ey {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 9px;
   letter-spacing: 0.22em;
   color: #60a5fa;
   opacity: 0.7;
@@ -290,7 +291,7 @@ h1 em {
   font-style: normal;
 }
 .brand-copy p {
-  font-size: 15px;
+  font-size: 13px;
   color: rgba(255, 255, 255, 0.45);
   line-height: 1.85;
   font-weight: 300;
@@ -307,7 +308,7 @@ h1 em {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13.5px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.5);
 }
 .fdot {
@@ -340,7 +341,7 @@ h1 em {
 }
 .form-ey {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 9px;
   letter-spacing: 0.22em;
   color: var(--a);
   opacity: 0.65;
@@ -365,7 +366,7 @@ h2 {
   margin-bottom: 6px;
 }
 .form-sub {
-  font-size: 14.5px;
+  font-size: 13px;
   color: var(--t2);
   font-weight: 300;
   margin-bottom: 36px;
@@ -383,7 +384,7 @@ h2 {
   gap: 6px;
 }
 .field label {
-  font-size: 12.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--t2);
@@ -414,7 +415,7 @@ input {
   padding: 12px 0;
   background: none;
   border: none;
-  font-size: 14.5px;
+  font-size: 13px;
   color: var(--t);
   outline: none;
 }

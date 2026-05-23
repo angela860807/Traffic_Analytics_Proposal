@@ -1,10 +1,19 @@
 <template>
   <div class="fab-wrap">
+    <button class="fab" @click="goChat" title="채팅">💬</button>
+    <button class="fab" @click="toggle" :title="isDark ? '라이트 모드' : '다크 모드'">
+      {{ isDark ? "☀️" : "🌙" }}
+    </button>
     <button class="fab" @click="top" title="맨 위로">↑</button>
   </div>
 </template>
 <script setup>
+import { useRouter } from "vue-router";
+import { useTheme } from "@/composables/useTheme";
+const { isDark, toggle } = useTheme();
+const router = useRouter();
 const top = () => window.scrollTo({ top: 0, behavior: "smooth" });
+const goChat = () => router.push("/sub/support?tab=chat");
 </script>
 <style scoped>
 .fab-wrap {

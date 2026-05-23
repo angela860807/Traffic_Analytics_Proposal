@@ -70,6 +70,17 @@
   color: #fff;
 }
 
+/* ── 터미널 / 코드 블록 (UsageView) ──────────────────────────── */
+.theme-navy.light .tcode    { background: #eef2f9; }
+.theme-navy.light .tline    { color: #1e3a5f; }
+.theme-navy.light .tprompt  { color: #2563eb; opacity: 0.55; }
+.theme-navy.light .term-bar { background: rgba(15, 40, 90, 0.04); }
+.theme-navy.light .tcopy    {
+  border-color: rgba(15, 40, 90, 0.15);
+  color: rgba(12, 31, 64, 0.5);
+}
+.theme-navy.light .tcopy:hover { border-color: #2563eb; color: #2563eb; }
+
 /* SubView 코드 블록 */
 .theme-navy.light .code {
   background: #eef2f9;
@@ -77,7 +88,7 @@
   color: #2563eb;
 }
 
-/* ── 기술 스택 칩 (IntroView) ────────────────────────────────── */
+/* ── 기술 스택 칩 (UsageView) ────────────────────────────────── */
 .theme-navy.light .arch-tech {
   background: rgba(37, 99, 235, 0.07);
   border-color: rgba(37, 99, 235, 0.18);
@@ -112,6 +123,21 @@
 .theme-navy.light .step-big-n { color: rgba(37, 99, 235, 0.1); }
 .theme-navy.light .arch-step  { color: rgba(37, 99, 235, 0.1); }
 .theme-navy.light .feat-num   { color: #2563eb; opacity: 0.4; }
+
+/* ── Step 수직선 ──────────────────────────────────────────────── */
+.theme-navy.light .step-vline {
+  background: linear-gradient(to bottom, rgba(37,99,235,.25), transparent);
+}
+
+/* ── HeroStats cyan variant ───────────────────────────────────── */
+.theme-navy.light .stats-band.cyan {
+  background: rgba(37, 99, 235, 0.04);
+  border-top-color: rgba(37, 99, 235, 0.14);
+}
+.theme-navy.light .stats-band.cyan .sc { background: #fff; }
+.theme-navy.light .stats-band.cyan .sc:first-child::before {
+  background: linear-gradient(90deg, #2563eb, transparent);
+}
 
 /* ── 입력 포커스 링 ───────────────────────────────────────────── */
 .theme-navy.light .field.focused .input-wrap {
