@@ -1,6 +1,6 @@
 import { ref } from 'vue'
-const isDark = ref(false)
+const isDark = ref(true)
 export function useTheme() {
-  const toggle = () => {}
+  const toggle = () => { isDark.value = !isDark.value }
   return { isDark, toggle }
 }
