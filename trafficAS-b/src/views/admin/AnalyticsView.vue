@@ -4,7 +4,7 @@
       <aside class="filter">
         <div class="side-top">
           <RouterLink to="/" class="brand" v-if="sideOpen">
-            Traffic <em>AS</em>
+            <img src="/TAS.png" alt="TAS" class="brand-img" />
           </RouterLink>
           <button class="side-toggle" @click="sideOpen = !sideOpen"
             :aria-label="sideOpen ? '사이드바 접기' : '사이드바 펼치기'"
@@ -36,12 +36,50 @@
               <span class="km-lab">자동 새로고침</span>
               <span class="km-state">{{ autoRefresh ? 'ON' : 'OFF' }}</span>
             </button>
+            <div class="hdr-bell-wrap" @click.stop>
+              <button class="hdr-bell" :class="{ critical: hasCritical, on: showAlerts }" @click="showAlerts = !showAlerts">
+                <i class="bi bi-bell-fill"></i>
+                <span v-if="liveAlerts.length" class="hdr-bell-c">{{ liveAlerts.length }}</span>
+              </button>
+              <div v-if="showAlerts" class="hdr-bell-pop" @click.stop>
+                <div class="hbp-h">
+                  <i class="bi bi-exclamation-octagon-fill"></i>
+                  <strong>실시간 알림</strong>
+                  <span class="hbp-c">{{ liveAlerts.length }}건</span>
+                  <button class="hbp-x" @click="showAlerts = false"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="hbp-list">
+                  <div v-for="a in liveAlerts" :key="a.id" class="ac-row" :class="a.sev" @click="showAlerts = false">
+                    <div class="ac-sev"><i :class="a.icon"></i></div>
+                    <div class="ac-body">
+                      <div class="ac-t">{{ a.title }}</div>
+                      <div class="ac-d">{{ a.detail }}</div>
+                      <div class="ac-meta">
+                        <span class="ac-loc"><i class="bi bi-geo-alt"></i> {{ a.place }}</span>
+                        <span class="ac-time">{{ a.time }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-if="!liveAlerts.length" class="ac-empty">활성 알림이 없습니다.</div>
+                </div>
+              </div>
+            </div>
+            <button class="km-toggle guide-btn-trigger" @click="guideOpen = true" title="사용자 가이드">
+              <i class="bi bi-question-circle"></i>
+              <span class="km-lab">가이드</span>
+            </button>
             <DeptSwitcher />
             <div class="t-user"><i class="bi bi-person-circle"></i> 교통분석팀 매니저 <i class="bi bi-chevron-down"></i></div>
           </div>
         </header>
 
-        <section class="ctx-bar" v-if="anaTab === 'dashboard'">
+        <GuideOverlay
+          v-model="guideOpen"
+          :steps="guideSteps"
+          :on-step-enter="onGuideStep"
+        />
+
+        <section class="ctx-bar" v-if="anaTab === 'ctx' || anaTab === 'dashboard'">
           <div class="ctx-grp">
             <span class="ctx-lab"><i class="bi bi-arrow-left-right"></i> 비교 기준</span>
             <select class="ctx-sel" v-model="compareBase">
@@ -70,15 +108,15 @@
             </select>
           </div>
           <div class="ctx-acts">
-            <button class="ctx-act bl" @click="opMsg = '통계 조회 실행'" title="통계 조회"><i class="bi bi-bar-chart"></i> 통계</button>
-            <button class="ctx-act bl" @click="opMsg = '기간 비교 실행'" title="기간 비교"><i class="bi bi-calendar3"></i> 비교</button>
-            <button class="ctx-act gr" @click="opMsg = '리포트 생성 시작'" title="리포트 생성"><i class="bi bi-file-earmark-text"></i> 리포트</button>
-            <button class="ctx-act pl" @click="opMsg = 'CSV 내보내기 완료'" title="CSV 내보내기"><i class="bi bi-download"></i> CSV</button>
+            <button class="ctx-act bl" @click="actStats" title="통계 인사이트로 이동"><i class="bi bi-bar-chart"></i> 통계</button>
+            <button class="ctx-act bl" @click="actCompare" title="구간 성능 비교로 이동"><i class="bi bi-calendar3"></i> 비교</button>
+            <button class="ctx-act gr" @click="actReport" title="일일 교통흐름 리포트 다운로드"><i class="bi bi-file-earmark-text"></i> 리포트</button>
+            <button class="ctx-act pl" @click="actCsv" title="주간 구간 성능 CSV 다운로드"><i class="bi bi-download"></i> CSV</button>
           </div>
         </section>
-        <div v-if="opMsg && anaTab === 'dashboard'" class="ctx-msg">{{ opMsg }}</div>
+        <div v-if="opMsg && (anaTab === 'ctx' || anaTab === 'dashboard')" class="ctx-msg">{{ opMsg }}</div>
 
-        <section class="insight-strip" v-if="anaTab === 'dashboard'">
+        <section class="insight-strip" v-if="anaTab === 'insight' || anaTab === 'dashboard'">
           <div class="is-h"><i class="bi bi-clipboard-data"></i> 분석 인사이트</div>
           <div class="is-list">
             <div class="is-card" v-for="(ins, i) in aiInsights" :key="i">
@@ -89,10 +127,9 @@
               </div>
             </div>
           </div>
-          <button class="is-more" @click="anaTab = 'insight'">상세 <i class="bi bi-arrow-right"></i></button>
         </section>
 
-        <section class="row-cmp" v-if="anaTab === 'dashboard'">
+        <section class="row-cmp" v-if="anaTab === 'cmp' || anaTab === 'dashboard'">
           <div class="cmp-area">
             <div class="cmp-h">
               <h3>구간 성능 비교 <i class="bi bi-info-circle"></i></h3>
@@ -126,273 +163,120 @@
 
         </section>
 
-        <!-- 분석 인사이트 상세 탭 -->
-        <section v-if="anaTab === 'insight'" class="tab-panel">
-          <div class="tp-h">
-            <h2><i class="bi bi-clipboard-data"></i> 분석 인사이트 상세</h2>
-            <span class="tp-sub">AI 분석 · 최근 24시간 · {{ aiInsights.length }}건</span>
+
+        <!-- ctx 단독 탭: 현재 설정 요약 + 저장된 분석 -->
+        <section class="ctx-extra" v-if="anaTab === 'ctx'">
+          <div class="card">
+            <div class="kpi-head">
+              <h3><i class="bi bi-list-check"></i> 현재 분석 설정 요약</h3>
+              <span class="seg-sub">선택한 조건이 모든 분석에 적용됩니다.</span>
+            </div>
+            <div class="cs-grid">
+              <div class="cs-cell"><span>도로</span><strong>{{ activeRoadLabel }}</strong></div>
+              <div class="cs-cell"><span>비교 기준</span><strong>{{ compareBase === 'prev' ? '전일' : compareBase === 'prevWeek' ? '전주 동일 요일' : '최근 7일 평균' }}</strong></div>
+              <div class="cs-cell"><span>기간</span><strong>{{ periods.find(p => p.id === period)?.label }}</strong></div>
+              <div class="cs-cell"><span>기간 범위</span><strong class="mono">{{ dateRange }}</strong></div>
+              <div class="cs-cell"><span>시간대</span><strong>{{ timeSlot === 'all' ? '전체' : timeSlot === 'am' ? '오전' : timeSlot === 'pm' ? '오후' : timeSlot === 'rush' ? '출퇴근' : '야간' }}</strong></div>
+              <div class="cs-cell"><span>자동 새로고침</span><strong :class="autoRefresh ? 'up' : 'dn'">{{ autoRefresh ? 'ON' : 'OFF' }}</strong></div>
+            </div>
           </div>
-          <div class="ins-grid">
-            <div class="ins-detail" v-for="(ins, i) in insightDetails" :key="i">
-              <div class="id-h">
-                <i :class="ins.icon" :style="{ color: ins.color }"></i>
-                <div class="id-title">
-                  <div class="id-t">{{ ins.title }}</div>
-                  <div class="id-sub">{{ ins.detail }}</div>
+          <div class="card">
+            <div class="kpi-head">
+              <h3><i class="bi bi-bookmark-star"></i> 저장된 분석 프리셋</h3>
+              <button class="tp-add"><i class="bi bi-plus-lg"></i> 분석 생성</button>
+            </div>
+            <table class="tbl-kpi">
+              <thead><tr><th>분석명</th><th>유형</th><th>기간</th><th>생성자</th><th>생성</th></tr></thead>
+              <tbody>
+                <tr v-for="s in savedAnalyses" :key="s.id">
+                  <td><strong>{{ s.name }}</strong></td>
+                  <td>{{ s.type }}</td>
+                  <td class="mono">{{ s.range }}</td>
+                  <td>{{ s.by }}</td>
+                  <td class="mono">{{ s.created }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- insight 단독 탭: 상세 인사이트 카드 -->
+        <section class="ins-extra" v-if="anaTab === 'insight'">
+          <div class="card">
+            <div class="kpi-head">
+              <h3><i class="bi bi-clipboard-data"></i> 인사이트 상세 (AI 분석)</h3>
+              <span class="seg-sub">최근 24시간 · {{ insightDetails.length }}건</span>
+            </div>
+            <div class="ins-grid">
+              <div class="ins-detail" v-for="(ins, i) in insightDetails" :key="i">
+                <div class="id-h">
+                  <i :class="ins.icon" :style="{ color: ins.color }"></i>
+                  <div class="id-title">
+                    <div class="id-t">{{ ins.title }}</div>
+                    <div class="id-sub">{{ ins.detail }}</div>
+                  </div>
+                  <span class="id-impact" :class="ins.tone">영향도 {{ ins.impact }}</span>
                 </div>
-                <span class="id-impact" :class="ins.tone">영향도 {{ ins.impact }}</span>
-              </div>
-              <div class="id-metrics">
-                <div class="id-m"><span>대상 구간</span><strong>{{ ins.target }}</strong></div>
-                <div class="id-m"><span>변동률</span><strong :class="ins.dTone">{{ ins.change }}</strong></div>
-                <div class="id-m"><span>발생 빈도</span><strong>{{ ins.freq }}</strong></div>
-                <div class="id-m"><span>지속 시간</span><strong>{{ ins.duration }}</strong></div>
-              </div>
-              <div class="id-actions">
-                <div class="id-act-h"><i class="bi bi-lightbulb"></i> 권장 조치</div>
-                <ul>
-                  <li v-for="(a, j) in ins.actions" :key="j">{{ a }}</li>
-                </ul>
+                <div class="id-metrics">
+                  <div class="id-m"><span>대상 구간</span><strong>{{ ins.target }}</strong></div>
+                  <div class="id-m"><span>변동률</span><strong :class="ins.dTone">{{ ins.change }}</strong></div>
+                  <div class="id-m"><span>발생 빈도</span><strong>{{ ins.freq }}</strong></div>
+                  <div class="id-m"><span>지속 시간</span><strong>{{ ins.duration }}</strong></div>
+                </div>
+                <div class="id-actions">
+                  <div class="id-act-h"><i class="bi bi-lightbulb"></i> 권장 조치</div>
+                  <ul>
+                    <li v-for="(a, j) in ins.actions" :key="j">{{ a }}</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        <!-- 구간 분석 탭 -->
-        <section v-if="anaTab === 'section'" class="tab-panel">
-          <div class="tp-h">
-            <h2><i class="bi bi-bezier2"></i> 구간 분석</h2>
-            <span class="tp-sub">{{ segKpis.length }}개 구간 · {{ activeRoadLabel }}</span>
-          </div>
-          <div class="tp-stat-row">
-            <div class="tp-st"><span>평균 속도</span><strong>{{ metrics.avgSpeed }}<small>km/h</small></strong></div>
-            <div class="tp-st"><span>혼잡 구간</span><strong class="rd">{{ metrics.congSections }}<small>개</small></strong></div>
-            <div class="tp-st"><span>전일 대비</span><strong class="up">▲ {{ metrics.changeDelta }}%</strong></div>
-            <div class="tp-st"><span>상시 혼잡</span><strong>{{ metrics.recurringJam }}<small>개</small></strong></div>
-          </div>
-          <table class="tp-tbl">
-            <thead>
-              <tr><th>구간</th><th>평균 속도</th><th>전일 대비</th><th>피크 시간</th><th>통행량</th><th>혼잡도</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="r in segKpis" :key="r.name">
-                <td><strong>{{ r.name }}</strong></td>
-                <td class="mono"><strong>{{ r.speed }}</strong> km/h</td>
-                <td><span :class="r.dTone" class="mono">{{ r.delta }}</span></td>
-                <td class="mono">{{ r.peak }}</td>
-                <td class="mono">{{ (r.speed * 80).toLocaleString() }}대/h</td>
-                <td><span class="cg-tag" :class="r.cgTone">{{ r.cg }}</span></td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-
-        <!-- 교차로 분석 탭 -->
-        <section v-if="anaTab === 'cross'" class="tab-panel">
-          <div class="tp-h"><h2><i class="bi bi-diagram-3"></i> 교차로 분석</h2><span class="tp-sub">3개 주요 교차로 · 신호 효율 평균 71%</span></div>
-          <div class="tp-grid">
-            <div class="tp-card" v-for="x in crossroads" :key="x.name">
-              <div class="tpc-name"><i class="bi bi-stoplights" :style="{ color: x.tone === 'rd' ? '#dc2626' : x.tone === 'or' ? '#b45309' : '#059669' }"></i> {{ x.name }}</div>
-              <div class="tpc-row"><span>평균 대기</span><strong class="mono">{{ x.wait }}초</strong></div>
-              <div class="tpc-row"><span>혼잡도</span><span class="cg-tag" :class="x.tone">{{ x.level }}</span></div>
-              <div class="tpc-row"><span>통행량 (시간)</span><strong class="mono">{{ x.vol.toLocaleString() }}대</strong></div>
-              <div class="tpc-row"><span>신호 효율</span><strong class="mono" :class="x.effTone">{{ x.eff }}%</strong></div>
-              <div class="tpc-row"><span>좌회전 비율</span><strong class="mono">{{ x.leftPct }}%</strong></div>
-              <div class="tpc-row"><span>보행 통과</span><strong class="mono">{{ x.pedPass }}건/h</strong></div>
+        <!-- cmp 단독 탭: 시간대별 비교 표 -->
+        <section class="cmp-extra" v-if="anaTab === 'cmp'">
+          <div class="card">
+            <div class="kpi-head">
+              <h3><i class="bi bi-clock-history"></i> 시간대별 성능 비교</h3>
+              <span class="seg-sub">24시간 · 전일 대비 변동</span>
             </div>
+            <table class="tbl-kpi">
+              <thead><tr><th>시간대</th><th>평균 속도</th><th>전일 대비</th><th>혼잡 구간</th><th>통행량</th><th>특징</th></tr></thead>
+              <tbody>
+                <tr v-for="t in timeSlots" :key="t.slot">
+                  <td><strong>{{ t.slot }}</strong></td>
+                  <td class="mono">{{ t.speed }} km/h</td>
+                  <td><span :class="t.dTone" class="mono">{{ t.delta }}</span></td>
+                  <td><span class="cg-tag" :class="t.tone">{{ t.level }}</span> {{ t.cong }}</td>
+                  <td class="mono">{{ t.vol.toLocaleString() }}대/h</td>
+                  <td>{{ t.note }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="kpi-head">
+              <h3><i class="bi bi-bezier2"></i> 구간별 상세 지표</h3>
+              <span class="seg-sub">{{ segKpis.length }}개 구간 · {{ activeRoadLabel }}</span>
+            </div>
+            <table class="tbl-kpi">
+              <thead><tr><th>구간</th><th>평균 속도</th><th>전일 대비</th><th>피크 시간</th><th>통행량</th><th>혼잡도</th></tr></thead>
+              <tbody>
+                <tr v-for="r in segKpis" :key="r.name">
+                  <td><strong>{{ r.name }}</strong></td>
+                  <td class="mono">{{ r.speed }} km/h</td>
+                  <td><span :class="r.dTone" class="mono">{{ r.delta }}</span></td>
+                  <td class="mono">{{ r.peak }}</td>
+                  <td class="mono">{{ (r.speed * 80).toLocaleString() }}대/h</td>
+                  <td><span class="cg-tag" :class="r.cgTone">{{ r.cg }}</span></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </section>
 
-        <!-- 시간대 분석 탭 -->
-        <section v-if="anaTab === 'time'" class="tab-panel">
-          <div class="tp-h"><h2><i class="bi bi-clock"></i> 시간대 분석</h2><span class="tp-sub">24시간 평균 · 전일 대비 변동</span></div>
-          <table class="tp-tbl">
-            <thead><tr><th>시간대</th><th>평균 속도</th><th>전일 대비</th><th>혼잡 구간</th><th>통행량</th><th>특징</th></tr></thead>
-            <tbody>
-              <tr v-for="t in timeSlots" :key="t.slot">
-                <td><strong>{{ t.slot }}</strong></td>
-                <td class="mono"><strong>{{ t.speed }}</strong> km/h</td>
-                <td><span :class="t.dTone" class="mono">{{ t.delta }}</span></td>
-                <td><span class="cg-tag" :class="t.tone">{{ t.level }}</span> {{ t.cong }}</td>
-                <td class="mono">{{ t.vol.toLocaleString() }}대/h</td>
-                <td>{{ t.note }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-
-        <!-- 교통통계 탭 (교통정보센터에서 이관) -->
-        <section v-if="anaTab === 'stats'" class="tab-panel">
-          <div class="tp-h">
-            <h2><i class="bi bi-bar-chart"></i> 교통통계</h2>
-            <span class="tp-sub">시간대별 평균 속도 추이</span>
-          </div>
-          <div class="stats-card">
-            <div class="stats-head">
-              <div class="stats-meta">
-                <span class="stats-lab">구간</span>
-                <strong>강변북로 (구리 → 한남)</strong>
-              </div>
-              <div class="stats-tabs">
-                <button v-for="t in statsChartTabs" :key="t.id"
-                  class="stats-t" :class="{ on: statsChartTab === t.id }"
-                  @click="statsChartTab = t.id">{{ t.label }}</button>
-              </div>
-            </div>
-            <div class="stats-kpi-row">
-              <div class="stats-kpi"><span>평균 속도</span><strong>{{ statsAvg }}<small>km/h</small></strong></div>
-              <div class="stats-kpi"><span>최저</span><strong class="rd">32<small>km/h</small></strong></div>
-              <div class="stats-kpi"><span>최고</span><strong class="up">82<small>km/h</small></strong></div>
-              <div class="stats-kpi"><span>표본 구간</span><strong>{{ statsX.length }}<small>지점</small></strong></div>
-            </div>
-            <svg class="stats-line" viewBox="0 0 400 160" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="sg-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#2563eb" stop-opacity="0.35"/>
-                  <stop offset="100%" stop-color="#2563eb" stop-opacity="0"/>
-                </linearGradient>
-              </defs>
-              <line v-for="y in [32, 64, 96, 128]" :key="y" :x1="0" :y1="y" :x2="400" :y2="y" stroke="#e7edf6" stroke-dasharray="3 5"/>
-              <path :d="`${statsLine} L400,160 L0,160 Z`" fill="url(#sg-fill)"/>
-              <path :d="statsLine" fill="none" stroke="#2563eb" stroke-width="2.5"/>
-            </svg>
-            <div class="stats-x">
-              <span v-for="x in statsX" :key="x">{{ x }}</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- 사고·이벤트 분석 탭 -->
-        <section v-if="anaTab === 'incident'" class="tab-panel">
-          <div class="tp-h"><h2><i class="bi bi-exclamation-triangle"></i> 사고·이벤트 분석</h2><span class="tp-sub">최근 24시간 · 진행 1건 / 복구 2건</span></div>
-          <div class="tp-stat-row">
-            <div class="tp-st"><span>총 발생</span><strong>3<small>건</small></strong></div>
-            <div class="tp-st"><span>진행 중</span><strong class="rd">1<small>건</small></strong></div>
-            <div class="tp-st"><span>평균 복구</span><strong class="mono">31<small>분</small></strong></div>
-            <div class="tp-st"><span>영향 거리</span><strong class="mono">4.2<small>km</small></strong></div>
-          </div>
-          <table class="tp-tbl">
-            <thead><tr><th>발생 시각</th><th>구간</th><th>유형</th><th>지속</th><th>영향 거리</th><th>영향</th><th>상태</th></tr></thead>
-            <tbody>
-              <tr v-for="ev in incidents" :key="ev.id">
-                <td class="mono">{{ ev.time }}</td>
-                <td>{{ ev.place }}</td>
-                <td>{{ ev.type }}</td>
-                <td class="mono">{{ ev.dur }}</td>
-                <td class="mono">{{ ev.dist }}km</td>
-                <td><span class="cg-tag" :class="ev.impTone">{{ ev.impact }}</span></td>
-                <td><span class="cg-tag" :class="ev.stTone">{{ ev.st }}</span></td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-
-        <!-- 보고서 관리 탭 -->
-        <section v-if="anaTab === 'report'" class="tab-panel">
-          <div class="tp-h">
-            <h2><i class="bi bi-file-earmark-text"></i> 보고서 관리</h2>
-            <span class="tp-sub">예약 {{ reservations.length }}건 · 저장 {{ savedAnalyses.length }}건 · 최근 발행 {{ recentReports.length }}건</span>
-            <label class="tp-auto"><input type="checkbox" v-model="autoPublish" /> 자동 발행</label>
-          </div>
-          <div class="tp-dl-row">
-            <button class="tp-dl" @click="downloadDeptReport('analytics', 'daily')"><i class="bi bi-download"></i> 일일 교통흐름 리포트 (CSV)</button>
-            <button class="tp-dl" @click="downloadDeptReport('analytics', 'weekly')"><i class="bi bi-download"></i> 주간 구간 성능 분석 (CSV)</button>
-          </div>
-
-          <div class="tp-sec-h">
-            <h3 class="tp-sec">최근 발행</h3>
-          </div>
-          <table class="tp-tbl">
-            <thead><tr><th>보고서명</th><th>발행일</th><th>발행자</th><th>크기</th><th>조회</th><th>상태</th><th></th></tr></thead>
-            <tbody>
-              <tr v-for="r in recentReports" :key="r.t">
-                <td><strong>{{ r.t }}</strong></td>
-                <td class="mono">{{ r.date }}</td>
-                <td>{{ r.by }}</td>
-                <td class="mono">{{ r.size }}</td>
-                <td class="mono"><i class="bi bi-eye"></i> {{ r.views }}</td>
-                <td><span class="cg-tag" :class="r.tone === 'ok' ? 'gr' : 'bl'">{{ r.st }}</span></td>
-                <td><button class="tp-dl-sm" @click="downloadDeptReport('analytics', r.t.includes('주간') || r.t.includes('월간') ? 'weekly' : 'daily')"><i class="bi bi-download"></i></button></td>
-              </tr>
-            </tbody>
-          </table>
-          <div class="tp-2col">
-            <div>
-              <div class="tp-sec-h">
-                <h3 class="tp-sec">보고서 예약 현황</h3>
-                <button class="tp-add"><i class="bi bi-plus-lg"></i> 예약 추가</button>
-              </div>
-              <table class="tp-tbl">
-                <thead><tr><th>보고서명</th><th>주기</th><th>다음 실행</th><th>수신자</th><th>상태</th><th></th></tr></thead>
-                <tbody>
-                  <tr v-for="r in reservations" :key="r.id">
-                    <td><strong>{{ r.name }}</strong></td><td>{{ r.cycle }}</td><td class="mono">{{ r.next }}</td>
-                    <td class="mono">{{ r.to }}</td>
-                    <td><span class="cg-tag" :class="r.tone === 'ok' ? 'gr' : 'or'">{{ r.st }}</span></td>
-                    <td><button class="tp-dl-sm" @click="downloadDeptReport('analytics', r.cycle.includes('주') ? 'weekly' : 'daily')"><i class="bi bi-download"></i></button></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div>
-              <div class="tp-sec-h">
-                <h3 class="tp-sec">저장된 분석 목록</h3>
-                <button class="tp-add"><i class="bi bi-plus-lg"></i> 분석 생성</button>
-              </div>
-              <table class="tp-tbl">
-                <thead><tr><th>분석명</th><th>유형</th><th>기간</th><th>생성자</th><th>생성</th><th></th></tr></thead>
-                <tbody>
-                  <tr v-for="s in savedAnalyses" :key="s.id">
-                    <td><strong>{{ s.name }}</strong></td><td>{{ s.type }}</td>
-                    <td class="mono">{{ s.range }}</td><td>{{ s.by }}</td><td class="mono">{{ s.created }}</td>
-                    <td><button class="tp-dl-sm" @click="downloadDeptReport('analytics', s.type.includes('시간') ? 'weekly' : 'daily')"><i class="bi bi-download"></i></button></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- 설정 탭 -->
-        <section v-if="anaTab === 'settings'" class="tab-panel">
-          <div class="tp-h"><h2><i class="bi bi-gear"></i> 설정</h2><span class="tp-sub">대시보드 · 알람 · 데이터</span></div>
-          <div class="tp-set-grid">
-            <div class="tp-set-blk">
-              <h3 class="tp-sec">분석 기본값</h3>
-              <div class="tps-row"><label>기본 비교 기준</label>
-                <select v-model="compareBase">
-                  <option value="prev">전일</option><option value="prevWeek">전주 동일 요일</option><option value="avg7">최근 7일 평균</option>
-                </select>
-              </div>
-              <div class="tps-row"><label>기본 시간대</label>
-                <select v-model="timeSlot">
-                  <option value="all">전체</option><option value="am">오전</option><option value="pm">오후</option><option value="rush">출퇴근</option><option value="night">야간</option>
-                </select>
-              </div>
-              <div class="tps-row"><label>자동 새로고침</label><input type="checkbox" v-model="autoRefresh" /></div>
-              <div class="tps-row"><label>리포트 자동 발행</label><input type="checkbox" /></div>
-            </div>
-            <div class="tp-set-blk">
-              <h3 class="tp-sec">알람 임계값</h3>
-              <div class="tps-row"><label>혼잡 경보 (속도 ≤)</label><input type="number" value="30" /> km/h</div>
-              <div class="tps-row"><label>주의 경보 (속도 ≤)</label><input type="number" value="40" /> km/h</div>
-              <div class="tps-row"><label>이벤트 알림</label><input type="checkbox" checked /></div>
-              <div class="tps-row"><label>주말 알림 제외</label><input type="checkbox" /></div>
-            </div>
-            <div class="tp-set-blk">
-              <h3 class="tp-sec">데이터·보관</h3>
-              <div class="tps-row"><label>원본 로그 보관</label>
-                <select><option>30일</option><option>60일</option><option>90일</option></select>
-              </div>
-              <div class="tps-row"><label>집계 보관</label>
-                <select><option>1년</option><option>2년</option><option>영구</option></select>
-              </div>
-              <div class="tps-row"><label>익명화 처리</label><input type="checkbox" checked /></div>
-            </div>
-          </div>
-        </section>
-
-        <section class="row-mid" v-if="anaTab === 'dashboard'">
+        <section class="row-mid" v-if="anaTab === 'map' || anaTab === 'dashboard'">
           <div class="card jam-map-card">
             <h3>도로 구간 혼잡 현황 <i class="bi bi-info-circle"></i></h3>
             <div ref="jamMapEl" class="jam-leaflet"></div>
@@ -406,7 +290,6 @@
           <div class="card kpi-tbl-card">
             <div class="kpi-head">
               <h3><i class="bi bi-bar-chart-line"></i> 구간 주요 지표</h3>
-              <a class="ch-link" @click="anaTab = 'section'">전체 보기 ›</a>
             </div>
             <div class="kpi-mini-row">
               <div class="kpi-mini bl">
@@ -451,6 +334,115 @@
           </div>
         </section>
 
+        <!-- 설정 탭 -->
+        <section class="settings-panel" v-if="anaTab === 'settings'">
+          <div class="card">
+            <div class="kpi-head">
+              <h3><i class="bi bi-gear"></i> 분석 환경 설정</h3>
+              <span class="seg-sub">자주 사용하는 분석 옵션을 미리 지정합니다.</span>
+            </div>
+            <div class="st-grid">
+              <div class="st-blk">
+                <h4>분석 기본값</h4>
+                <div class="st-row"><label>기본 도로</label>
+                  <select v-model="setDefaultRoad">
+                    <option value="gangbyeon">강변북로 (구리 → 한남)</option>
+                    <option value="olympic">올림픽대로 (가양 → 여의도)</option>
+                    <option value="naebu">내부순환로 (월계 → 성수)</option>
+                  </select>
+                </div>
+                <div class="st-row"><label>기본 비교 기준</label>
+                  <select v-model="compareBase">
+                    <option value="prev">전일</option>
+                    <option value="prevWeek">전주 동일 요일</option>
+                    <option value="avg7">최근 7일 평균</option>
+                  </select>
+                </div>
+                <div class="st-row"><label>기본 시간대</label>
+                  <select v-model="timeSlot">
+                    <option value="all">전체</option>
+                    <option value="am">오전</option>
+                    <option value="pm">오후</option>
+                    <option value="rush">출퇴근</option>
+                    <option value="night">야간</option>
+                  </select>
+                </div>
+              </div>
+              <div class="st-blk">
+                <h4>자동 갱신 · 알림</h4>
+                <div class="st-row"><label>자동 새로고침</label><input type="checkbox" v-model="autoRefresh" /></div>
+                <div class="st-row"><label>갱신 주기 (초)</label><input type="number" v-model.number="setRefreshSec" min="10" max="600" /></div>
+                <div class="st-row"><label>알림 사운드</label><input type="checkbox" v-model="setSound" /></div>
+                <div class="st-row"><label>주말 알림 제외</label><input type="checkbox" /></div>
+              </div>
+              <div class="st-blk">
+                <h4>알람 임계값</h4>
+                <div class="st-row"><label>혼잡 경보 (≤ km/h)</label><input type="number" value="30" /></div>
+                <div class="st-row"><label>주의 경보 (≤ km/h)</label><input type="number" value="40" /></div>
+                <div class="st-row"><label>이벤트 알림</label><input type="checkbox" checked /></div>
+                <div class="st-row"><label>리포트 자동 발행</label><input type="checkbox" /></div>
+              </div>
+              <div class="st-blk">
+                <h4>데이터 · 보관</h4>
+                <div class="st-row"><label>원본 로그 보관</label>
+                  <select><option>30일</option><option>60일</option><option>90일</option></select>
+                </div>
+                <div class="st-row"><label>집계 보관</label>
+                  <select><option>1년</option><option>2년</option><option>영구</option></select>
+                </div>
+                <div class="st-row"><label>익명화 처리</label><input type="checkbox" checked /></div>
+              </div>
+            </div>
+            <div class="st-foot">
+              <button class="st-save" @click="saveSettings"><i class="bi bi-check2"></i> 저장</button>
+              <span v-if="setMsg" class="st-msg">{{ setMsg }}</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- map 단독 탭: 교차로 분석 + 사고/이벤트 -->
+        <section class="map-extra" v-if="anaTab === 'map'">
+          <div class="card">
+            <div class="kpi-head">
+              <h3><i class="bi bi-diagram-3"></i> 교차로 분석</h3>
+              <span class="seg-sub">{{ crossroads.length }}개 주요 교차로 · 신호 효율 평균 71%</span>
+            </div>
+            <div class="cross-grid">
+              <div class="cross-card" v-for="x in crossroads" :key="x.name">
+                <div class="cross-name">
+                  <i class="bi bi-stoplights" :style="{ color: x.tone === 'rd' ? '#dc2626' : x.tone === 'or' ? '#b45309' : '#059669' }"></i>
+                  {{ x.name }}
+                </div>
+                <div class="cross-row"><span>평균 대기</span><strong class="mono">{{ x.wait }}초</strong></div>
+                <div class="cross-row"><span>혼잡도</span><span class="cg-tag" :class="x.tone">{{ x.level }}</span></div>
+                <div class="cross-row"><span>통행량</span><strong class="mono">{{ x.vol.toLocaleString() }}대/h</strong></div>
+                <div class="cross-row"><span>신호 효율</span><strong class="mono" :class="x.effTone">{{ x.eff }}%</strong></div>
+                <div class="cross-row"><span>좌회전 비율</span><strong class="mono">{{ x.leftPct }}%</strong></div>
+                <div class="cross-row"><span>보행 통과</span><strong class="mono">{{ x.pedPass }}건/h</strong></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="kpi-head">
+              <h3><i class="bi bi-exclamation-triangle"></i> 사고 · 이벤트 로그</h3>
+              <span class="seg-sub">최근 24시간 · 진행 1건 · 복구 2건</span>
+            </div>
+            <table class="tbl-kpi">
+              <thead><tr><th>발생 시각</th><th>구간</th><th>유형</th><th>지속</th><th>영향 거리</th><th>영향</th><th>상태</th></tr></thead>
+              <tbody>
+                <tr v-for="ev in incidents" :key="ev.id">
+                  <td class="mono">{{ ev.time }}</td>
+                  <td>{{ ev.place }}</td>
+                  <td>{{ ev.type }}</td>
+                  <td class="mono">{{ ev.dur }}</td>
+                  <td class="mono">{{ ev.dist }}km</td>
+                  <td><span class="cg-tag" :class="ev.impTone">{{ ev.impact }}</span></td>
+                  <td><span class="cg-tag" :class="ev.stTone">{{ ev.st }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
       </div>
     </div>
@@ -467,6 +459,15 @@ import { loadOSMRoads, renderOSMRoads } from "@/composables/useOSMRoads";
 import DeptSwitcher from "@/components/dashboard/DeptSwitcher.vue";
 import { useReportDownload } from "@/composables/useReportDownload";
 const { downloadDeptReport } = useReportDownload();
+import GuideOverlay from "@/components/GuideOverlay.vue";
+import guideSteps from "@/data/guides/analytics.js";
+
+const guideOpen = ref(false);
+async function onGuideStep(step) {
+  if (step?.tab && step.tab !== anaTab.value) {
+    anaTab.value = step.tab;
+  }
+}
 
 const roads = [
   { id: "gangbyeon", label: "강변복로 (구리 → 한남)",     subs: ["구리IC", "토평IC", "강일IC", "미사IC", "암사IC", "천호대교", "한남IC"] },
@@ -527,34 +528,40 @@ const aiInsights = [
 ];
 
 const analysisMenu = [
-  { id: "dashboard", icon: "bi bi-grid-1x2",            label: "대시보드" },
-  { id: "insight",   icon: "bi bi-clipboard-data",      label: "분석 인사이트" },
-  { id: "section",   icon: "bi bi-bezier2",             label: "구간 분석" },
-  { id: "cross",     icon: "bi bi-diagram-3",           label: "교차로 분석" },
-  { id: "time",      icon: "bi bi-clock",               label: "시간대 분석" },
-  { id: "stats",     icon: "bi bi-bar-chart",           label: "교통통계" },
-  { id: "incident",  icon: "bi bi-exclamation-triangle",label: "사고·이벤트 분석" },
-  { id: "report",    icon: "bi bi-file-earmark-text",   label: "보고서 관리" },
-  { id: "settings",  icon: "bi bi-gear",                label: "설정" },
+  { id: "dashboard", icon: "bi bi-grid-1x2",        label: "대시보드" },
+  { id: "ctx",       icon: "bi bi-sliders",         label: "분석 기준" },
+  { id: "insight",   icon: "bi bi-clipboard-data",  label: "분석 인사이트" },
+  { id: "cmp",       icon: "bi bi-bar-chart-line",  label: "구간 성능 비교" },
+  { id: "map",       icon: "bi bi-geo-alt",         label: "혼잡 지도 · 지표" },
+  { id: "settings",  icon: "bi bi-gear",            label: "설정" },
 ];
 
-// 교통통계 — 시간대별 평균 속도 (ControlView에서 이관)
-const statsChartTabs = [
-  { id: "1h", label: "1시간" },
-  { id: "3h", label: "3시간" },
-  { id: "6h", label: "6시간" },
-  { id: "24h", label: "24시간" },
-];
-const statsChartTab = ref("3h");
-const statsChartData = {
-  "1h":  { line: "M0,46 L40,42 L80,50 L120,52 L160,58 L200,68 L240,78 L280,88 L320,108 L360,118 L400,128", x: ["13:30","13:45","14:00","14:15","14:30"], avg: 62 },
-  "3h":  { line: "M0,30 L50,38 L100,35 L150,48 L200,55 L250,72 L300,90 L350,108 L400,128", x: ["11:30","12:15","13:00","13:45","14:30"], avg: 54 },
-  "6h":  { line: "M0,28 L60,40 L120,52 L180,58 L240,70 L300,86 L360,110 L400,128", x: ["08:30","10:00","11:30","13:00","14:30"], avg: 48 },
-  "24h": { line: "M0,90 L40,70 L80,40 L120,32 L160,55 L200,75 L240,55 L280,40 L320,60 L360,95 L400,110", x: ["00시","04시","08시","12시","16시","20시","24시"], avg: 56 },
-};
-const statsLine = computed(() => statsChartData[statsChartTab.value].line);
-const statsX = computed(() => statsChartData[statsChartTab.value].x);
-const statsAvg = computed(() => statsChartData[statsChartTab.value].avg);
+/* ── 헤더 실시간 알림 ── */
+const showAlerts = ref(false);
+const liveAlerts = ref([
+  { id: 1, sev: "critical", icon: "bi bi-exclamation-octagon-fill", title: "피크시간 악화 구간 증가",  detail: "출근 시간대 혼잡 악화 구간이 전일 대비 1개 증가", place: "강변북로 일산IC", time: "08:42" },
+  { id: 2, sev: "serious",  icon: "bi bi-graph-down",               title: "특정 구간 속도 저하",      detail: "일산IC → 원효대교 구간 속도 전일 대비 -12%",      place: "강변북로",         time: "08:35" },
+  { id: 3, sev: "info",     icon: "bi bi-check-circle-fill",        title: "전반적 흐름 개선",         detail: "전체 평균 속도 전일 대비 +6%",                    place: "전 구간",           time: "08:10" },
+  { id: 4, sev: "caution",  icon: "bi bi-file-earmark-text",        title: "보고서 발행 예약",         detail: "주간 구간 성능 분석 리포트 09:00 발행 예정",      place: "교통분석팀",        time: "07:55" },
+]);
+const hasCritical = computed(() => liveAlerts.value.some(a => a.sev === "critical"));
+
+/* ── 설정 ── */
+const setSound = ref(true);
+const setRefreshSec = ref(30);
+const setDefaultRoad = ref("gangbyeon");
+const setMsg = ref("");
+function saveSettings() {
+  setMsg.value = "설정 저장 완료";
+  setTimeout(() => { setMsg.value = ""; }, 1800);
+}
+
+function closeAlertsOnOutside(e) {
+  if (showAlerts.value && !e.target.closest(".hdr-bell-wrap")) showAlerts.value = false;
+}
+if (typeof document !== "undefined") {
+  document.addEventListener("click", closeAlertsOnOutside);
+}
 
 const insightDetails = [
   { icon: "bi bi-exclamation-circle-fill", color: "#dc2626", tone: "rd",
@@ -609,29 +616,40 @@ const compareBase = ref("prev");
 const opMsg = ref("");
 const dataUpdated = ref("2025-05-15  08:00");
 
+/* ── ctx-bar 액션 버튼 ── */
+let opMsgTimer = null;
+function flashMsg(msg) {
+  opMsg.value = msg;
+  if (opMsgTimer) clearTimeout(opMsgTimer);
+  opMsgTimer = setTimeout(() => { opMsg.value = ""; }, 2500);
+}
+function actStats() {
+  anaTab.value = "insight";
+  flashMsg(`📊 통계 인사이트로 이동 — ${aiInsights.length}건 분석 완료 (${dateRange.value})`);
+}
+function actCompare() {
+  anaTab.value = "cmp";
+  flashMsg(`🔀 ${activeRoadLabel.value} 기간 비교 — 기준: ${compareBase.value === 'prev' ? '전일' : compareBase.value === 'prevWeek' ? '전주 동일 요일' : '최근 7일 평균'}`);
+}
+function actReport() {
+  const reportKey = (period.value === '7d' || period.value === '30d') ? 'weekly' : 'daily';
+  downloadDeptReport('analytics', reportKey, { date: dateRange.value.split(' ~ ')[0] });
+  flashMsg(`📄 ${reportKey === 'weekly' ? '주간' : '일일'} 리포트 다운로드 시작`);
+}
+function actCsv() {
+  downloadDeptReport('analytics', 'weekly', { date: dateRange.value.split(' ~ ')[0] });
+  flashMsg(`💾 CSV 내보내기 — 주간 구간 성능 분석`);
+}
+
 const segKpis = [
   { name: "강변IC",   speed: 61, delta: "▲ 4",  dTone: "up",   peak: "09시", cg: "원활", cgTone: "gr" },
   { name: "일산IC",   speed: 23, delta: "▼ 9",  dTone: "dn",   peak: "08시", cg: "혼잡", cgTone: "rd" },
   { name: "원효대교", speed: 27, delta: "▼ 11", dTone: "dn",   peak: "18시", cg: "혼잡", cgTone: "rd" },
 ];
 
-const reservations = [
-  { id: 1, name: "일일 교통흐름 리포트",   cycle: "매일 08:00",   next: "2025-05-16 08:00", to: "admin@trafficas.com", st: "예약", tone: "ok" },
-  { id: 2, name: "주간 구간 성능 리포트", cycle: "매주 월 09:00", next: "2025-05-19 09:00", to: "team@trafficas.com",  st: "예약", tone: "ok" },
-];
-
 const savedAnalyses = [
   { id: 1, name: "일산IC 혼잡 원인 분석",       type: "구간 분석",  range: "2025-05-09 ~ 2025-05-15", created: "2025-05-15 07:45", by: "김분석" },
   { id: 2, name: "출근시간 속도 저하 구간 분석", type: "시간대 분석", range: "2025-05-09 ~ 2025-05-15", created: "2025-05-14 18:30", by: "김분석" },
-];
-
-// 최근 발행 보고서 (운영기획팀에서 흡수)
-const autoPublish = ref(true);
-const recentReports = [
-  { t: "일일 운영 보고서",     date: "2026-05-19", by: "교통분석팀 김분석",  size: "2.4MB", views: 12, st: "발행", tone: "ok" },
-  { t: "주간 성과 보고서",     date: "2026-05-12", by: "교통분석팀 정민혁",  size: "5.1MB", views: 38, st: "발행", tone: "ok" },
-  { t: "5월 1주 이슈 리포트", date: "2026-05-08", by: "교통분석팀 이수진",  size: "1.8MB", views: 24, st: "발행", tone: "ok" },
-  { t: "4월 월간 종합",       date: "2026-05-02", by: "교통분석팀 김분석",  size: "8.6MB", views: 56, st: "승인", tone: "appr" },
 ];
 
 // === Leaflet 혼잡도 지도 ===

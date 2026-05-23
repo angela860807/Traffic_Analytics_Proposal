@@ -2,7 +2,7 @@
   <div class="sa-shell" :class="{ 'side-collapsed': !sideOpen }">
     <aside class="side">
       <div class="side-top">
-        <RouterLink to="/" class="brand" v-if="sideOpen">Traffic <em>AS</em></RouterLink>
+        <RouterLink to="/" class="brand" v-if="sideOpen"><img src="/TAS.png" alt="TAS" class="brand-img" /></RouterLink>
         <button class="side-toggle" @click="sideOpen = !sideOpen"
           :aria-label="sideOpen ? '사이드바 접기' : '사이드바 펼치기'"
           :title="sideOpen ? '사이드바 접기' : '사이드바 펼치기'">
@@ -23,7 +23,7 @@
           <i :class="n.icon"></i>{{ n.label }}
         </button>
       </nav>
-      <div class="side-foot">Traffic AS<br />경영전략본부 v2.0.0</div>
+      <div class="side-foot">TAS<br />경영전략본부 v2.0.0</div>
     </aside>
 
     <div class="main">
@@ -36,10 +36,48 @@
             <span class="km-lab">자동 새로고침</span>
             <span class="km-state">{{ autoRefresh ? 'ON' : 'OFF' }}</span>
           </button>
+          <div class="hdr-bell-wrap" @click.stop>
+            <button class="hdr-bell" :class="{ critical: hasCritical, on: showAlerts }" @click="showAlerts = !showAlerts">
+              <i class="bi bi-bell-fill"></i>
+              <span v-if="liveAlerts.length" class="hdr-bell-c">{{ liveAlerts.length }}</span>
+            </button>
+            <div v-if="showAlerts" class="hdr-bell-pop" @click.stop>
+              <div class="hbp-h">
+                <i class="bi bi-exclamation-octagon-fill"></i>
+                <strong>실시간 알림</strong>
+                <span class="hbp-c">{{ liveAlerts.length }}건</span>
+                <button class="hbp-x" @click="showAlerts = false"><i class="bi bi-x-lg"></i></button>
+              </div>
+              <div class="hbp-list">
+                <div v-for="a in liveAlerts" :key="a.id" class="ac-row" :class="a.sev" @click="showAlerts = false">
+                  <div class="ac-sev"><i :class="a.icon"></i></div>
+                  <div class="ac-body">
+                    <div class="ac-t">{{ a.title }}</div>
+                    <div class="ac-d">{{ a.detail }}</div>
+                    <div class="ac-meta">
+                      <span class="ac-loc"><i class="bi bi-geo-alt"></i> {{ a.place }}</span>
+                      <span class="ac-time">{{ a.time }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="!liveAlerts.length" class="ac-empty">활성 알림이 없습니다.</div>
+              </div>
+            </div>
+          </div>
+          <button class="km-toggle guide-btn-trigger" @click="guideOpen = true" title="사용자 가이드">
+            <i class="bi bi-question-circle"></i>
+            <span class="km-lab">가이드</span>
+          </button>
           <DeptSwitcher />
           <div class="t-user"><i class="bi bi-person-circle"></i> SUPER ADMIN <i class="bi bi-chevron-down"></i></div>
         </div>
       </header>
+
+      <GuideOverlay
+        v-model="guideOpen"
+        :steps="guideSteps"
+        :on-step-enter="onGuideStep"
+      />
 
       <template v-if="tab === 'dashboard'">
       <section class="seg">
@@ -296,14 +334,275 @@
         </div>
       </section>
 
-      <section v-if="topNavTabs.includes(tab) && tab !== 'reports'" class="card pnl">
-        <h3>{{ topNavLabel }} <span class="seg-sub">전사 통합 뷰</span></h3>
-        <div class="map-stub">
-          <i class="bi bi-globe2"></i>
-          <div>{{ topNavLabel }} — 모든 부서의 데이터 통합 표시</div>
-          <div class="ms-sub">상세 권한이 있는 부서 대시보드에서 더 풍부한 정보를 확인할 수 있습니다.</div>
-        </div>
-      </section>
+      <!-- ── 운영현황 (ops) ── -->
+      <template v-if="tab === 'ops'">
+        <section class="seg">
+          <div class="seg-h">
+            <h2>전사 운영현황 <span class="seg-sub">시설운영팀 통합</span></h2>
+          </div>
+          <div class="kpis">
+            <div v-for="k in opsKpis" :key="k.label" class="kpi" :class="k.tone">
+              <i :class="k.icon"></i>
+              <div class="kpi-body">
+                <div class="kpi-lab">{{ k.label }}</div>
+                <div class="kpi-val">{{ k.value }}</div>
+                <div class="kpi-sub">전일 대비 {{ k.delta }}</div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="card pnl">
+          <h3>대표 서버 상태</h3>
+          <table class="pnl-tbl">
+            <thead><tr><th>서버</th><th>역할</th><th>CPU</th><th>메모리</th><th>디스크</th><th>상태</th></tr></thead>
+            <tbody>
+              <tr v-for="s in opsServers" :key="s.name">
+                <td class="dn mono">{{ s.name }}</td>
+                <td>{{ s.role }}</td>
+                <td class="mono">{{ s.cpu }}%</td>
+                <td class="mono">{{ s.mem }}%</td>
+                <td class="mono">{{ s.disk }}%</td>
+                <td><span class="stat" :class="s.tone">{{ s.status }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </template>
+
+      <!-- ── 지도 (map) ── -->
+      <template v-if="tab === 'map'">
+        <section class="card pnl">
+          <h3>실시간 교통 흐름 <span class="seg-sub">교통정보센터 요약</span></h3>
+          <div class="map-overview">
+            <div class="map-stub-card">
+              <i class="bi bi-map-fill"></i>
+              <div class="ms-t">서울 주요 간선 실시간 흐름</div>
+              <div class="ms-sub">상세 지도는 교통정보센터 대시보드에서 확인하세요</div>
+            </div>
+            <table class="pnl-tbl">
+              <thead><tr><th>도로</th><th>평균 속도</th><th>혼잡도</th><th>활성 이벤트</th></tr></thead>
+              <tbody>
+                <tr v-for="r in mapRoadStats" :key="r.road">
+                  <td class="dn">{{ r.road }}</td>
+                  <td class="mono">{{ r.speed }} km/h</td>
+                  <td><span class="stat" :class="r.tone">{{ r.level }}</span></td>
+                  <td class="mono">{{ r.events }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </template>
+
+      <!-- ── 이벤트 (events) ── -->
+      <template v-if="tab === 'events'">
+        <section class="card pnl">
+          <h3>전사 이벤트 통합 <span class="seg-sub">최근 24시간 · {{ allEvents.length }}건</span></h3>
+          <table class="pnl-tbl">
+            <thead><tr><th>시각</th><th>부서</th><th>유형</th><th>상세</th></tr></thead>
+            <tbody>
+              <tr v-for="(e, i) in allEvents" :key="i">
+                <td class="mono">{{ e.time }}</td>
+                <td class="dn">{{ e.dept }}</td>
+                <td><span class="stat" :class="e.tone">{{ e.type }}</span></td>
+                <td>{{ e.detail }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </template>
+
+      <!-- ── 카메라 (cams) ── -->
+      <template v-if="tab === 'cams'">
+        <section class="seg">
+          <div class="seg-h">
+            <h2>전체 카메라 현황 <span class="seg-sub">총 {{ allCamStats.total }}대 운영</span></h2>
+          </div>
+          <div class="kpis">
+            <div class="kpi gr">
+              <i class="bi bi-camera-video-fill"></i>
+              <div class="kpi-body">
+                <div class="kpi-lab">정상 운영</div>
+                <div class="kpi-val">{{ allCamStats.online }}<span class="kpi-u">대</span></div>
+                <div class="kpi-sub">{{ ((allCamStats.online / allCamStats.total) * 100).toFixed(1) }}%</div>
+              </div>
+            </div>
+            <div class="kpi rd">
+              <i class="bi bi-camera-video-off-fill"></i>
+              <div class="kpi-body">
+                <div class="kpi-lab">오프라인</div>
+                <div class="kpi-val">{{ allCamStats.offline }}<span class="kpi-u">대</span></div>
+                <div class="kpi-sub">즉시 점검 필요</div>
+              </div>
+            </div>
+            <div class="kpi yl">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+              <div class="kpi-body">
+                <div class="kpi-lab">오류</div>
+                <div class="kpi-val">{{ allCamStats.error }}<span class="kpi-u">대</span></div>
+                <div class="kpi-sub">신호 이상</div>
+              </div>
+            </div>
+            <div class="kpi bl">
+              <i class="bi bi-grid-3x3-gap-fill"></i>
+              <div class="kpi-body">
+                <div class="kpi-lab">전체 카메라</div>
+                <div class="kpi-val">{{ allCamStats.total }}<span class="kpi-u">대</span></div>
+                <div class="kpi-sub">5개 권역</div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="card pnl">
+          <h3>부서별 카메라 배분</h3>
+          <table class="pnl-tbl">
+            <thead><tr><th>부서</th><th>전체</th><th>정상</th><th>오프라인</th><th>오류</th><th>가동률</th></tr></thead>
+            <tbody>
+              <tr v-for="(c, i) in camsByDept" :key="i">
+                <td class="dn">{{ c.dept }}</td>
+                <td class="mono">{{ c.total }}</td>
+                <td class="mono">{{ c.online }}</td>
+                <td class="mono">{{ c.offline }}</td>
+                <td class="mono">{{ c.error }}</td>
+                <td class="mono">{{ ((c.online / c.total) * 100).toFixed(1) }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+        <section class="card pnl">
+          <h3>최근 이슈 카메라</h3>
+          <table class="pnl-tbl">
+            <thead><tr><th>장비 ID</th><th>위치</th><th>상태</th><th>경과 시간</th></tr></thead>
+            <tbody>
+              <tr v-for="c in recentCamIssues" :key="c.id">
+                <td class="mono dn">{{ c.id }}</td>
+                <td>{{ c.name }}</td>
+                <td><span class="stat" :class="c.tone">{{ c.status }}</span></td>
+                <td class="mono">{{ c.since }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </template>
+
+      <!-- ── OCR (ocr) ── -->
+      <template v-if="tab === 'ocr'">
+        <section class="seg">
+          <div class="seg-h">
+            <h2>OCR 인식 현황 <span class="seg-sub">단속관리팀 통합 · 오늘</span></h2>
+          </div>
+          <div class="kpis">
+            <div class="kpi bl">
+              <i class="bi bi-card-text"></i>
+              <div class="kpi-body">
+                <div class="kpi-lab">오늘 처리</div>
+                <div class="kpi-val">{{ ocrSummary.todayTotal.toLocaleString() }}<span class="kpi-u">건</span></div>
+              </div>
+            </div>
+            <div class="kpi gr">
+              <i class="bi bi-check-circle-fill"></i>
+              <div class="kpi-body">
+                <div class="kpi-lab">인식 성공률</div>
+                <div class="kpi-val">{{ ocrSummary.successRate }}<span class="kpi-u">%</span></div>
+                <div class="kpi-sub">{{ ocrSummary.success.toLocaleString() }}건 성공</div>
+              </div>
+            </div>
+            <div class="kpi yl">
+              <i class="bi bi-speedometer"></i>
+              <div class="kpi-body">
+                <div class="kpi-lab">평균 신뢰도</div>
+                <div class="kpi-val">{{ ocrSummary.avgConf }}<span class="kpi-u">%</span></div>
+              </div>
+            </div>
+            <div class="kpi rd">
+              <i class="bi bi-x-circle-fill"></i>
+              <div class="kpi-body">
+                <div class="kpi-lab">인식 실패</div>
+                <div class="kpi-val">{{ ocrSummary.failed }}<span class="kpi-u">건</span></div>
+                <div class="kpi-sub">중복 제거 {{ ocrSummary.duplicates }}건</div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="card pnl">
+          <h3>최근 OCR 인식 로그</h3>
+          <table class="pnl-tbl">
+            <thead><tr><th>시각</th><th>차량 번호</th><th>카메라</th><th>방향</th><th>신뢰도</th><th>상태</th></tr></thead>
+            <tbody>
+              <tr v-for="(o, i) in recentOcr" :key="i">
+                <td class="mono">{{ o.time }}</td>
+                <td class="mono dn">{{ o.plate }}</td>
+                <td>{{ o.cam }}</td>
+                <td class="mono">{{ o.dir === 'in' ? '진입' : o.dir === 'out' ? '이탈' : '-' }}</td>
+                <td class="mono">{{ o.conf > 0 ? o.conf + '%' : '-' }}</td>
+                <td><span class="stat" :class="o.status === 'FLOW_EVENT_CREATED' ? 'gr' : 'rd'">{{ o.status === 'FLOW_EVENT_CREATED' ? '정상' : '실패' }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </template>
+
+      <!-- ── 통계 (stats) ── -->
+      <template v-if="tab === 'stats'">
+        <section class="seg">
+          <div class="seg-h">
+            <h2>교통 통계 요약 <span class="seg-sub">교통분석팀 통합 · 오늘</span></h2>
+          </div>
+          <div class="kpis">
+            <div v-for="s in statsKpis" :key="s.label" class="kpi" :class="s.up ? 'gr' : 'rd'">
+              <i :class="s.icon"></i>
+              <div class="kpi-body">
+                <div class="kpi-lab">{{ s.label }}</div>
+                <div class="kpi-val">{{ s.value }}<span class="kpi-u">{{ s.unit }}</span></div>
+                <div class="kpi-sub">전일 대비 {{ s.diff }}</div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="card pnl">
+          <h3>시간대별 통행량 분포</h3>
+          <table class="pnl-tbl">
+            <thead><tr><th>시간대</th><th>통행량</th><th>혼잡도</th><th>분포</th></tr></thead>
+            <tbody>
+              <tr v-for="h in statsByHour" :key="h.hour">
+                <td class="dn">{{ h.hour }}</td>
+                <td class="mono">{{ h.traffic.toLocaleString() }}대</td>
+                <td><span class="stat" :class="h.level === '정체' ? 'rd' : h.level === '혼잡' ? 'or' : h.level === '보통' ? 'yl' : 'gr'">{{ h.level }}</span></td>
+                <td><div class="stat-bar"><div class="stat-bar-fill" :style="{ width: (h.traffic / 1840 * 100) + '%' }"></div></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </template>
+
+      <!-- ── 설정 (settings) ── -->
+      <template v-if="tab === 'settings'">
+        <section class="card pnl">
+          <h3>전사 시스템 설정 <span class="seg-sub">경영전략본부 권한 필요</span></h3>
+          <div class="su-set-grid">
+            <div class="su-set-blk">
+              <h4>알림 · 백업</h4>
+              <div class="set-row"><label>알림 사운드</label><input type="checkbox" v-model="setAlertSound" /></div>
+              <div class="set-row"><label>자동 백업</label><input type="checkbox" v-model="setAutoBackup" /></div>
+              <div class="set-row"><label>유지보수 시간대</label><input type="text" v-model="setMaintWindow" /></div>
+            </div>
+            <div class="su-set-blk">
+              <h4>로그 · API</h4>
+              <div class="set-row"><label>로그 보관 (일)</label><input type="number" v-model.number="setLogRetention" min="30" max="365" /></div>
+              <div class="set-row"><label>API 타임아웃 (초)</label><input type="number" v-model.number="setApiTimeout" min="3" max="60" /></div>
+              <div class="set-row"><label>데이터 보존 (일)</label><input type="number" v-model.number="setRetention" min="30" max="365" /></div>
+            </div>
+            <div class="su-set-blk">
+              <h4>보안</h4>
+              <div class="set-row"><label>이중 인증 (MFA)</label><input type="checkbox" v-model="setMfa" /></div>
+              <div class="set-row"><label>유지보수 모드</label><input type="checkbox" v-model="setMaint" /></div>
+              <div class="set-row"><label>IP 허용 목록 사용</label><input type="checkbox" checked /></div>
+            </div>
+          </div>
+          <button class="btn-save" @click="saveSys"><i class="bi bi-check2"></i> 전체 저장</button>
+          <div v-if="msg" class="set-msg">{{ msg }}</div>
+        </section>
+      </template>
 
       <footer v-if="tab === 'dashboard'" class="bot-bar">
         <div class="bb"><i class="bi bi-clock"></i><span>시스템 시간</span><strong>2025-05-16 (금) 10:30:00</strong></div>
@@ -320,9 +619,33 @@ import { ref, computed } from "vue";
 import { RouterLink } from "vue-router";
 import DeptSwitcher from "@/components/dashboard/DeptSwitcher.vue";
 import { useReportDownload } from "@/composables/useReportDownload";
+import GuideOverlay from "@/components/GuideOverlay.vue";
+import guideSteps from "@/data/guides/super.js";
 const { downloadDeptReport } = useReportDownload();
 
+const guideOpen = ref(false);
 const tab = ref("dashboard");
+
+/* ── 헤더 실시간 알림 ── */
+const showAlerts = ref(false);
+const liveAlerts = ref([
+  { id: 1, sev: "critical", icon: "bi bi-shield-exclamation",     title: "권한 승격 요청 대기",       detail: "교통분석팀장 — 부장급 권한 승격 요청 (대기 4시간)",   place: "권한 관리 큐",       time: "11:24" },
+  { id: 2, sev: "serious",  icon: "bi bi-file-earmark-text",      title: "월간 종합 보고서 결재",     detail: "4월 월간 운영 보고서 — 최종 승인 필요 (마감 D-2)",   place: "경영전략본부 결재함", time: "10:45" },
+  { id: 3, sev: "caution",  icon: "bi bi-cash-stack",             title: "분기 예산 집행률 알림",     detail: "Q2 IT 인프라 예산 78% 집행 — 목표치 초과",            place: "예산 모니터",         time: "10:12" },
+  { id: 4, sev: "info",     icon: "bi bi-check-circle-fill",      title: "전 부서 SLA 달성",          detail: "이번 주 전 부서 SLA 98% 이상 달성",                   place: "전사 SLA 모니터",     time: "09:30" },
+]);
+const hasCritical = computed(() => liveAlerts.value.some(a => a.sev === "critical"));
+function closeAlertsOnOutside(e) {
+  if (showAlerts.value && !e.target.closest(".hdr-bell-wrap")) showAlerts.value = false;
+}
+if (typeof document !== "undefined") {
+  document.addEventListener("click", closeAlertsOnOutside);
+}
+async function onGuideStep(step) {
+  if (step?.tab && step.tab !== tab.value) {
+    tab.value = step.tab;
+  }
+}
 const autoRefresh = ref(true);
 const sideOpen = ref(true);
 function goHome() {
@@ -349,13 +672,13 @@ const saNav = [
 ];
 
 const kpis = [
-  { label: "전체 시스템",   value: "정상", unit: "", icon: "bi bi-check-circle-fill",          tone: "gr" },
-  { label: "활성 이벤트",   value: 18,     unit: "건", icon: "bi bi-exclamation-triangle-fill", tone: "rd" },
-  { label: "처리 중 이벤트", value: 36,     unit: "건", icon: "bi bi-exclamation-triangle-fill", tone: "or" },
-  { label: "카메라 온라인", value: 98,     unit: "%",  icon: "bi bi-camera-video-fill",         tone: "bl", sub: "2,450 / 2,500" },
-  { label: "OCR 정상률",   value: 96,     unit: "%",  icon: "bi bi-bullseye",                  tone: "pl" },
-  { label: "속도 이상 처리율", value: 97,  unit: "%",  icon: "bi bi-speedometer",              tone: "gr" },
-  { label: "데이터 수집률", value: 98,     unit: "%",  icon: "bi bi-database-fill",            tone: "cy" },
+  { label: "전체 시스템",     value: "정상", unit: "",   icon: "bi bi-shield-check",             tone: "gr" },
+  { label: "활성 이벤트",     value: 18,     unit: "건", icon: "bi bi-bell-fill",                tone: "rd" },
+  { label: "처리 중 이벤트",  value: 36,     unit: "건", icon: "bi bi-hourglass-split",          tone: "or" },
+  { label: "카메라 온라인",   value: 98,     unit: "%",  icon: "bi bi-camera-video-fill",        tone: "bl", sub: "2,450 / 2,500" },
+  { label: "OCR 정상률",      value: 96,     unit: "%",  icon: "bi bi-card-text",                tone: "pl" },
+  { label: "속도 이상 처리율", value: 97,    unit: "%",  icon: "bi bi-speedometer2",             tone: "gr" },
+  { label: "데이터 수집률",   value: 98,     unit: "%",  icon: "bi bi-cloud-arrow-down-fill",    tone: "cy" },
 ];
 
 const topNavTabs = computed(() => topNav.map(n => n.id));
@@ -450,6 +773,95 @@ const logs = [
   { time: "10:12", user: "SUPER ADMIN", action: "카메라 설정 변경", target: "강남대로 구간" },
   { time: "10:05", user: "SUPER ADMIN", action: "사용자 생성",      target: "신규 사용자 2명" },
 ];
+
+/* ── topNav 탭별 통합 데이터 ── */
+
+/* 운영현황 (ops) — 시설운영팀 요약 */
+const opsKpis = [
+  { label: "전체 가동률",     value: "99.6%",  delta: "+0.2",  tone: "gr", icon: "bi bi-activity" },
+  { label: "온라인 카메라",   value: "243/247", delta: "-2",   tone: "yl", icon: "bi bi-camera-video-fill" },
+  { label: "평균 네트워크 지연", value: "128ms",  delta: "+18", tone: "yl", icon: "bi bi-wifi" },
+  { label: "활성 장애",       value: "3건",     delta: "-2",   tone: "rd", icon: "bi bi-exclamation-triangle-fill" },
+];
+const opsServers = [
+  { name: "ocr-srv-01",   role: "OCR 처리",   cpu: 42, mem: 58, disk: 72, status: "정상", tone: "gr" },
+  { name: "stream-srv-02", role: "스트림",    cpu: 68, mem: 71, disk: 45, status: "주의", tone: "yl" },
+  { name: "edge-04",      role: "엣지 분석",  cpu: 35, mem: 48, disk: 88, status: "정상", tone: "gr" },
+  { name: "db-master",    role: "DB 마스터",  cpu: 28, mem: 65, disk: 52, status: "정상", tone: "gr" },
+];
+
+/* 지도 (map) — 교통정보센터 요약 */
+const mapRoadStats = [
+  { road: "강변북로",   speed: 42, level: "혼잡", tone: "or", events: 3 },
+  { road: "올림픽대로", speed: 56, level: "보통", tone: "yl", events: 1 },
+  { road: "내부순환로", speed: 38, level: "정체", tone: "rd", events: 2 },
+  { road: "동부간선",   speed: 64, level: "원활", tone: "gr", events: 0 },
+  { road: "경부고속",   speed: 71, level: "원활", tone: "gr", events: 1 },
+];
+
+/* 이벤트 (events) — 전 부서 이벤트 누적 */
+const allEvents = [
+  { time: "14:32", dept: "교통정보센터", type: "교통사고",  detail: "강변북로 한남TG 2개 차로 통제", tone: "rd" },
+  { time: "14:24", dept: "단속관리팀",   type: "과속 단속", detail: "신규 후보 5건 검토 대기 큐 추가",  tone: "or" },
+  { time: "14:18", dept: "시설운영팀",   type: "장비 장애", detail: "NSN-N-0023 RTSP 타임아웃",        tone: "rd" },
+  { time: "13:50", dept: "교통분석팀",   type: "AI 인사이트", detail: "피크시간 악화 구간 1개 증가",   tone: "yl" },
+  { time: "13:32", dept: "시설운영팀",   type: "네트워크",  detail: "강남 권역 평균 지연 286ms",        tone: "yl" },
+  { time: "11:08", dept: "교통정보센터", type: "차량 고장", detail: "올림픽대로 가양 갓길 정차",        tone: "yl" },
+  { time: "10:00", dept: "시설운영팀",   type: "점검 완료", detail: "OCR 서버 4대 재가동 확인",         tone: "gr" },
+];
+
+/* 카메라 (cams) — 전 부서 카메라 통합 */
+const allCamStats = { online: 243, offline: 2, error: 2, total: 247 };
+const camsByDept = [
+  { dept: "교통정보센터", total: 95,  online: 94, offline: 1, error: 0 },
+  { dept: "시설운영팀",   total: 152, online: 149, offline: 1, error: 2 },
+];
+const recentCamIssues = [
+  { id: "NSN-N-0023", name: "내부순환로 03K+150", status: "장애", since: "12분", tone: "rd" },
+  { id: "CAM-O-019",  name: "올림픽대로 가양IC", status: "오프라인", since: "1시간 8분", tone: "rd" },
+  { id: "CAM-K-008",  name: "강변북로 한남",     status: "오류",     since: "32분", tone: "or" },
+];
+
+/* OCR (ocr) — 단속관리팀 OCR 결과 요약 */
+const ocrSummary = {
+  todayTotal: 1842,
+  success: 1763,
+  failed: 79,
+  successRate: 95.7,
+  avgConf: 94.2,
+  duplicates: 286,
+};
+const recentOcr = [
+  { time: "14:32:18", plate: "12가 4567", cam: "강변북로", conf: 97, dir: "in",  status: "FLOW_EVENT_CREATED" },
+  { time: "14:31:22", plate: "34더 5678", cam: "내부순환", conf: 92, dir: "out", status: "FLOW_EVENT_CREATED" },
+  { time: "14:30:11", plate: "11가 2233", cam: "강변북로", conf: 98, dir: "in",  status: "FLOW_EVENT_CREATED" },
+  { time: "14:29:47", plate: "미인식",     cam: "올림픽",  conf: 0,  dir: "-",   status: "OCR_FAILED" },
+  { time: "14:29:33", plate: "78사 4321", cam: "동부간선", conf: 89, dir: "out", status: "FLOW_EVENT_CREATED" },
+];
+
+/* 통계 (stats) — 교통분석팀 요약 */
+const statsKpis = [
+  { label: "총 감지 차량",   value: "2,418",  unit: "대",  diff: "+8.2%", up: true,  icon: "bi bi-car-front-fill" },
+  { label: "진입 (IN)",       value: "1,247",  unit: "대",  diff: "+5.4%", up: true,  icon: "bi bi-box-arrow-in-down-right" },
+  { label: "이탈 (OUT)",     value: "1,171",  unit: "대",  diff: "+4.1%", up: true,  icon: "bi bi-box-arrow-up-right" },
+  { label: "평균 통과 속도", value: "47",     unit: "km/h", diff: "-2.3%", up: false, icon: "bi bi-speedometer2" },
+];
+const statsByHour = [
+  { hour: "00~06", traffic: 320,  level: "원활" },
+  { hour: "06~09", traffic: 1840, level: "혼잡" },
+  { hour: "09~12", traffic: 980,  level: "보통" },
+  { hour: "12~15", traffic: 1120, level: "보통" },
+  { hour: "15~18", traffic: 1450, level: "혼잡" },
+  { hour: "18~21", traffic: 1680, level: "정체" },
+  { hour: "21~24", traffic: 720,  level: "원활" },
+];
+
+/* 설정 (settings) — 전사 시스템 설정 */
+const setAlertSound = ref(true);
+const setAutoBackup = ref(true);
+const setLogRetention = ref(90);
+const setApiTimeout = ref(10);
+const setMaintWindow = ref("03:00 ~ 04:00");
 </script>
 
 <style scoped>
@@ -459,7 +871,8 @@ const logs = [
 .snav-sep i { color: #34d399; }
 .side-foot { font-size: 10.5px; opacity: .4; padding: 12px 6px 0; line-height: 1.6; }
 .main { flex: 1; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.top h1 { font-size: 19px; display: flex; align-items: center; gap: 10px; }
+.top h1 { font-size: 18px; font-weight: 600; color: #0c1f40; display: flex; align-items: center; gap: 10px; }
+.top h1 .t-main { font-size: 22px; font-weight: 700; color: #0c1f40; }
 .t-tag { background: linear-gradient(90deg, #8b5cf6, #3b82f6); color: #fff; font-size: 10px; font-weight: 800; padding: 3px 10px; border-radius: 4px; letter-spacing: 0.05em; }
 .t-right { gap: 14px; }
 .t-ic { font-size: 18px; opacity: .7; cursor: pointer; }
@@ -585,39 +998,48 @@ const logs = [
 .bb strong { font-weight: 700; }
 .bb-set { margin-left: auto; background: rgba(96,165,250,.08); border: 1px solid rgba(96,165,250,.2); color: #60a5fa; padding: 6px 18px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .pnl { padding: 18px; }
-.pnl h3 { font-size: 14px; font-weight: 700; margin: 0 0 14px; }
-.pnl-search { width: 100%; background: #06101e; border: 1px solid #1f3055; color: #e4eeff; padding: 8px 12px; border-radius: 6px; font-size: 12.5px; margin-bottom: 12px; }
-.pnl-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.pnl-tbl th, .pnl-tbl td { padding: 9px 10px; text-align: left; border-bottom: 1px solid #1a2a45; }
-.pnl-tbl th { font-weight: 600; opacity: .6; font-size: 11.5px; }
-.pnl-tbl .mono { font-family: "JetBrains Mono", monospace; opacity: .8; }
-.pnl-tbl .dn { font-weight: 700; }
-.pnl-empty { text-align: center; opacity: .55; padding: 24px 0; }
-.stat { padding: 2px 8px; border-radius: 100px; font-size: 10.5px; font-weight: 700; }
-.stat.ok { background: rgba(16,185,129,.15); color: #34d399; }
-.stat.wn { background: rgba(245,158,11,.18); color: #fbbf24; }
-.stat.no { background: rgba(239,68,68,.18); color: #f87171; }
-.btn-mini { background: rgba(96,165,250,.12); border: 0; color: #60a5fa; padding: 4px 10px; border-radius: 4px; font-size: 11.5px; cursor: pointer; }
-.map-stub { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; height: 280px; background: #06101e; border: 1px dashed #1f3055; border-radius: 8px; opacity: .85; text-align: center; }
-.map-stub > i { font-size: 36px; color: #60a5fa; }
-.ms-sub { font-size: 11px; opacity: .55; max-width: 360px; line-height: 1.6; }
-.set-row { display: grid; grid-template-columns: 220px 1fr; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #1a2a45; font-size: 13px; }
-.set-row input[type="number"], .set-row select { background: #06101e; border: 1px solid #1f3055; color: #e4eeff; padding: 6px 10px; border-radius: 5px; font-size: 12.5px; max-width: 200px; }
-.set-row input[type="checkbox"] { accent-color: #60a5fa; }
-.btn-save { margin-top: 14px; background: #3b82f6; color: #fff; border: 0; padding: 9px 16px; border-radius: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
-.set-msg { margin-top: 10px; font-size: 12px; color: #34d399; }
+.pnl h3 { font-size: 14px; font-weight: 700; margin: 0 0 14px; color: #0c1f40; }
+.pnl-search { width: 100%; background: #ffffff; border: 1px solid #d8dfeb; color: #0c1f40; padding: 8px 12px; border-radius: 6px; font-size: 12.5px; margin-bottom: 12px; }
+.pnl-search::placeholder { color: #94a3b8; }
+.pnl-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; color: #0c1f40; }
+.pnl-tbl th, .pnl-tbl td { padding: 9px 10px; text-align: left; border-bottom: 1px solid #e3eaf4; }
+.pnl-tbl th { font-weight: 700; color: #4a5b78; font-size: 11.5px; background: #f5f8fd; }
+.pnl-tbl .mono { font-family: "JetBrains Mono", monospace; color: #1e293b; }
+.pnl-tbl .dn { font-weight: 700; color: #0c1f40; }
+.pnl-empty { text-align: center; color: #94a3b8; padding: 24px 0; }
+.stat { padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; }
+.stat.ok, .stat.gr { background: #d1fae5; color: #047857; }
+.stat.wn, .stat.yl { background: #fef3c7; color: #b45309; }
+.stat.or { background: #fed7aa; color: #9a3412; }
+.stat.no, .stat.rd { background: #fee2e2; color: #b91c1c; }
+.stat.bl { background: #dbeafe; color: #1e40af; }
+.btn-mini { background: #eff6ff; border: 1px solid #bfdbfe; color: #2563eb; padding: 4px 10px; border-radius: 4px; font-size: 11.5px; cursor: pointer; font-weight: 600; }
+.btn-mini:hover { background: #dbeafe; }
+.ms-sub { font-size: 11px; color: #5b6b85; max-width: 360px; line-height: 1.6; }
+.set-row { display: grid; grid-template-columns: 220px 1fr; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #e3eaf4; font-size: 13px; color: #2c3a52; }
+.set-row label { font-weight: 600; color: #0c1f40; }
+.set-row input[type="number"], .set-row input[type="text"], .set-row select {
+  background: #ffffff; border: 1px solid #d8dfeb; color: #0c1f40;
+  padding: 6px 10px; border-radius: 5px; font-size: 12.5px; max-width: 200px;
+}
+.set-row input[type="checkbox"] { accent-color: #2563eb; width: 16px; height: 16px; cursor: pointer; }
+.btn-save { margin-top: 14px; background: #2563eb; color: #fff; border: 0; padding: 9px 18px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.btn-save:hover { background: #1d4ed8; }
+.set-msg { margin-top: 10px; font-size: 12px; color: #059669; font-weight: 600; display: inline-block; margin-left: 12px; }
 
 .su-rep-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
 .su-rep {
   display: flex; align-items: center; gap: 14px;
-  background: rgba(96,165,250,0.05);
-  border: 1px solid rgba(96,165,250,0.18);
-  border-radius: 6px; padding: 14px 16px;
+  background: #f5f8fd;
+  border: 1px solid #e3eaf4;
+  border-radius: 8px; padding: 16px 18px;
+  transition: background 0.15s, border-color 0.15s;
 }
-.su-rep > i { font-size: 22px; color: #60a5fa; flex-shrink: 0; }
+.su-rep:hover { background: #eff6ff; border-color: #bfdbfe; }
+.su-rep > i { font-size: 26px; color: #2563eb; flex-shrink: 0; }
 .sr-body { flex: 1; min-width: 0; }
-.sr-t { font-size: 14px; font-weight: 700; color: #e4eeff; margin-bottom: 3px; }
-.sr-d { font-size: 12px; opacity: 0.65; }
+.sr-t { font-size: 14.5px; font-weight: 700; color: #0c1f40; margin-bottom: 4px; }
+.sr-d { font-size: 12.5px; color: #5b6b85; }
 .su-dl {
   background: #059669; color: #fff; border: 0;
   padding: 7px 14px; border-radius: 4px;
@@ -628,4 +1050,68 @@ const logs = [
 .su-dl:hover { background: #047857; }
 .pnl h3 .su-dl { margin-left: auto; }
 .pnl h3 { display: flex; align-items: center; gap: 10px; }
+
+/* ── topNav 탭별 통합 뷰 ── */
+.map-overview {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 16px;
+  align-items: start;
+}
+.map-stub-card {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px;
+  min-height: 220px;
+  background: #f5f8fd;
+  border: 1px dashed #c9d4e3;
+  border-radius: 8px;
+  text-align: center;
+  padding: 24px;
+}
+.map-stub-card > i { font-size: 48px; color: #2563eb; }
+.map-stub-card .ms-t { font-size: 14.5px; font-weight: 700; color: #0c1f40; }
+.map-stub-card .ms-sub { font-size: 12.5px; color: #5b6b85; }
+
+.stat-bar {
+  width: 100%; height: 8px;
+  background: #e3eaf4;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.stat-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+/* 설정 그리드 */
+.su-set-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.su-set-blk {
+  background: #f5f8fd;
+  border: 1px solid #e3eaf4;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.su-set-blk h4 {
+  font-size: 14px; font-weight: 700; color: #0c1f40;
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e3eaf4;
+}
+.su-set-blk .set-row { padding: 8px 0; border-bottom: 1px solid #eef2f9; }
+.su-set-blk .set-row:last-child { border-bottom: 0; }
+
+@media (max-width: 1100px) {
+  .map-overview { grid-template-columns: 1fr; }
+  .su-set-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 720px) {
+  .su-set-grid { grid-template-columns: 1fr; }
+}
 </style>

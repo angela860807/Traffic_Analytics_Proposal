@@ -5,7 +5,7 @@
       <div class="left">
         <div class="left-inner">
           <RouterLink to="/" class="logo">
-            <span class="ls"></span>Traffic<em>AS</em>
+            <img src="/TAS.png" alt="TAS" class="logo-img" />
           </RouterLink>
           <div class="brand-copy">
             <div class="ey">AI-POWERED TRAFFIC SYSTEM</div>
@@ -24,9 +24,8 @@
       <!-- 오른쪽 폼 패널 -->
       <div class="right">
         <div class="form-wrap">
-          <div class="form-ey">AUTHENTICATION</div>
           <h2>로그인</h2>
-          <p class="form-sub">TrafficAS 계정으로 로그인하세요.</p>
+          <p class="form-sub">TAS 계정으로 로그인하세요.</p>
 
           <form @submit.prevent="handleLogin" class="form" novalidate>
             <div class="field" :class="{ focused: focus === 'email', filled: email }">
@@ -142,7 +141,6 @@
           <p class="switch">
             계정이 없으신가요? <RouterLink to="/signup">회원가입하기</RouterLink>
           </p>
-          <p class="back"><RouterLink to="/">← 메인 페이지로</RouterLink></p>
         </div>
       </div>
     </div>
@@ -196,13 +194,18 @@ const feats = [
   display: grid;
   grid-template-columns: 1fr 1fr;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* ── 왼쪽 패널 ── */
 .left {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(145deg, #020b18 0%, #051628 60%, #020b18 100%);
+  background:
+    linear-gradient(145deg, rgba(2, 8, 18, 0.92) 0%, rgba(4, 16, 32, 0.88) 60%, rgba(2, 8, 18, 0.95) 100%),
+    url("/hero-poster.jpg") center/cover no-repeat;
   display: flex;
   align-items: stretch;
 }
@@ -247,6 +250,12 @@ const feats = [
   color: #60a5fa;
   font-style: normal;
 }
+.logo-img {
+  height: 56px;
+  width: auto;
+  display: block;
+  filter: brightness(0) invert(1) drop-shadow(0 2px 10px rgba(0, 0, 0, 0.5));
+}
 .ls {
   width: 8px;
   height: 8px;
@@ -260,14 +269,16 @@ const feats = [
 }
 .ey {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 14px;
+  font-weight: 700;
   letter-spacing: 0.22em;
-  color: #60a5fa;
-  opacity: 0.7;
-  margin-bottom: 20px;
+  color: #bfdbfe;
+  opacity: 1;
+  margin-bottom: 22px;
   display: flex;
   align-items: center;
   gap: 8px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.8);
 }
 .ey::before {
   content: "";
@@ -278,22 +289,25 @@ const feats = [
 }
 h1 {
   font-family: "Syne", sans-serif;
-  font-size: clamp(30px, 3.2vw, 52px);
+  font-size: clamp(36px, 3.8vw, 60px);
   font-weight: 800;
-  line-height: 0.96;
-  letter-spacing: -2.5px;
+  line-height: 1.02;
+  letter-spacing: -2px;
   color: #fff;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
+  text-shadow: 0 3px 24px rgba(0, 0, 0, 0.95), 0 1px 4px rgba(0, 0, 0, 0.9);
 }
 h1 em {
-  color: #60a5fa;
+  color: #93c5fd;
   font-style: normal;
+  text-shadow: 0 3px 24px rgba(0, 0, 0, 0.95), 0 0 6px rgba(37, 99, 235, 0.4);
 }
 .brand-copy p {
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.45);
-  line-height: 1.85;
-  font-weight: 300;
+  font-size: 17px;
+  color: #ffffff;
+  line-height: 1.75;
+  font-weight: 500;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.95), 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 .feats {
   list-style: none;
@@ -307,8 +321,10 @@ h1 em {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13.5px;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 15.5px;
+  font-weight: 600;
+  color: #ffffff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 0.85);
 }
 .fdot {
   width: 5px;
@@ -320,10 +336,11 @@ h1 em {
 }
 .left-foot {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.2);
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.75);
   letter-spacing: 0.08em;
   margin-top: 48px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
 }
 
 /* ── 오른쪽 패널 ── */
@@ -340,11 +357,12 @@ h1 em {
 }
 .form-ey {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 600;
   letter-spacing: 0.22em;
   color: var(--a);
-  opacity: 0.65;
-  margin-bottom: 12px;
+  opacity: 0.85;
+  margin-bottom: 14px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -358,16 +376,16 @@ h1 em {
 }
 h2 {
   font-family: "Syne", sans-serif;
-  font-size: 32px;
+  font-size: 38px;
   font-weight: 800;
-  letter-spacing: -1.2px;
+  letter-spacing: -1px;
   color: var(--t);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .form-sub {
-  font-size: 14.5px;
+  font-size: 16px;
   color: var(--t2);
-  font-weight: 300;
+  font-weight: 400;
   margin-bottom: 36px;
 }
 
@@ -383,7 +401,7 @@ h2 {
   gap: 6px;
 }
 .field label {
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--t2);
@@ -411,10 +429,10 @@ h2 {
 }
 input {
   flex: 1;
-  padding: 12px 0;
+  padding: 14px 0;
   background: none;
   border: none;
-  font-size: 14.5px;
+  font-size: 16px;
   color: var(--t);
   outline: none;
 }
@@ -456,15 +474,16 @@ input::placeholder {
 
 .submit {
   width: 100%;
-  padding: 13px;
+  padding: 15px;
   margin-top: 6px;
   background: var(--a);
   color: var(--bg);
   border: none;
   border-radius: 8px;
   font-family: "Syne", sans-serif;
-  font-size: 14px;
+  font-size: 15.5px;
   font-weight: 700;
+  letter-spacing: 0.02em;
   cursor: pointer;
   transition: opacity 0.2s, transform 0.15s;
   display: flex;
@@ -501,8 +520,10 @@ input::placeholder {
   align-items: center;
   gap: 12px;
   margin: 24px 0;
-  color: var(--t3);
-  font-size: 11px;
+  color: var(--t2);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
 }
 .divider::before,
 .divider::after {
@@ -513,7 +534,7 @@ input::placeholder {
 }
 
 .switch {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--t2);
   text-align: center;
   margin: 0 0 12px;
@@ -527,7 +548,7 @@ input::placeholder {
   text-decoration: underline;
 }
 .back {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--t3);
   text-align: center;
   margin: 0;

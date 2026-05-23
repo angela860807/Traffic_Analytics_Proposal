@@ -10,7 +10,7 @@
             <div class="hero-tag">SYSTEM INTRODUCTION</div>
             <h1>시스템 <em>소개</em></h1>
             <p class="hero-sub">
-              Traffic AS는 카메라 기반 AI 영상 분석과 실시간 데이터 처리를 통해<br />
+              TAS는 카메라 기반 AI 영상 분석과 실시간 데이터 처리를 통해<br />
               교통 흐름을 정밀하게 이해하고, 더 안전하고 효율적인 도시를 만듭니다.
             </p>
           </div>
@@ -93,7 +93,7 @@
         <div class="sw">
           <div class="sec-head">
             <h2>핵심 모듈</h2>
-            <p>Traffic AS의 주요 기능 모듈로 교통 데이터를 가치로 극대화합니다.</p>
+            <p>TAS의 주요 기능 모듈로 교통 데이터를 가치로 극대화합니다.</p>
           </div>
           <div class="mod-row">
             <div v-for="m in modules" :key="m.num" class="mod-card">
@@ -155,7 +155,7 @@
         <div class="sw">
           <div class="impact-head">
             <h2>비즈니스 임팩트</h2>
-            <p>Traffic AS가 제공하는 핵심 성과 지표</p>
+            <p>TAS가 제공하는 핵심 성과 지표</p>
           </div>
           <div class="impact-row">
             <div v-for="k in kpis" :key="k.title" class="kpi-card">

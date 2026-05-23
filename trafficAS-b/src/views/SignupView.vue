@@ -5,7 +5,7 @@
       <div class="left">
         <div class="left-inner">
           <RouterLink to="/" class="logo">
-            <span class="ls"></span>Traffic<em>AS</em>
+            <img src="/TAS.png" alt="TAS" class="logo-img" />
           </RouterLink>
           <div class="brand-copy">
             <div class="ey">JOIN TRAFFICIAS</div>
@@ -33,9 +33,8 @@
       <!-- 오른쪽 폼 패널 -->
       <div class="right">
         <div class="form-wrap">
-          <div class="form-ey">CREATE ACCOUNT</div>
           <h2>회원가입</h2>
-          <p class="form-sub">TrafficAS 계정을 만들어보세요.</p>
+          <p class="form-sub">TAS 계정을 만들어보세요.</p>
 
           <!-- 진행 단계 표시 -->
           <div class="progress">
@@ -423,7 +422,6 @@
           <p class="switch">
             이미 계정이 있으신가요? <RouterLink to="/login">로그인하기</RouterLink>
           </p>
-          <p class="back"><RouterLink to="/">← 메인 페이지로</RouterLink></p>
         </div>
       </div>
     </div>
@@ -552,13 +550,18 @@ const steps = [
   display: grid;
   grid-template-columns: 1fr 1fr;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* ── 왼쪽 패널 ── */
 .left {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(145deg, #020b18 0%, #051628 60%, #020b18 100%);
+  background:
+    linear-gradient(145deg, rgba(2, 8, 18, 0.92) 0%, rgba(4, 16, 32, 0.88) 60%, rgba(2, 8, 18, 0.95) 100%),
+    url("/hero-poster.jpg") center/cover no-repeat;
   display: flex;
   align-items: stretch;
 }
@@ -603,6 +606,12 @@ const steps = [
   color: #60a5fa;
   font-style: normal;
 }
+.logo-img {
+  height: 56px;
+  width: auto;
+  display: block;
+  filter: brightness(0) invert(1) drop-shadow(0 2px 10px rgba(0, 0, 0, 0.5));
+}
 .ls {
   width: 8px;
   height: 8px;
@@ -616,14 +625,16 @@ const steps = [
 }
 .ey {
   font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
+  font-size: 14px;
+  font-weight: 700;
   letter-spacing: 0.22em;
-  color: #60a5fa;
-  opacity: 0.7;
-  margin-bottom: 20px;
+  color: #bfdbfe;
+  opacity: 1;
+  margin-bottom: 22px;
   display: flex;
   align-items: center;
   gap: 8px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.8);
 }
 .ey::before {
   content: "";
@@ -634,22 +645,25 @@ const steps = [
 }
 h1 {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: clamp(30px, 3.2vw, 50px);
+  font-size: clamp(36px, 3.8vw, 58px);
   font-weight: 800;
-  line-height: 0.96;
-  letter-spacing: -2.5px;
+  line-height: 1.02;
+  letter-spacing: -2px;
   color: #fff;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
+  text-shadow: 0 3px 24px rgba(0, 0, 0, 0.95), 0 1px 4px rgba(0, 0, 0, 0.9);
 }
 h1 em {
-  color: #60a5fa;
+  color: #93c5fd;
   font-style: normal;
+  text-shadow: 0 3px 24px rgba(0, 0, 0, 0.95), 0 0 6px rgba(37, 99, 235, 0.4);
 }
 .brand-copy p {
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.45);
-  line-height: 1.85;
-  font-weight: 300;
+  font-size: 17px;
+  color: #ffffff;
+  line-height: 1.75;
+  font-weight: 500;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.95), 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 .steps {
   margin-top: 40px;
@@ -668,32 +682,36 @@ h1 em {
 }
 .snum {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 800;
   letter-spacing: -1px;
-  color: rgba(96, 165, 250, 0.12);
+  color: #93c5fd;
   line-height: 1;
   flex-shrink: 0;
-  width: 38px;
+  width: 42px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
 }
 .st {
-  font-size: 14.5px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.65);
-  margin-bottom: 3px;
+  font-size: 16.5px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 4px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.95), 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 .sd {
-  font-size: 12.5px;
-  color: rgba(255, 255, 255, 0.3);
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
   line-height: 1.6;
-  font-weight: 300;
+  font-weight: 500;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
 }
 .left-foot {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.2);
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.75);
   letter-spacing: 0.08em;
   margin-top: 40px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
 }
 
 /* ── 오른쪽 패널 ── */
@@ -711,11 +729,12 @@ h1 em {
 }
 .form-ey {
   font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 600;
   letter-spacing: 0.22em;
   color: var(--a);
-  opacity: 0.65;
-  margin-bottom: 12px;
+  opacity: 0.85;
+  margin-bottom: 14px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -729,16 +748,16 @@ h1 em {
 }
 h2 {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 32px;
+  font-size: 38px;
   font-weight: 800;
-  letter-spacing: -1.2px;
+  letter-spacing: -1px;
   color: var(--t);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .form-sub {
-  font-size: 14.5px;
+  font-size: 16px;
   color: var(--t2);
-  font-weight: 300;
+  font-weight: 400;
   margin-bottom: 28px;
 }
 
@@ -785,7 +804,7 @@ h2 {
   border-color: var(--a);
 }
 .prog-step small {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--t3);
   letter-spacing: 0.05em;
   white-space: nowrap;
@@ -866,7 +885,7 @@ h2 {
   gap: 6px;
 }
 .field label {
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--t2);
@@ -877,7 +896,7 @@ h2 {
 }
 .req {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 10.5px;
   color: var(--t3);
   text-transform: none;
   letter-spacing: 0.04em;
@@ -920,10 +939,10 @@ h2 {
 }
 input {
   flex: 1;
-  padding: 12px 0;
+  padding: 14px 0;
   background: none;
   border: none;
-  font-size: 14.5px;
+  font-size: 16px;
   color: var(--t);
   outline: none;
 }
@@ -1075,15 +1094,16 @@ input::placeholder {
 
 .submit {
   width: 100%;
-  padding: 13px;
+  padding: 15px;
   margin-top: 6px;
   background: var(--a);
   color: var(--bg);
   border: none;
   border-radius: 8px;
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 14px;
+  font-size: 15.5px;
   font-weight: 700;
+  letter-spacing: 0.02em;
   cursor: pointer;
   transition: opacity 0.2s, transform 0.15s;
   display: flex;
@@ -1120,8 +1140,10 @@ input::placeholder {
   align-items: center;
   gap: 12px;
   margin: 24px 0;
-  color: var(--t3);
-  font-size: 11px;
+  color: var(--t2);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
 }
 .divider::before,
 .divider::after {
@@ -1132,7 +1154,7 @@ input::placeholder {
 }
 
 .switch {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--t2);
   text-align: center;
   margin: 0 0 12px;
@@ -1146,7 +1168,7 @@ input::placeholder {
   text-decoration: underline;
 }
 .back {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--t3);
   text-align: center;
   margin: 0;

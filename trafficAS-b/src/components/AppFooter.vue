@@ -3,8 +3,7 @@
     <div class="ft-top">
       <div class="ft-brand">
         <div class="ft-logo">
-          <span class="ft-logo-dot"></span>
-          Traffic<em>AS</em>
+          <img src="/TAS.png" alt="TAS" class="ft-logo-img" />
         </div>
         <p class="ft-tag">YOLO 기반 실시간 차량 감지와<br />번호판 OCR로 교통 흐름을 분석합니다.</p>
       </div>
@@ -14,7 +13,6 @@
         <ul>
           <li><RouterLink to="/sub/intro">시스템 소개</RouterLink></li>
           <li><RouterLink to="/sub/support">공지사항</RouterLink></li>
-          <li><RouterLink to="/dashboard">관리자 대시보드</RouterLink></li>
         </ul>
       </div>
 
@@ -60,6 +58,7 @@ import { RouterLink } from "vue-router";
   margin-bottom: 10px;
 }
 .ft-logo em { color: var(--a); font-style: normal; }
+.ft-logo-img { height: 56px; width: auto; display: block; }
 .ft-logo-dot {
   width: 7px; height: 7px;
   border-radius: 50%;

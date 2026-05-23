@@ -1808,3 +1808,245 @@ if re.match(r"^@(media|supports|keyframes)", stripped):
 - 인라인 셀렉터 토큰 단위 정제가 필요하면 **proper CSS parser**(postcss 등) 사용
 - 정제 작업은 **백업 + 빌드 + 시각 확인** 3단계 검증 필수
 
+
+---
+
+## 36. CSS `:has()` 셀렉터로 조건부 스크롤 활성화
+
+### 증상
+AnalyticsView를 5탭으로 분할하면서 대시보드 탭은 viewport-fit으로, 서브탭(ctx/insight/cmp/map/settings)은 콘텐츠 추가로 스크롤 가능해야 했다. 같은 `.content` 요소인데 탭에 따라 `overflow` 정책이 달라야 함.
+
+### 해결 — `:has()` 셀렉터
+```css
+/* 서브탭일 때 자식에 .ctx-extra 등이 있으면 scroll 허용 */
+.an-shell .content:has(.ctx-extra),
+.an-shell .content:has(.ins-extra),
+.an-shell .content:has(.cmp-extra),
+.an-shell .content:has(.map-extra),
+.an-shell .content:has(.settings-panel) {
+  overflow-y: auto !important;
+}
+```
+
+### 동작 원리
+- 대시보드 탭일 때는 `.ctx-extra` 등이 v-if로 렌더링 안 됨 → `:has()` 미매칭 → 기본 `overflow: hidden`
+- 서브탭일 때는 해당 추가 섹션이 렌더링 → `:has()` 매칭 → `overflow-y: auto`
+- JS 클래스 토글 없이 순수 CSS로 분기
+
+### 주의
+- `:has()` 는 모던 브라우저(Chrome 105+, Safari 15.4+, Firefox 121+)에서만 동작
+- 구형 브라우저 지원 필요하면 Vue 측에서 `:class="{ scrollable: anaTab !== 'dashboard' }"` 토글 권장
+
+---
+
+## 37. img를 `filter: brightness(0) invert(1)`로 흰색 만들기
+
+### 증상
+TAS 로고 PNG는 어두운 색인데 로그인/회원가입 페이지의 어두운 hero-poster 배경 위에 올리니 안 보임. SVG가 아니라서 `fill` 속성으로 색 변경 불가.
+
+### 해결
+```css
+.logo-img {
+  height: 56px;
+  filter: brightness(0) invert(1) drop-shadow(0 2px 10px rgba(0, 0, 0, 0.5));
+}
+```
+
+### 원리
+1. `brightness(0)` — 모든 픽셀의 명도를 0으로 → **완전한 검정 실루엣** (알파 채널은 유지)
+2. `invert(1)` — 색을 반전 → 검정이 **흰색**으로 변환
+3. `drop-shadow` — 미세한 그림자로 입체감
+
+### 적용 범위 — 페이지별 다르게
+```css
+/* 로그인/회원가입만 흰색, 나머지는 원본 */
+/* LoginView.vue scoped */
+.logo-img { filter: brightness(0) invert(1) drop-shadow(0 2px 10px rgba(0,0,0,0.5)); }
+
+/* AppNav.vue scoped */
+.logo-img { /* 원본 색상 그대로 */ }
+```
+
+### 다른 색으로 변환하려면
+```css
+/* 파란색으로 */
+filter: brightness(0) invert(1) sepia(1) hue-rotate(190deg) saturate(5);
+/* 빨간색으로 */
+filter: brightness(0) invert(1) sepia(1) hue-rotate(330deg) saturate(5);
+```
+
+복잡한 색은 `mask-image` 또는 SVG 사용이 더 정확함.
+
+---
+
+## 38. 디스크 공간 부족으로 브랜치 전환 실패
+
+### 증상
+`git checkout yoon` 실행 중:
+```
+error: unable to write file trafficAS-b/public/hero-main.mp4
+error: unable to write file ...
+fatal: sha1 file '.../.git/index.lock' write error. Out of diskspace
+```
+working tree가 main과 yoon 사이 어중간한 상태로 손상됨.
+
+### 원인
+- yoon 브랜치에 큰 비디오 파일(50MB+×5개)이 포함됨
+- 로컬 디스크가 거의 가득 찬 상태 (100% 사용)
+- checkout이 새 파일을 working tree에 쓰는 중 공간 부족 → 일부만 쓰여진 채 중단
+
+### 해결
+1. 즉시 main으로 강제 복귀 (working tree 정리 포기):
+```bash
+git checkout -f main
+```
+
+2. 디스크 공간 확보 후 재시도:
+```bash
+df -h .              # 사용량 확인
+# 임시 파일/캐시 정리 (Windows)
+# - 휴지통 비우기
+# - npm cache clean --force
+# - node_modules 재설치 시 디스크 절약 가능
+```
+
+3. 큰 브랜치 전환 전 미리 확인:
+```bash
+git diff --stat main..yoon -- public/  # 전환 시 추가될 용량 가늠
+```
+
+### 예방
+- `.gitignore`에 `*.mp4`, `*.mov` 추가 권장 (LFS 미사용 프로젝트)
+- 큰 미디어 파일은 외부 스토리지(S3/CDN)에 두고 코드엔 URL만
+- Git LFS 도입 검토 (50MB+ 파일이 5개 이상이면)
+
+### 부수 효과 주의
+- 이미 commit된 비디오 파일은 `.gitignore` 추가만으로 제거 안 됨 → `git rm --cached` 필요
+- 그러면 history는 그대로라 clone 시 여전히 받음. `git filter-repo`로 history 정리 필요
+
+---
+
+## 39. CSS 다크 톤이 라이트 모드 셸에서 안 보이는 문제
+
+### 증상
+경영전략본부(SuperView)에 새로 추가한 탭(`보고서`, `설정`) 콘텐츠가 흐릿하거나 안 보임. 어두운 배경과 흰 텍스트 조합이 라이트 모드 셸에 어울리지 않음.
+
+### 원인
+SuperView의 scoped CSS는 다크 톤 가정으로 작성됨:
+```css
+.set-row { border-bottom: 1px solid #1a2a45; }      /* 라이트 배경에선 거의 검정선 */
+.set-row input { background: #06101e; color: #e4eeff; }  /* 라이트에선 부담스러움 */
+.sr-t { color: #e4eeff; }                            /* 흰 글자 + 라이트 배경 = 안보임 */
+.pnl-tbl td { border-bottom: 1px solid #1a2a45; }    /* 어두운 선이 라이트에 튐 */
+```
+
+하지만 `admin-shared.css`가 admin 셸을 **강제 라이트 모드**로 만듦 (`color: #0c1f40`, `background: #ffffff`).
+
+### 해결 — 다크 톤 색상을 라이트 톤으로 일괄 교체
+```css
+/* Before → After */
+border-bottom: 1px solid #1a2a45;  →  border-bottom: 1px solid #e3eaf4;
+background: #06101e;               →  background: #ffffff;
+color: #e4eeff;                    →  color: #0c1f40;
+opacity: .55 / .65 / .85;          →  명시적 color: #4a5b78/#5b6b85
+```
+
+라벨/제목엔 `font-weight: 600~700` + `color: #0c1f40` 같이 명도 대비를 확실히.
+
+### 교훈
+- 다크 모드 가정으로 짠 컴포넌트를 라이트 셸로 옮기면 **모든 색을 점검**해야 함
+- `opacity`로 텍스트 약하게 만든 자리는 라이트 모드에서 더 흐려짐 → 명시적 `color` 권장
+- 라이트/다크 둘 다 지원하려면 CSS 변수 토큰(`--t`, `--bg`)로 통일하는 게 안전
+
+---
+
+## 40. `.t-sub` 클래스가 헤더 타이틀을 흐리게 만드는 문제
+
+### 증상
+시설운영팀(OpsView)의 "시설운영팀" 헤더 타이틀이 다른 부서(교통정보센터/단속관리팀)보다 흐릿하게 보임. 폰트 크기는 같은데 색상이 묘하게 흐림.
+
+### 원인
+OpsView 템플릿에 잉여 클래스가 붙어있음:
+```html
+<h1><a class="t-sub t-main" @click="goHome">시설운영팀</a></h1>
+```
+
+`admin-shared.css`의 `.t-sub` 정의:
+```css
+.t-sub { color: #0c1f40; opacity: .85; }
+```
+
+→ `opacity: .85`가 적용되어 같은 색상이라도 흐릿하게 보임. 다른 뷰들은 `<a class="t-main">` 만 사용해서 100% 명도.
+
+### 해결
+```html
+<!-- Before -->
+<a class="t-sub t-main">시설운영팀</a>
+
+<!-- After -->
+<a class="t-main">시설운영팀</a>
+```
+
+또한 OpsView 자체 scoped CSS의 `:deep(.t-main)`에서 잉여 속성도 제거:
+```css
+/* Before — 다른 뷰엔 없는 padding/border */
+.ops-shell :deep(.t-main) {
+  padding: 2px 0;
+  border-bottom: 2px solid transparent;
+  display: inline-block;
+}
+
+/* After — 공통 스펙만 */
+.ops-shell :deep(.t-main) {
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
+```
+
+### 교훈
+- 비슷한 페이지 5개가 있을 때 **공통 스펙은 하나의 shared CSS**로 통합 후 페이지별 차이는 명시적으로만
+- `class="t-sub t-main"` 같이 의미 충돌하는 클래스 조합은 어느 쪽이 이길지 예측 어려움 → 한 클래스로 통일
+
+---
+
+## 41. `git add -A`로 `.claude/settings.local.json` 같이 staged
+
+### 증상
+대규모 변경을 한 번에 commit하려고 `git add -A` 후 `git status`로 보니 `.claude/settings.local.json`이 같이 staged됨. 이 파일은 로컬 Claude Code 설정이라 공유 저장소에 올리면 안 됨.
+
+### 원인
+- `.gitignore`에 `.claude/` 미등록
+- `git add -A` / `git add .`는 모든 untracked + modified를 일괄 스테이징하므로 의도하지 않은 파일까지 포함
+
+### 해결
+```bash
+# 이번만 unstage
+git restore --staged .claude/settings.local.json
+
+# 영구 제외 — .gitignore에 추가
+echo ".claude/" >> .gitignore
+git add .gitignore
+git commit -m "chore: ignore .claude local settings"
+```
+
+### 예방 — 안전한 staging 패턴
+```bash
+# 1) 변경 파일 미리보기
+git status --short
+
+# 2) 특정 디렉토리/패턴만 stage
+git add src/ public/TAS.* README.md TROUBLESHOOTING.md
+
+# 3) 또는 인터랙티브
+git add -p
+
+# 4) staged 항목 다시 검토
+git diff --cached --stat
+```
+
+### 교훈
+- `.env`, `.claude/`, `.vscode/`, OS별 설정 파일 등은 **반드시 `.gitignore` 등록**
+- 대규모 변경일수록 staging은 신중하게 — 한 번 push되면 history에 남음
+- `git add -A`는 작은 작업이거나 모든 변경이 확실히 검토된 경우에만
+

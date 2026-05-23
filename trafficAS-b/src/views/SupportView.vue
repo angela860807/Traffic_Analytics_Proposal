@@ -34,7 +34,7 @@
         <div class="sw">
           <div class="values-head">
             <span class="values-line"></span>
-            <h2>Traffic AS가 제공하는 가치</h2>
+            <h2>TAS가 제공하는 가치</h2>
           </div>
           <div class="values-grid">
             <div v-for="v in values" :key="v.title" class="value-card">
