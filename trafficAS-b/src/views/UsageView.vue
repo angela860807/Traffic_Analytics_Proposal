@@ -147,7 +147,7 @@ const steps = [
     shortTitle: "프론트엔드",
     title: "Vue.js 대시보드 실행",
     desc:
-      "교통 관제 대시보드입니다. 의존성 설치 후 개발 서버를 실행하면 http://localhost:5173 에서 확인할 수 있습니다.",
+      "교통 관제 대시보드입니다. 의존성 설치 후 개발 서버를 실행하면 http://localhost:5174 에서 확인할 수 있습니다.",
     code:
       "cd frontend\nnpm install\nnpm run dev",
   },
@@ -166,7 +166,7 @@ const steps = [
     shortTitle: "프론트엔드",
     title: "Vue.js 프론트엔드 실행",
     desc:
-      "실시간 모니터링 대시보드입니다. 의존성 설치 후 개발 서버를 실행하면 http://localhost:5173 에서 확인할 수 있습니다.",
+      "실시간 모니터링 대시보드입니다. 의존성 설치 후 개발 서버를 실행하면 http://localhost:5174 에서 확인할 수 있습니다.",
     code: "cd frontend && npm install && npm run dev",
   },
 ];

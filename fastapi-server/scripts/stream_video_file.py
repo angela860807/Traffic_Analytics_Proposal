@@ -100,7 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--fps",
         type=float,
-        default=3.0,
+        default=5.0,
         help="Target frame upload FPS.",
     )
     parser.add_argument(
@@ -116,13 +116,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--jpeg-quality",
         type=int,
-        default=55,
+        default=70,
         help="JPEG quality for uploaded frames.",
     )
     parser.add_argument(
         "--upload-scale",
         type=float,
-        default=0.5,
+        default=0.6,
         help=(
             "Resize frames before upload to reduce server YOLO load. "
             "1.0 uploads original resolution."
@@ -182,20 +182,32 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--preview-fps",
         type=float,
-        default=8.0,
+        default=12.0,
         help="Maximum OpenCV GUI redraw FPS. 0 displays every decoded video frame.",
     )
     parser.add_argument(
         "--preview-tracker",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
         help="Track response bbox between server responses. Disable for smoother low-end CPU preview.",
     )
     parser.add_argument(
         "--bbox-hold-seconds",
         type=float,
-        default=0.6,
+        default=1.4,
         help="Keep drawing the latest response bbox for this many seconds without OpenCV tracking.",
+    )
+    parser.add_argument(
+        "--preview-max-event-age-seconds",
+        type=float,
+        default=3.8,
+        help="Hide preview bbox when the active stream event is older than this. 0 disables.",
+    )
+    parser.add_argument(
+        "--preview-max-bbox-area-ratio",
+        type=float,
+        default=0.32,
+        help="Hide preview bbox when it covers more than this ratio of the frame. 0 disables.",
     )
     parser.add_argument(
         "--model-path",
@@ -905,6 +917,8 @@ def draw_preview(
     tracker_confidence: float = 0.0,
     response_coord_scale: float = 1.0,
     speed_overlay: SpeedOverlayConfig | None = None,
+    max_event_age_seconds: float = 0.0,
+    max_bbox_area_ratio: float = 0.0,
 ) -> int:
     if scale != 1.0:
         display_frame = cv2.resize(
@@ -925,6 +939,7 @@ def draw_preview(
     bbox = response.get("bbox")
     bboxes = response.get("bboxes") or []
     bbox_confidence = response.get("bboxConfidenceScore", 0.0)
+    event_age_seconds = response.get("eventAgeSeconds", 0.0)
 
     if speed_overlay is not None:
         draw_speed_overlay(
@@ -940,11 +955,26 @@ def draw_preview(
         bbox = list(tracker_bbox)
         bbox_confidence = tracker_confidence
 
+    if (
+        max_event_age_seconds > 0
+        and isinstance(event_age_seconds, (int, float))
+        and event_age_seconds > max_event_age_seconds
+    ):
+        bboxes = []
+        bbox = None
+
+    bbox_response_coord_scale = 1.0 if tracker_bbox is not None else response_coord_scale
+    display_area = max(display_frame.shape[0] * display_frame.shape[1], 1)
+
     for index, current_bbox in enumerate(bboxes):
         x1, y1, x2, y2 = [
-            int(round(float(value) * response_coord_scale * coord_scale))
+            int(round(float(value) * bbox_response_coord_scale * coord_scale))
             for value in current_bbox
         ]
+        bbox_area_ratio = (max(0, x2 - x1) * max(0, y2 - y1)) / display_area
+        if max_bbox_area_ratio > 0 and bbox_area_ratio > max_bbox_area_ratio:
+            continue
+
         color = (0, 255, 0)
         cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
         label = f"TRACK {index + 1}" if tracker_bbox is not None else f"VEHICLE {index + 1}"
@@ -965,6 +995,15 @@ def draw_preview(
             int(round(float(value) * response_coord_scale * coord_scale))
             for value in bbox
         ]
+        bbox_area_ratio = (max(0, x2 - x1) * max(0, y2 - y1)) / display_area
+        if max_bbox_area_ratio > 0 and bbox_area_ratio > max_bbox_area_ratio:
+            bbox = None
+
+    if not bboxes and bbox is not None:
+        x1, y1, x2, y2 = [
+            int(round(float(value) * response_coord_scale * coord_scale))
+            for value in bbox
+        ]
         color = (0, 255, 0)
         cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
         draw_text(
@@ -975,7 +1014,6 @@ def draw_preview(
             overlay_font_scale,
         )
 
-    event_age_seconds = response.get("eventAgeSeconds", 0.0)
     header = (
         f"frame={frame_number} "
         f"boxes={len(bboxes)} "
@@ -1560,6 +1598,16 @@ def main() -> None:
     if args.bbox_hold_seconds < 0:
         raise SystemExit("--bbox-hold-seconds must be greater than or equal to 0")
 
+    if args.preview_max_event_age_seconds < 0:
+        raise SystemExit(
+            "--preview-max-event-age-seconds must be greater than or equal to 0"
+        )
+
+    if args.preview_max_bbox_area_ratio < 0:
+        raise SystemExit(
+            "--preview-max-bbox-area-ratio must be greater than or equal to 0"
+        )
+
     speed_config_json: str | None = None
     if args.configure_speed_zone:
         speed_config_json = configure_speed_zone_from_video(args, video_path)
@@ -1687,6 +1735,8 @@ def main() -> None:
                 "uploadQueueSize": args.upload_queue_size,
                 "previewDelaySeconds": args.preview_delay_seconds,
                 "previewDelayFrames": preview_delay_frames,
+                "previewMaxEventAgeSeconds": args.preview_max_event_age_seconds,
+                "previewMaxBboxAreaRatio": args.preview_max_bbox_area_ratio,
                 "bboxSource": "fastapi-response" if args.preview_bbox else None,
                 "speedOverlay": speed_overlay is not None,
                 "speedConfigSent": speed_config_json is not None,
@@ -1878,6 +1928,8 @@ def main() -> None:
                         tracker_confidence=tracker_confidence,
                         response_coord_scale=response_coord_scale,
                         speed_overlay=speed_overlay,
+                        max_event_age_seconds=args.preview_max_event_age_seconds,
+                        max_bbox_area_ratio=args.preview_max_bbox_area_ratio,
                     )
                     should_quit, should_toggle_pause = handle_preview_key(key)
                 else:
@@ -1912,6 +1964,8 @@ def main() -> None:
                         wait_ms=preview_wait_ms if args.realtime else 1,
                         response_coord_scale=response_coord_scale,
                         speed_overlay=speed_overlay,
+                        max_event_age_seconds=args.preview_max_event_age_seconds,
+                        max_bbox_area_ratio=args.preview_max_bbox_area_ratio,
                     )
                     should_quit, should_toggle_pause = handle_preview_key(key)
 
@@ -2033,6 +2087,8 @@ def main() -> None:
                     wait_ms=preview_wait_ms if args.realtime else 1,
                     response_coord_scale=response_coord_scale,
                     speed_overlay=speed_overlay,
+                    max_event_age_seconds=args.preview_max_event_age_seconds,
+                    max_bbox_area_ratio=args.preview_max_bbox_area_ratio,
                 )
                 should_quit, should_toggle_pause = handle_preview_key(key)
 
