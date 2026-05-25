@@ -147,7 +147,7 @@ npm run preview
 ### 8-5 웹 접속
 
 ```
-http://localhost:5173
+http://localhost:5174
 ```
 
 ### 8-6 관리자 계정

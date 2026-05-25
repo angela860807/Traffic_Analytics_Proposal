@@ -14,7 +14,7 @@
       <div class="right">
         <template v-if="isLoggedIn">
           <span class="uname">{{ currentUser.name }}님, 안녕하세요</span>
-          <RouterLink v-if="isAdmin" to="/dashboard" class="btn-dash">대시보드</RouterLink>
+          <RouterLink v-if="isAdmin" to="/admin/super" class="btn-dash">대시보드</RouterLink>
           <button class="btn-out" @click="logout">로그아웃</button>
         </template>
         <template v-else>

@@ -87,7 +87,7 @@ services:
       - spring-backend
       - fastapi-server
     ports:
-      - "5173:80"
+      - "5174:80"
 
 volumes:
   traffic_postgres_data:

@@ -18,6 +18,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/',            component: MainView      },
+    { path: '/home',        component: MainView      },
     { path: '/sub',         redirect: '/sub/usage'   },
     { path: '/sub/usage',   component: UsageView     },
     { path: '/sub/intro',   component: IntroView     },
@@ -37,7 +38,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  if (to.path === '/dashboard' || to.path.startsWith('/admin')) {
+  if (to.path === '/dashboard') {
     const { isLoggedIn, isAdmin } = useAuth()
     if (!isLoggedIn.value) return '/login'
     if (!isAdmin.value)    return '/'
