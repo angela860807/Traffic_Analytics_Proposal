@@ -203,6 +203,29 @@ def test_detection_warmup_endpoint_loads_models(monkeypatch) -> None:
     assert loaded == ["vehicle", "plate", "ocr"]
 
 
+def test_stream_ocr_status_endpoint_returns_saved_status() -> None:
+    detection_route.stream_ocr_statuses.clear()
+    result = make_recognized_detection()
+    detection_route.remember_stream_ocr_status(
+        "event-1",
+        camera_code="CAM_001",
+        processing_status="OCR_COMPLETED",
+        analysis_status="FLOW_EVENT_CREATED",
+        message="done",
+        result=result,
+    )
+
+    response = client.get("/api/detections/stream-events/event-1/ocr-status")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["eventId"] == "event-1"
+    assert body["processingStatus"] == "OCR_COMPLETED"
+    assert body["plateNumber"] == "123A4567"
+
+    detection_route.stream_ocr_statuses.clear()
+
+
 def test_plate_number_normalization_keeps_korean_plate_characters() -> None:
     recognizer = PlateRecognizer()
 
@@ -960,7 +983,6 @@ def test_detection_saves_frame_crop_and_ocr_images_when_enabled(
     assert (storage_dir / "CAM_001_103000_plate_crop.jpg").exists()
     assert (storage_dir / "CAM_001_103000_ocr.jpg").exists()
     assert result.processing_status == "OCR_COMPLETED"
-
 
 def test_detection_includes_crop_and_ocr_images_when_ocr_fails_after_bbox(
     monkeypatch,
