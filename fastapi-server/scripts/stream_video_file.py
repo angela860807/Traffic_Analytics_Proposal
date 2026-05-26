@@ -146,6 +146,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="JPEG quality for high-resolution OCR crops.",
     )
     parser.add_argument(
+        "--finalized-highres-ocr",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "After FINALIZED, synchronously call the legacy high-res OCR endpoint. "
+            "Disabled by default because stream-frame now queues OCR in FastAPI."
+        ),
+    )
+    parser.add_argument(
         "--timeout",
         type=float,
         default=60.0,
@@ -560,6 +569,25 @@ def draw_text(
     )
 
 
+def has_speed_violation(response_body: dict[str, Any] | None) -> bool:
+    if not isinstance(response_body, dict):
+        return False
+
+    speed_violation = response_body.get("speedViolation")
+    if isinstance(speed_violation, dict):
+        return bool(speed_violation.get("isViolation", True))
+
+    speed_measurements = response_body.get("speedMeasurements") or []
+    if isinstance(speed_measurements, list):
+        return any(
+            isinstance(measurement, dict)
+            and bool(measurement.get("isViolation", False))
+            for measurement in speed_measurements
+        )
+
+    return False
+
+
 def parse_speed_overlay_config(
     raw_value: str | None,
     *,
@@ -960,6 +988,9 @@ def draw_preview(
     bboxes = response.get("bboxes") or []
     bbox_confidence = response.get("bboxConfidenceScore", 0.0)
     event_age_seconds = response.get("eventAgeSeconds", 0.0)
+    speed_violation_active = has_speed_violation(response)
+    bbox_color = (0, 0, 255) if speed_violation_active else (0, 255, 0)
+    bbox_label_prefix = "OVERSPEED" if speed_violation_active else "VEHICLE"
 
     if primary_bbox_only and tracker_bbox is None:
         primary_bbox = bbox if bbox is not None else (bboxes[0] if bboxes else None)
@@ -1008,9 +1039,13 @@ def draw_preview(
         if max_bbox_area_ratio > 0 and bbox_area_ratio > max_bbox_area_ratio:
             continue
 
-        color = (0, 255, 0)
+        color = bbox_color
         cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
-        label = f"TRACK {index + 1}" if tracker_bbox is not None else f"VEHICLE {index + 1}"
+        label = (
+            f"{'OVERSPEED ' if speed_violation_active else ''}TRACK {index + 1}"
+            if tracker_bbox is not None
+            else f"{bbox_label_prefix} {index + 1}"
+        )
 
         if index == 0:
             label = f"{label} {bbox_confidence:.3f}"
@@ -1037,11 +1072,11 @@ def draw_preview(
             int(round(float(value) * response_coord_scale * coord_scale))
             for value in bbox
         ]
-        color = (0, 255, 0)
+        color = bbox_color
         cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
         draw_text(
             display_frame,
-            f"VEHICLE {bbox_confidence:.3f}",
+            f"{bbox_label_prefix} {bbox_confidence:.3f}",
             (x1, max(overlay_line_height, y1 - 8)),
             color,
             overlay_font_scale,
@@ -1062,11 +1097,18 @@ def draw_preview(
             f"analysis={response.get('analysisStatus') or '-'} "
             f"plate={data.get('plateNumber') or '-'}"
         )
+        if speed_violation_active:
+            speed_violation = response.get("speedViolation") or {}
+            measured_speed = speed_violation.get("measuredSpeed")
+            if isinstance(measured_speed, (int, float)):
+                status_text += f" OVERSPEED={measured_speed:.1f}km/h"
+            else:
+                status_text += " OVERSPEED"
         draw_text(
             display_frame,
             status_text,
             (12, overlay_line_height * 2),
-            (0, 255, 255),
+            (0, 0, 255) if speed_violation_active else (0, 255, 255),
             overlay_font_scale,
         )
 
@@ -1711,6 +1753,10 @@ def main() -> None:
     preview_wait_ms = max(1, round(1000 / source_fps))
     response_coord_scale = 1.0 / args.upload_scale
     use_async_upload = args.preview_bbox and args.async_upload
+    effective_preview_all_frames = (
+        args.preview_all_frames
+        or (args.preview_bbox and not use_async_upload)
+    )
     use_preview_tracker = use_async_upload and args.preview_tracker
     uploaded_count = 0
     finalized_count = 0
@@ -1750,7 +1796,7 @@ def main() -> None:
                 "camera_code": args.camera_code,
                 "timeout": args.timeout,
                 "stop_after_finalized": args.stop_after_finalized,
-                "highres_ocr_enabled": args.highres_ocr_crop,
+                "highres_ocr_enabled": args.finalized_highres_ocr,
                 "response_coord_scale": response_coord_scale,
                 "highres_crop_padding": args.highres_crop_padding,
                 "highres_jpeg_quality": args.highres_jpeg_quality,
@@ -1773,7 +1819,7 @@ def main() -> None:
                 "stopAfterFinalized": args.stop_after_finalized,
                 "flushFrames": args.flush_frames,
                 "previewBbox": args.preview_bbox,
-                "previewAllFrames": args.preview_all_frames,
+                "previewAllFrames": effective_preview_all_frames,
                 "previewFps": args.preview_fps,
                 "previewFrameStep": preview_frame_step,
                 "previewTracker": use_preview_tracker,
@@ -1781,6 +1827,7 @@ def main() -> None:
                 "displayScale": args.scale,
                 "uploadScale": args.upload_scale,
                 "highresOcrCrop": args.highres_ocr_crop,
+                "finalizedHighresOcr": args.finalized_highres_ocr,
                 "highresCropPadding": args.highres_crop_padding,
                 "highresJpegQuality": args.highres_jpeg_quality,
                 "windowWidth": args.window_width,
@@ -2033,7 +2080,7 @@ def main() -> None:
                 continue
 
             if not should_upload:
-                if args.preview_bbox and args.preview_all_frames:
+                if args.preview_bbox and effective_preview_all_frames:
                     if use_async_upload:
                         latest_response_body = get_latest_response_body(upload_state)
 
@@ -2118,7 +2165,7 @@ def main() -> None:
                     high_res_crop_bytes=high_res_crop_bytes,
                     high_res_crop_frame_number=high_res_crop_frame_number,
                 )
-                if args.highres_ocr_crop and should_run_finalized_highres_ocr(
+                if args.finalized_highres_ocr and should_run_finalized_highres_ocr(
                     response_body
                 ):
                     (

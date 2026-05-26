@@ -18,6 +18,7 @@ class LatestFrame:
 class BufferedFrame(LatestFrame):
     bbox: tuple[int, int, int, int] | None = None
     bboxes: list[tuple[int, int, int, int]] | None = None
+    track_id: int | None = None
     high_res_crop_bytes: bytes | None = None
     high_res_crop_content_type: str | None = None
     confidence_score: float = 0.0

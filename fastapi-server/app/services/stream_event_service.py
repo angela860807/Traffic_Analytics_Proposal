@@ -14,15 +14,22 @@ from app.core.config import (
     MAX_EVENT_SECONDS,
     POST_MISS_FRAMES,
     SAVE_EVENT_DEBUG,
+    STREAM_BBOX_MAX_AREA_RATIO,
+    STREAM_BBOX_MAX_ASPECT_RATIO,
+    STREAM_BBOX_MIN_AREA_RATIO,
+    STREAM_BBOX_MIN_ASPECT_RATIO,
+    STREAM_BBOX_MIN_EDGE_MARGIN_RATIO,
+    STREAM_BBOX_ROI_NORMALIZED,
 )
 from app.schemas.detection import DetectionResult
 from app.schemas.speed import SpeedMeasurementResult
+from app.services.bbox_tracker import BboxTracker
 from app.services.frame_buffer import BufferedFrame, FrameBuffer, frame_buffer
 from app.services.image_decoder import ImageDecoder
 from app.services.inference_service import InferenceService
 from app.services.speed_tracker import SpeedTracker, VehicleTrackInput
 from app.services.speed_config import SpeedCameraConfig
-from app.services.vehicle_detector import VehicleDetection
+from app.services.vehicle_detector import VehicleDetection, VehicleDetectionBox
 
 
 STREAM_STATUS_IDLE = "IDLE"
@@ -39,6 +46,7 @@ class StreamEvent:
     camera_code: str
     started_at: datetime
     started_monotonic: float
+    track_id: int | None = None
     frames: list[BufferedFrame] = field(default_factory=list)
     miss_count: int = 0
     speed_measurement: SpeedMeasurementResult | None = None
@@ -54,6 +62,7 @@ class StreamProcessingResult:
     bbox: tuple[int, int, int, int] | None = None
     bboxes: list[tuple[int, int, int, int]] | None = None
     bbox_confidence_score: float = 0.0
+    track_id: int | None = None
     best_candidate_frame_number: int | None = None
     best_candidate_bbox: tuple[int, int, int, int] | None = None
     best_candidate_captured_at: datetime | None = None
@@ -62,7 +71,9 @@ class StreamProcessingResult:
     speed_violation: SpeedMeasurementResult | None = None
     speed_violation_sent: bool = False
     speed_violation_send_error: str | None = None
+    processing_status: str | None = None
     result: DetectionResult | None = None
+    best_candidate_frame: BufferedFrame | None = field(default=None, repr=False)
 
 
 class StreamEventService:
@@ -73,12 +84,15 @@ class StreamEventService:
         image_decoder: ImageDecoder | None = None,
         inference_service: InferenceService | None = None,
         speed_tracker: SpeedTracker | None = None,
+        bbox_tracker: BboxTracker | None = None,
     ) -> None:
         self.buffer = buffer
         self.image_decoder = image_decoder or ImageDecoder()
         self.inference_service = inference_service or InferenceService()
         self.speed_tracker = speed_tracker or SpeedTracker()
+        self.bbox_tracker = bbox_tracker or BboxTracker()
         self._events_by_camera: dict[str, StreamEvent] = {}
+        self._stream_bbox_roi = self._parse_normalized_roi(STREAM_BBOX_ROI_NORMALIZED)
 
     async def process_frame(
         self,
@@ -92,11 +106,23 @@ class StreamEventService:
         high_res_crop_content_type: str | None = None,
         high_res_crop_frame_number: int | None = None,
         speed_camera_config: SpeedCameraConfig | None = None,
+        finalize_with_ocr: bool = True,
     ) -> StreamProcessingResult:
         received_monotonic = time.monotonic()
         image = self.image_decoder.decode_image_bytes(image_bytes)
-        detection = self.inference_service.detect_vehicle_bbox_from_image(image)
+        raw_detection = self.inference_service.detect_vehicle_bbox_from_image(image)
+        detection = self._postprocess_vehicle_detection(raw_detection, image)
         bboxes = [box.bbox for box in detection.boxes]
+        tracked_bboxes = self.bbox_tracker.update(
+            camera_code=camera_code,
+            captured_at=captured_at,
+            boxes=detection.boxes,
+        )
+        event = self._events_by_camera.get(camera_code)
+        primary_track = self._select_primary_track(
+            tracked_bboxes=tracked_bboxes,
+            event_track_id=event.track_id if event is not None else None,
+        )
         track_inputs = self._build_track_inputs(detection)
         speed_measurements = self.speed_tracker.process_detections(
             camera_code=camera_code,
@@ -132,17 +158,26 @@ class StreamEventService:
                 else None
             ),
             image=image,
-            bbox=detection.bbox,
+            bbox=primary_track.bbox if primary_track is not None else detection.bbox,
             bboxes=bboxes,
-            confidence_score=detection.confidence_score,
+            track_id=primary_track.track_id if primary_track is not None else None,
+            confidence_score=(
+                primary_track.confidence_score
+                if primary_track is not None
+                else detection.confidence_score
+            ),
         )
         self.buffer.add_frame(frame)
 
-        has_trigger = (
+        has_detection_trigger = (
             frame.bbox is not None
             and frame.confidence_score >= DETECTION_CONFIDENCE_THRESHOLD
         )
-        event = self._events_by_camera.get(camera_code)
+        has_trigger = (
+            has_detection_trigger
+            if event is None
+            else has_detection_trigger and frame.track_id == event.track_id
+        )
 
         if (
             event is not None
@@ -157,18 +192,25 @@ class StreamEventService:
             )
 
         if event is None:
-            if not has_trigger:
+            if not has_detection_trigger:
                 return StreamProcessingResult(
                     stream_status=STREAM_STATUS_IDLE,
                     camera_code=camera_code,
                     bbox=frame.bbox,
                     bboxes=frame.bboxes,
                     bbox_confidence_score=frame.confidence_score,
+                    track_id=frame.track_id,
+                    processing_status="NO_VEHICLE",
                     speed_measurements=speed_measurements,
                     speed_violation=speed_violation,
                 )
 
-            event = self._start_event(camera_code, captured_at, received_monotonic)
+            event = self._start_event(
+                camera_code,
+                captured_at,
+                received_monotonic,
+                frame.track_id,
+            )
 
         if has_trigger:
             event.miss_count = 0
@@ -187,14 +229,19 @@ class StreamEventService:
         event_age_seconds = self._calculate_event_age_seconds(event, received_monotonic)
 
         if self._should_finalize_event(event, event_age_seconds):
-            result, best_candidate = await self._finalize_event(event)
+            result, best_candidate = await self._finalize_event(
+                event,
+                run_ocr=finalize_with_ocr,
+            )
             del self._events_by_camera[camera_code]
             logger.info(
-                "vehicle event finalized: eventId=%s cameraCode=%s frames=%s ageSeconds=%.2f resultPlate=%s resultType=%s",
+                "vehicle event finalized: eventId=%s cameraCode=%s trackId=%s frames=%s ageSeconds=%.2f ocrQueued=%s resultPlate=%s resultType=%s",
                 event.event_id,
                 camera_code,
+                event.track_id,
                 len(event.frames),
                 event_age_seconds,
+                not finalize_with_ocr and best_candidate is not None,
                 result.plate_number if result else None,
                 result.detection_type if result else None,
             )
@@ -206,6 +253,7 @@ class StreamEventService:
                 bbox=frame.bbox,
                 bboxes=frame.bboxes,
                 bbox_confidence_score=frame.confidence_score,
+                track_id=frame.track_id,
                 best_candidate_frame_number=(
                     best_candidate.frame_number if best_candidate is not None else None
                 ),
@@ -216,12 +264,16 @@ class StreamEventService:
                     best_candidate.captured_at if best_candidate is not None else None
                 ),
                 event_age_seconds=event_age_seconds,
+                processing_status=(
+                    "OCR_COMPLETED" if result is not None else "OCR_QUEUED"
+                ),
                 speed_measurements=self._build_event_speed_measurements(
                     event,
                     speed_measurements,
                 ),
                 speed_violation=event.speed_violation or speed_violation,
                 result=result,
+                best_candidate_frame=best_candidate,
             )
 
         return StreamProcessingResult(
@@ -232,7 +284,9 @@ class StreamEventService:
             bbox=frame.bbox,
             bboxes=frame.bboxes,
             bbox_confidence_score=frame.confidence_score,
+            track_id=frame.track_id,
             event_age_seconds=event_age_seconds,
+            processing_status="TRACKING",
             speed_measurements=self._build_event_speed_measurements(
                 event,
                 speed_measurements,
@@ -243,6 +297,7 @@ class StreamEventService:
     def clear(self) -> None:
         self._events_by_camera.clear()
         self.speed_tracker.clear()
+        self.bbox_tracker.clear()
 
     def _attach_high_res_crop_to_event_frame(
         self,
@@ -276,6 +331,144 @@ class StreamEventService:
             return [event.speed_measurement]
         return []
 
+    def _select_primary_track(
+        self,
+        *,
+        tracked_bboxes,
+        event_track_id: int | None,
+    ):
+        if not tracked_bboxes:
+            return None
+
+        if event_track_id is not None:
+            for tracked_bbox in tracked_bboxes:
+                if tracked_bbox.track_id == event_track_id:
+                    return tracked_bbox
+
+        return tracked_bboxes[0]
+
+    def _postprocess_vehicle_detection(
+        self,
+        detection: VehicleDetection,
+        image: np.ndarray,
+    ) -> VehicleDetection:
+        frame_h, frame_w = image.shape[:2]
+        boxes = detection.boxes
+        if not boxes and detection.bbox is not None:
+            boxes = [
+                VehicleDetectionBox(
+                    bbox=detection.bbox,
+                    confidence_score=detection.confidence_score,
+                    class_name="vehicle",
+                )
+            ]
+
+        filtered_boxes = [
+            box
+            for box in boxes
+            if self._is_usable_vehicle_bbox(
+                bbox=box.bbox,
+                frame_width=frame_w,
+                frame_height=frame_h,
+            )
+        ]
+
+        if not filtered_boxes:
+            if boxes:
+                logger.debug(
+                    "all vehicle bboxes filtered: total=%s frameWidth=%s frameHeight=%s",
+                    len(boxes),
+                    frame_w,
+                    frame_h,
+                )
+            return VehicleDetection(
+                detection_type="UNKNOWN",
+                confidence_score=0.0,
+                bbox=None,
+                boxes=[],
+            )
+
+        filtered_boxes = sorted(
+            filtered_boxes,
+            key=lambda box: box.confidence_score,
+            reverse=True,
+        )
+        primary = filtered_boxes[0]
+        return VehicleDetection(
+            detection_type="VEHICLE",
+            confidence_score=primary.confidence_score,
+            bbox=primary.bbox,
+            boxes=filtered_boxes,
+        )
+
+    def _is_usable_vehicle_bbox(
+        self,
+        *,
+        bbox: tuple[int, int, int, int],
+        frame_width: int,
+        frame_height: int,
+    ) -> bool:
+        x1, y1, x2, y2 = bbox
+        bbox_w = max(0, x2 - x1)
+        bbox_h = max(0, y2 - y1)
+        if bbox_w == 0 or bbox_h == 0:
+            return False
+
+        frame_area = max(frame_width * frame_height, 1)
+        area_ratio = (bbox_w * bbox_h) / frame_area
+        if (
+            area_ratio < STREAM_BBOX_MIN_AREA_RATIO
+            or area_ratio > STREAM_BBOX_MAX_AREA_RATIO
+        ):
+            return False
+
+        aspect_ratio = bbox_w / max(bbox_h, 1)
+        if (
+            aspect_ratio < STREAM_BBOX_MIN_ASPECT_RATIO
+            or aspect_ratio > STREAM_BBOX_MAX_ASPECT_RATIO
+        ):
+            return False
+
+        min_edge_margin = min(x1, y1, frame_width - x2, frame_height - y2)
+        min_edge_margin_ratio = min_edge_margin / max(min(frame_width, frame_height), 1)
+        if min_edge_margin_ratio < STREAM_BBOX_MIN_EDGE_MARGIN_RATIO:
+            return False
+
+        if self._stream_bbox_roi is not None:
+            roi_x1, roi_y1, roi_x2, roi_y2 = self._stream_bbox_roi
+            center_x = x1 + (bbox_w / 2)
+            center_y = y1 + (bbox_h / 2)
+            norm_x = center_x / max(frame_width, 1)
+            norm_y = center_y / max(frame_height, 1)
+            if not (roi_x1 <= norm_x <= roi_x2 and roi_y1 <= norm_y <= roi_y2):
+                return False
+
+        return True
+
+    def _parse_normalized_roi(
+        self,
+        raw_roi: str,
+    ) -> tuple[float, float, float, float] | None:
+        if not raw_roi:
+            return None
+
+        try:
+            values = [float(value.strip()) for value in raw_roi.split(",")]
+        except ValueError:
+            logger.warning("STREAM_BBOX_ROI_NORMALIZED is invalid: %s", raw_roi)
+            return None
+
+        if len(values) != 4:
+            logger.warning("STREAM_BBOX_ROI_NORMALIZED must have 4 values: %s", raw_roi)
+            return None
+
+        x1, y1, x2, y2 = values
+        if x1 < 0 or y1 < 0 or x2 > 1 or y2 > 1 or x1 >= x2 or y1 >= y2:
+            logger.warning("STREAM_BBOX_ROI_NORMALIZED is out of range: %s", raw_roi)
+            return None
+
+        return x1, y1, x2, y2
+
     def _build_track_inputs(
         self,
         detection,
@@ -304,19 +497,22 @@ class StreamEventService:
         camera_code: str,
         captured_at: datetime,
         received_monotonic: float,
+        track_id: int | None = None,
     ) -> StreamEvent:
         event = StreamEvent(
             event_id=f"{camera_code}-{captured_at:%Y%m%d%H%M%S}-{uuid4().hex[:8]}",
             camera_code=camera_code,
             started_at=captured_at,
             started_monotonic=received_monotonic,
+            track_id=track_id,
             frames=self.buffer.get_recent_frames(camera_code),
         )
         self._events_by_camera[camera_code] = event
         logger.info(
-            "vehicle event started: eventId=%s cameraCode=%s preBufferFrames=%s",
+            "vehicle event started: eventId=%s cameraCode=%s trackId=%s preBufferFrames=%s",
             event.event_id,
             camera_code,
+            track_id,
             len(event.frames),
         )
         return event
@@ -341,11 +537,14 @@ class StreamEventService:
     async def _finalize_event(
         self,
         event: StreamEvent,
+        *,
+        run_ocr: bool = True,
     ) -> tuple[DetectionResult | None, BufferedFrame | None]:
         candidates = [
             frame
             for frame in event.frames
             if frame.bbox is not None
+            and (event.track_id is None or frame.track_id == event.track_id)
             and frame.confidence_score >= DETECTION_CONFIDENCE_THRESHOLD
         ]
 
@@ -380,6 +579,9 @@ class StreamEventService:
                 event=event,
                 frames=sorted_candidates[:DEBUG_EVENT_FRAME_LIMIT],
             )
+
+        if not run_ocr:
+            return None, best_candidate
 
         best_result: DetectionResult | None = None
 
@@ -448,6 +650,7 @@ class StreamEventService:
         image: np.ndarray,
         bbox: tuple[int, int, int, int] | None,
         bboxes: list[tuple[int, int, int, int]],
+        track_id: int | None,
         confidence_score: float,
     ) -> BufferedFrame:
         frame_h, frame_w = image.shape[:2]
@@ -471,6 +674,7 @@ class StreamEventService:
             frame_number=frame_number,
             bbox=bbox,
             bboxes=bboxes,
+            track_id=track_id,
             high_res_crop_bytes=high_res_crop_bytes,
             high_res_crop_content_type=high_res_crop_content_type,
             confidence_score=confidence_score,
