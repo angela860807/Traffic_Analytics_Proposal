@@ -60,6 +60,51 @@ def crop_plate_with_padding(
     return plate_crop
 
 
+def crop_vehicle_square(
+    image: np.ndarray,
+    bbox: tuple[int, int, int, int],
+    padding_ratio: float = 0.20,
+) -> np.ndarray:
+    image_h, image_w = image.shape[:2]
+    x1, y1, x2, y2 = bbox
+    box_w = max(0, x2 - x1)
+    box_h = max(0, y2 - y1)
+
+    if box_w == 0 or box_h == 0:
+        raise ValueError("vehicle crop bbox is empty")
+
+    side = int(max(box_w, box_h) * (1.0 + padding_ratio))
+    center_x = x1 + (box_w / 2)
+    center_y = y1 + (box_h / 2)
+
+    crop_x1 = int(round(center_x - (side / 2)))
+    crop_y1 = int(round(center_y - (side / 2)))
+    crop_x2 = crop_x1 + side
+    crop_y2 = crop_y1 + side
+
+    if crop_x1 < 0:
+        crop_x2 -= crop_x1
+        crop_x1 = 0
+    if crop_y1 < 0:
+        crop_y2 -= crop_y1
+        crop_y1 = 0
+    if crop_x2 > image_w:
+        shift = crop_x2 - image_w
+        crop_x1 = max(0, crop_x1 - shift)
+        crop_x2 = image_w
+    if crop_y2 > image_h:
+        shift = crop_y2 - image_h
+        crop_y1 = max(0, crop_y1 - shift)
+        crop_y2 = image_h
+
+    vehicle_crop = image[crop_y1:crop_y2, crop_x1:crop_x2]
+
+    if vehicle_crop.size == 0:
+        raise ValueError("vehicle crop is empty")
+
+    return vehicle_crop
+
+
 def preprocess_plate_for_ocr(plate_crop: np.ndarray) -> np.ndarray:
     return build_plate_ocr_variants(plate_crop)[-1][1]
 

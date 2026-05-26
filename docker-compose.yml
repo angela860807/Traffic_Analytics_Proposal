@@ -49,7 +49,8 @@ services:
       VEHICLE_CLASS_NAMES: car,bus,truck,motorcycle
       DETECTION_PREPROCESS_MODE: none
       SAVE_PLATE_CROP: "true"
-      SAVE_OCR_PREPROCESSED_IMAGE: "true"
+      SAVE_VEHICLE_CROP: "false"
+      SAVE_OCR_PREPROCESSED_IMAGE: "false"
       STREAM_FPS: 5
       PRE_BUFFER_SECONDS: 2
       POST_MISS_FRAMES: 5

@@ -76,7 +76,12 @@
             <div class="process-icon-wrap">
               <div class="process-num">{{ p.num }}</div>
               <div class="process-icon">
-                <component v-if="p.lucide" :is="p.lucide" :size="36" :stroke-width="1.8" />
+                <component
+                  v-if="p.lucide"
+                  :is="p.lucide"
+                  :size="36"
+                  :stroke-width="1.8"
+                />
                 <i v-else :class="p.icon"></i>
               </div>
               <span v-if="i < processSteps.length - 1" class="process-line"></span>
@@ -207,11 +212,11 @@ const processSteps = [
 ];
 
 const coreFeatures = [
-  { title: "실시간 영상 분석",     lucide: Cctv,      desc: "다중 카메라 실시간 분석" },
-  { title: "번호판 인식 (OCR)",    lucide: ScanText,  desc: "정확한 번호판 인식 및 검색" },
-  { title: "이벤트 알림",          lucide: BellRing,  desc: "이상 상황 실시간 알림" },
-  { title: "통계 및 리포트",       lucide: BarChart3, desc: "다양한 통계 및 리포트 제공" },
-  { title: "확장 가능한 아키텍처", lucide: Network,   desc: "유연한 연동 및 확장 지원" },
+  { title: "실시간 영상 분석", lucide: Cctv, desc: "다중 카메라 실시간 분석" },
+  { title: "번호판 인식 (OCR)", lucide: ScanText, desc: "정확한 번호판 인식 및 검색" },
+  { title: "이벤트 알림", lucide: BellRing, desc: "이상 상황 실시간 알림" },
+  { title: "통계 및 리포트", lucide: BarChart3, desc: "다양한 통계 및 리포트 제공" },
+  { title: "확장 가능한 아키텍처", lucide: Network, desc: "유연한 연동 및 확장 지원" },
 ];
 </script>
 
@@ -226,7 +231,7 @@ const coreFeatures = [
   max-width: 1440px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);  /* 3:7 */
+  grid-template-columns: minmax(0, 3fr) minmax(0, 7fr); /* 3:7 */
   align-items: end;
 }
 .hero-left {
@@ -279,7 +284,7 @@ const coreFeatures = [
 .hero-right {
   position: relative;
   align-self: stretch;
-  margin-right: calc(60px - (50vw - 50%));  /* 화면 우측 끝까지 */
+  margin-right: calc(60px - (50vw - 50%)); /* 화면 우측 끝까지 */
   overflow: hidden;
   min-height: 600px;
 }
@@ -293,18 +298,20 @@ const coreFeatures = [
   /* 톤다운 */
   filter: saturate(0.78) brightness(0.85);
   /* 좌측 페이드 */
-  --hero-mask: linear-gradient(to right,
+  --hero-mask: linear-gradient(
+    to right,
     transparent 0%,
-    rgba(0,0,0,0.02) 4%,
-    rgba(0,0,0,0.08) 8%,
-    rgba(0,0,0,0.18) 13%,
-    rgba(0,0,0,0.32) 18%,
-    rgba(0,0,0,0.5) 23%,
-    rgba(0,0,0,0.68) 28%,
-    rgba(0,0,0,0.84) 33%,
-    rgba(0,0,0,0.95) 38%,
+    rgba(0, 0, 0, 0.02) 4%,
+    rgba(0, 0, 0, 0.08) 8%,
+    rgba(0, 0, 0, 0.18) 13%,
+    rgba(0, 0, 0, 0.32) 18%,
+    rgba(0, 0, 0, 0.5) 23%,
+    rgba(0, 0, 0, 0.68) 28%,
+    rgba(0, 0, 0, 0.84) 33%,
+    rgba(0, 0, 0, 0.95) 38%,
     #000 42%,
-    #000 100%);
+    #000 100%
+  );
   -webkit-mask-image: var(--hero-mask);
   mask-image: var(--hero-mask);
 }
@@ -435,7 +442,9 @@ const coreFeatures = [
   gap: 80px;
   align-items: center;
 }
-.solution-right { padding-left: 40px; }
+.solution-right {
+  padding-left: 40px;
+}
 .solution-img {
   width: 100%;
   height: auto;
@@ -594,7 +603,9 @@ const coreFeatures = [
   text-align: left;
   border-right: 1px solid var(--b);
 }
-.core-item:last-child { border-right: none; }
+.core-item:last-child {
+  border-right: none;
+}
 .core-icon {
   width: 44px;
   height: 44px;
@@ -604,7 +615,11 @@ const coreFeatures = [
   color: var(--a);
   flex-shrink: 0;
 }
-.core-text { display: flex; flex-direction: column; min-width: 0; }
+.core-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
 .core-title {
   font-size: 17px;
   font-weight: 700;
@@ -740,7 +755,9 @@ const coreFeatures = [
     gap: 40px;
     padding: 60px 24px;
   }
-  .hero-right { margin-right: 0; }
+  .hero-right {
+    margin-right: 0;
+  }
   .hero-img {
     max-height: 320px;
     mask-image: none;
@@ -775,7 +792,9 @@ const coreFeatures = [
     grid-template-columns: repeat(2, 1fr);
   }
   /* 2-col 우측 항목 보더 제거 */
-  .core-item:nth-child(2n) { border-right: none; }
+  .core-item:nth-child(2n) {
+    border-right: none;
+  }
   .cta-card {
     flex-direction: column;
     align-items: flex-start;

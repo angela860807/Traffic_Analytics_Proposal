@@ -4,12 +4,14 @@ from app.core.config import (
     DETECTION_CONFIDENCE_THRESHOLD,
     SAVE_OCR_PREPROCESSED_IMAGE,
     SAVE_PLATE_CROP,
+    SAVE_VEHICLE_CROP,
 )
 from app.schemas.detection import DetectionResult, RaspberryFrameRequest
 from app.services.image_decoder import ImageDecoder
 from app.services.image_storage_service import ImageStorageService
 from app.services.image_preprocessor import (
     build_plate_ocr_variants,
+    crop_vehicle_square,
     crop_plate_with_padding,
     preprocess_frame_for_detection,
 )
@@ -41,6 +43,23 @@ class InferenceService:
         )
 
     async def detect_from_image_bytes(
+        self,
+        *,
+        camera_code: str,
+        captured_at: datetime,
+        image_bytes: bytes,
+        high_res_crop_bytes: bytes | None = None,
+        vehicle_detection: VehicleDetection | None = None,
+    ) -> DetectionResult:
+        return self.detect_from_image_bytes_sync(
+            camera_code=camera_code,
+            captured_at=captured_at,
+            image_bytes=image_bytes,
+            high_res_crop_bytes=high_res_crop_bytes,
+            vehicle_detection=vehicle_detection,
+        )
+
+    def detect_from_image_bytes_sync(
         self,
         *,
         camera_code: str,
@@ -111,10 +130,15 @@ class InferenceService:
             image_path = existing_image_path.replace("\\", "/")
 
         image_url = self.image_storage_service.build_detection_image_url(image_path)
+        frame_image_path = image_path
+        frame_image_url = image_url
+        vehicle_crop_image_path = None
+        vehicle_crop_image_url = None
         plate_crop_image_path = None
         plate_crop_image_url = None
         ocr_image_path = None
         ocr_image_url = None
+        processing_status = "OCR_COMPLETED"
 
         if vehicle_detection is None:
             vehicle_detection = self.detect_vehicle_bbox_from_image(image)
@@ -123,7 +147,26 @@ class InferenceService:
             plate_number = None
             detection_type = "UNKNOWN"
             confidence_score = 0.0
+            processing_status = "NO_VEHICLE"
         else:
+            if SAVE_VEHICLE_CROP:
+                vehicle_crop = crop_vehicle_square(
+                    image,
+                    vehicle_detection.bbox,
+                )
+                vehicle_crop_image_path = (
+                    self.image_storage_service.save_detection_image(
+                        image=vehicle_crop,
+                        camera_code=camera_code,
+                        captured_at=captured_at,
+                        suffix="vehicle_crop",
+                    )
+                )
+                vehicle_crop_image_url = (
+                    self.image_storage_service.build_detection_image_url(
+                        vehicle_crop_image_path,
+                    )
+                )
             ocr_source_image = (
                 high_res_ocr_image
                 if high_res_ocr_image is not None
@@ -138,6 +181,7 @@ class InferenceService:
             ):
                 plate_number = None
                 detection_type = "VEHICLE"
+                processing_status = "PLATE_NOT_DETECTED"
             else:
                 plate_crop = crop_plate_with_padding(
                     ocr_source_image,
@@ -185,6 +229,9 @@ class InferenceService:
                 plate_number = recognition.text
                 detection_type = "PLATE" if plate_number else "VEHICLE"
                 confidence_score = plate_detection.confidence_score
+                processing_status = (
+                    "OCR_COMPLETED" if plate_number else "OCR_FAILED"
+                )
 
         return DetectionResult(
             camera_code=camera_code,
@@ -194,11 +241,16 @@ class InferenceService:
             confidence_score=confidence_score,
             image_path=image_path,
             image_url=image_url,
+            frame_image_path=frame_image_path,
+            frame_image_url=frame_image_url,
+            vehicle_crop_image_path=vehicle_crop_image_path,
+            vehicle_crop_image_url=vehicle_crop_image_url,
             plate_crop_image_path=plate_crop_image_path,
             plate_crop_image_url=plate_crop_image_url,
             ocr_image_path=ocr_image_path,
             ocr_image_url=ocr_image_url,
             detected_at=captured_at,
+            processing_status=processing_status,
         )
 
 

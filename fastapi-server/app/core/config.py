@@ -85,8 +85,9 @@ OCR_PREPROCESS_SCALE = float(os.getenv("OCR_PREPROCESS_SCALE", "2.0"))
 OCR_ADAPTIVE_BLOCK_SIZE = int(os.getenv("OCR_ADAPTIVE_BLOCK_SIZE", "31"))
 OCR_ADAPTIVE_C = int(os.getenv("OCR_ADAPTIVE_C", "5"))
 SAVE_PLATE_CROP = os.getenv("SAVE_PLATE_CROP", "true").lower() == "true"
+SAVE_VEHICLE_CROP = os.getenv("SAVE_VEHICLE_CROP", "false").lower() == "true"
 SAVE_OCR_PREPROCESSED_IMAGE = (
-    os.getenv("SAVE_OCR_PREPROCESSED_IMAGE", "true").lower() == "true"
+    os.getenv("SAVE_OCR_PREPROCESSED_IMAGE", "false").lower() == "true"
 )
 
 STREAM_FPS = int(os.getenv("STREAM_FPS", "5"))
@@ -95,6 +96,19 @@ POST_MISS_FRAMES = int(os.getenv("POST_MISS_FRAMES", "5"))
 MAX_EVENT_SECONDS = float(os.getenv("MAX_EVENT_SECONDS", "4"))
 TOP_N_OCR_FRAMES = int(os.getenv("TOP_N_OCR_FRAMES", "1"))
 SAVE_EVENT_DEBUG = os.getenv("SAVE_EVENT_DEBUG", "false").lower() == "true"
+STREAM_TRACK_TTL_SECONDS = float(os.getenv("STREAM_TRACK_TTL_SECONDS", "2.0"))
+STREAM_TRACK_MIN_IOU = float(os.getenv("STREAM_TRACK_MIN_IOU", "0.10"))
+STREAM_TRACK_MAX_CENTER_DISTANCE_PIXELS = float(
+    os.getenv("STREAM_TRACK_MAX_CENTER_DISTANCE_PIXELS", "180.0")
+)
+STREAM_BBOX_MIN_AREA_RATIO = float(os.getenv("STREAM_BBOX_MIN_AREA_RATIO", "0.002"))
+STREAM_BBOX_MAX_AREA_RATIO = float(os.getenv("STREAM_BBOX_MAX_AREA_RATIO", "0.40"))
+STREAM_BBOX_MIN_ASPECT_RATIO = float(os.getenv("STREAM_BBOX_MIN_ASPECT_RATIO", "0.45"))
+STREAM_BBOX_MAX_ASPECT_RATIO = float(os.getenv("STREAM_BBOX_MAX_ASPECT_RATIO", "4.50"))
+STREAM_BBOX_MIN_EDGE_MARGIN_RATIO = float(
+    os.getenv("STREAM_BBOX_MIN_EDGE_MARGIN_RATIO", "0.0")
+)
+STREAM_BBOX_ROI_NORMALIZED = os.getenv("STREAM_BBOX_ROI_NORMALIZED", "").strip()
 
 SPEED_DETECTION_ENABLED = os.getenv("SPEED_DETECTION_ENABLED", "false").lower() == "true"
 SPEED_DEFAULT_DISTANCE_METERS = float(

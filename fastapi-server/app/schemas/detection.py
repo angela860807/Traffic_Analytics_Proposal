@@ -8,6 +8,14 @@ from app.schemas.speed import SpeedMeasurementResult
 
 DirectionType = Literal["IN", "OUT", "BOTH"]
 DetectionType = Literal["VEHICLE", "PLATE", "UNKNOWN"]
+ProcessingStatus = Literal[
+    "NO_VEHICLE",
+    "TRACKING",
+    "OCR_QUEUED",
+    "PLATE_NOT_DETECTED",
+    "OCR_FAILED",
+    "OCR_COMPLETED",
+]
 AnalysisStatus = Literal[
     "ANALYSIS_ONLY",
     "SENT_TO_BACKEND",
@@ -72,6 +80,26 @@ class DetectionResult(BaseModel):
         alias="imageUrl",
         examples=["/static/detections/2026/04/30/CAM_001_103000_frame.jpg"],
     )
+    frame_image_path: str | None = Field(
+        default=None,
+        alias="frameImagePath",
+        examples=["storage/detections/2026/04/30/CAM_001_103000_frame.jpg"],
+    )
+    frame_image_url: str | None = Field(
+        default=None,
+        alias="frameImageUrl",
+        examples=["/static/detections/2026/04/30/CAM_001_103000_frame.jpg"],
+    )
+    vehicle_crop_image_path: str | None = Field(
+        default=None,
+        alias="vehicleCropImagePath",
+        examples=["storage/detections/2026/04/30/CAM_001_103000_vehicle_crop.jpg"],
+    )
+    vehicle_crop_image_url: str | None = Field(
+        default=None,
+        alias="vehicleCropImageUrl",
+        examples=["/static/detections/2026/04/30/CAM_001_103000_vehicle_crop.jpg"],
+    )
     plate_crop_image_path: str | None = Field(
         default=None,
         alias="plateCropImagePath",
@@ -95,6 +123,11 @@ class DetectionResult(BaseModel):
     detected_at: datetime = Field(
         alias="detectedAt",
         examples=["2026-04-30T10:30:00"],
+    )
+    processing_status: ProcessingStatus = Field(
+        default="OCR_COMPLETED",
+        alias="processingStatus",
+        examples=["OCR_COMPLETED"],
     )
 
     model_config = ConfigDict(populate_by_name=True)
@@ -150,6 +183,11 @@ class StreamFrameResponse(BaseModel):
         le=1,
         examples=[0.9321],
     )
+    track_id: int | None = Field(
+        default=None,
+        alias="trackId",
+        examples=[1],
+    )
     best_candidate_frame_number: int | None = Field(
         default=None,
         alias="bestCandidateFrameNumber",
@@ -191,6 +229,11 @@ class StreamFrameResponse(BaseModel):
         default=None,
         alias="analysisStatus",
         examples=["FLOW_EVENT_CREATED"],
+    )
+    processing_status: ProcessingStatus | None = Field(
+        default=None,
+        alias="processingStatus",
+        examples=["OCR_QUEUED"],
     )
     data: DetectionResult | None = None
 
