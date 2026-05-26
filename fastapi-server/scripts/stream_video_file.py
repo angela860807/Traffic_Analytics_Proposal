@@ -13,11 +13,19 @@ from typing import Any
 import cv2
 import numpy as np
 import requests
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:
+    Image = None
+    ImageDraw = None
+    ImageFont = None
 
 STREAM_FRAME_PATH = "/api/detections/stream-frame"
 HIGHRES_OCR_PATH = "/api/detections/stream-frame/highres-ocr"
+OCR_STATUS_PATH_TEMPLATE = "/api/detections/stream-events/{event_id}/ocr-status"
 WINDOW_NAME = "Traffic Stream + BBox Preview"
 SPEED_ZONE_WINDOW_NAME = "Speed Zone Config"
+_KOREAN_FONT = None
 
 
 @dataclass
@@ -35,6 +43,9 @@ class UploadState:
     latest_response_body: dict[str, Any] | None = None
     latest_response_frame_number: int | None = None
     responses_by_frame: dict[int, dict[str, Any]] = field(default_factory=dict)
+    pending_ocr_event_ids: set[str] = field(default_factory=set)
+    ocr_statuses_by_event_id: dict[str, dict[str, Any]] = field(default_factory=dict)
+    latest_ocr_status: dict[str, Any] | None = None
     uploaded_count: int = 0
     finalized_count: int = 0
     dropped_count: int = 0
@@ -300,6 +311,17 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--auto-full-frame-speed-zone",
+        action="store_true",
+        help="Send a full-frame speed zone config without opening the ROI click UI.",
+    )
+    parser.add_argument(
+        "--preview-speed-overlay",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Draw speed ROI/line overlay on the preview when speed config is sent.",
+    )
+    parser.add_argument(
         "--save-speed-config-json",
         default=None,
         help=(
@@ -425,6 +447,22 @@ def post_frame(
     return response.json()
 
 
+def get_ocr_status(
+    *,
+    base_url: str,
+    event_id: str,
+    timeout: float,
+) -> dict[str, Any] | None:
+    status_url = f"{base_url}{OCR_STATUS_PATH_TEMPLATE.format(event_id=event_id)}"
+    try:
+        response = requests.get(status_url, timeout=min(timeout, 1.0))
+        response.raise_for_status()
+    except requests.RequestException:
+        return None
+
+    return response.json()
+
+
 def post_highres_ocr(
     *,
     url: str,
@@ -545,6 +583,10 @@ def draw_text(
     color=(255, 255, 255),
     font_scale: float = 0.45,
 ) -> None:
+    if any(ord(char) > 127 for char in text) and Image is not None:
+        draw_unicode_text(frame, text, origin, color, font_scale)
+        return
+
     x, y = origin
     shadow_thickness = max(1, round(font_scale * 3))
     cv2.putText(
@@ -569,6 +611,54 @@ def draw_text(
     )
 
 
+def load_korean_font(font_size: int):
+    global _KOREAN_FONT
+    if ImageFont is None:
+        return None
+
+    if _KOREAN_FONT is not None and _KOREAN_FONT[0] == font_size:
+        return _KOREAN_FONT[1]
+
+    font_candidates = [
+        Path("C:/Windows/Fonts/malgun.ttf"),
+        Path("C:/Windows/Fonts/gulim.ttc"),
+        Path("/usr/share/fonts/truetype/nanum/NanumGothic.ttf"),
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+    ]
+    for font_path in font_candidates:
+        if font_path.exists():
+            font = ImageFont.truetype(str(font_path), font_size)
+            _KOREAN_FONT = (font_size, font)
+            return font
+
+    return None
+
+
+def draw_unicode_text(
+    frame,
+    text: str,
+    origin: tuple[int, int],
+    color,
+    font_scale: float,
+) -> None:
+    if Image is None or ImageDraw is None:
+        return
+
+    x, y = origin
+    font_size = max(12, round(font_scale * 32))
+    font = load_korean_font(font_size)
+    if font is None:
+        return
+
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    image = Image.fromarray(rgb_frame)
+    draw = ImageDraw.Draw(image)
+    rgb_color = (int(color[2]), int(color[1]), int(color[0]))
+    draw.text((x + 1, y - font_size + 1), text, font=font, fill=(0, 0, 0))
+    draw.text((x, y - font_size), text, font=font, fill=rgb_color)
+    frame[:] = cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
+
+
 def has_speed_violation(response_body: dict[str, Any] | None) -> bool:
     if not isinstance(response_body, dict):
         return False
@@ -586,6 +676,79 @@ def has_speed_violation(response_body: dict[str, Any] | None) -> bool:
         )
 
     return False
+
+
+def build_tracking_log_text(
+    *,
+    response: dict[str, Any],
+    visible_bbox_count: int,
+    bbox_confidence: float,
+) -> str:
+    stream_status = response.get("streamStatus") or "-"
+    track_id = response.get("trackId")
+    track_text = f" / Track ID: {track_id}" if track_id is not None else ""
+    return (
+        f"Tracking: {stream_status}{track_text} / "
+        f"차량 {visible_bbox_count}대 / 신뢰도 {bbox_confidence:.3f}"
+    )
+
+
+def build_ocr_log_text(ocr_status: dict[str, Any] | None) -> str:
+    if not isinstance(ocr_status, dict):
+        return "번호판 결과: 대기"
+
+    processing_status = str(ocr_status.get("processingStatus") or "UNKNOWN")
+    status_label = {
+        "OCR_QUEUED": "대기 중",
+        "OCR_RUNNING": "인식 중",
+        "OCR_COMPLETED": "완료",
+        "OCR_FAILED": "실패",
+        "PLATE_NOT_DETECTED": "번호판 미검출",
+        "NO_OCR_CANDIDATE": "후보 없음",
+        "UNKNOWN": "확인 중",
+    }.get(processing_status, processing_status)
+    plate_number = ocr_status.get("plateNumber") or "-"
+    return f"번호판 결과: {status_label} / {plate_number}"
+
+
+def build_speed_log_text(response: dict[str, Any]) -> str:
+    speed_violation = response.get("speedViolation")
+    if isinstance(speed_violation, dict):
+        measured_speed = speed_violation.get("measuredSpeed")
+        speed_limit = speed_violation.get("speedLimit")
+        if isinstance(measured_speed, (int, float)):
+            if isinstance(speed_limit, (int, float)):
+                return (
+                    f"속도 계산: 과속 {measured_speed:.1f}km/h "
+                    f"(제한 {speed_limit:.1f}km/h)"
+                )
+            return f"속도 계산: 과속 {measured_speed:.1f}km/h"
+        return "속도 계산: 과속 감지"
+
+    speed_measurements = response.get("speedMeasurements") or []
+    if isinstance(speed_measurements, list) and speed_measurements:
+        latest_measurement = next(
+            (
+                measurement
+                for measurement in reversed(speed_measurements)
+                if isinstance(measurement, dict)
+            ),
+            None,
+        )
+        if latest_measurement is not None:
+            measured_speed = latest_measurement.get("measuredSpeed")
+            speed_limit = latest_measurement.get("speedLimit")
+            is_violation = bool(latest_measurement.get("isViolation", False))
+            label = "과속" if is_violation else "정상"
+            if isinstance(measured_speed, (int, float)):
+                if isinstance(speed_limit, (int, float)):
+                    return (
+                        f"속도 계산: {label} {measured_speed:.1f}km/h "
+                        f"(제한 {speed_limit:.1f}km/h)"
+                    )
+                return f"속도 계산: {label} {measured_speed:.1f}km/h"
+
+    return "속도 계산: 대기"
 
 
 def parse_speed_overlay_config(
@@ -952,6 +1115,32 @@ def configure_speed_zone_from_video(args: argparse.Namespace, video_path: Path) 
     return config_json
 
 
+def build_auto_full_frame_speed_config(args: argparse.Namespace, video_path: Path) -> str:
+    capture = cv2.VideoCapture(str(video_path))
+    if not capture.isOpened():
+        raise SystemExit(f"failed to open video file: {video_path}")
+
+    try:
+        ok, frame = capture.read()
+    finally:
+        capture.release()
+
+    if not ok:
+        raise SystemExit(f"failed to read the first frame: {video_path}")
+
+    upload_frame = resize_for_upload(frame, upload_scale=args.upload_scale)
+    config = build_full_frame_speed_zone_config(
+        camera_code=args.camera_code,
+        frame_width=upload_frame.shape[1],
+        frame_height=upload_frame.shape[0],
+        distance_meters=args.distance_meters,
+        speed_limit_kmh=args.speed_limit_kmh,
+        roi_width_meters=args.roi_width_meters,
+        roi_height_meters=args.roi_height_meters,
+    )
+    return json.dumps(config, ensure_ascii=False)
+
+
 def draw_preview(
     *,
     frame,
@@ -967,6 +1156,7 @@ def draw_preview(
     max_bbox_area_ratio: float = 0.0,
     min_bbox_confidence: float = 0.0,
     primary_bbox_only: bool = True,
+    ocr_status: dict[str, Any] | None = None,
 ) -> int:
     if scale != 1.0:
         display_frame = cv2.resize(
@@ -1082,41 +1272,35 @@ def draw_preview(
             overlay_font_scale,
         )
 
-    header = (
-        f"frame={frame_number} "
-        f"boxes={len(bboxes)} "
-        f"bboxConf={bbox_confidence:.3f} "
-        f"eventAge={event_age_seconds:.1f}s"
+    tracking_text = build_tracking_log_text(
+        response=response,
+        visible_bbox_count=len(bboxes),
+        bbox_confidence=float(bbox_confidence or 0.0),
     )
-    draw_text(display_frame, header, (12, overlay_line_height), font_scale=overlay_font_scale)
-
-    if response:
-        data = response.get("data") or {}
-        status_text = (
-            f"stream={response.get('streamStatus')} "
-            f"analysis={response.get('analysisStatus') or '-'} "
-            f"plate={data.get('plateNumber') or '-'}"
-        )
-        if speed_violation_active:
-            speed_violation = response.get("speedViolation") or {}
-            measured_speed = speed_violation.get("measuredSpeed")
-            if isinstance(measured_speed, (int, float)):
-                status_text += f" OVERSPEED={measured_speed:.1f}km/h"
-            else:
-                status_text += " OVERSPEED"
-        draw_text(
-            display_frame,
-            status_text,
-            (12, overlay_line_height * 2),
-            (0, 0, 255) if speed_violation_active else (0, 255, 255),
-            overlay_font_scale,
-        )
+    ocr_text = build_ocr_log_text(ocr_status)
+    speed_text = build_speed_log_text(response)
+    log_color = (0, 0, 255) if speed_violation_active else (0, 255, 255)
 
     draw_text(
         display_frame,
-        "q/ESC: quit  space: pause",
-        (12, display_frame.shape[0] - 12),
-        font_scale=overlay_font_scale,
+        tracking_text,
+        (12, overlay_line_height),
+        log_color,
+        overlay_font_scale,
+    )
+    draw_text(
+        display_frame,
+        ocr_text,
+        (12, overlay_line_height * 2),
+        log_color,
+        overlay_font_scale,
+    )
+    draw_text(
+        display_frame,
+        speed_text,
+        (12, overlay_line_height * 3),
+        log_color,
+        overlay_font_scale,
     )
 
     cv2.imshow(WINDOW_NAME, display_frame)
@@ -1141,6 +1325,61 @@ def configure_preview_window(width: int, height: int) -> None:
 def get_latest_response_body(upload_state: UploadState) -> dict[str, Any] | None:
     with upload_state.lock:
         return upload_state.latest_response_body
+
+
+def get_latest_ocr_status(upload_state: UploadState) -> dict[str, Any] | None:
+    with upload_state.lock:
+        return upload_state.latest_ocr_status
+
+
+def remember_ocr_event_from_response(
+    upload_state: UploadState,
+    response_body: dict[str, Any],
+) -> None:
+    event_id = response_body.get("eventId")
+    if (
+        response_body.get("streamStatus") != "FINALIZED"
+        or not isinstance(event_id, str)
+        or not event_id
+    ):
+        return
+
+    queued_status = {
+        "eventId": event_id,
+        "processingStatus": response_body.get("processingStatus") or "OCR_QUEUED",
+        "message": "OCR queued",
+        "plateNumber": None,
+    }
+    with upload_state.lock:
+        upload_state.pending_ocr_event_ids.add(event_id)
+        upload_state.ocr_statuses_by_event_id[event_id] = queued_status
+        upload_state.latest_ocr_status = queued_status
+
+
+def refresh_pending_ocr_statuses(
+    *,
+    base_url: str,
+    upload_state: UploadState,
+    timeout: float,
+) -> None:
+    with upload_state.lock:
+        pending_event_ids = list(upload_state.pending_ocr_event_ids)
+
+    for event_id in pending_event_ids:
+        status_body = get_ocr_status(
+            base_url=base_url,
+            event_id=event_id,
+            timeout=timeout,
+        )
+        if status_body is None:
+            continue
+
+        processing_status = status_body.get("processingStatus")
+        with upload_state.lock:
+            upload_state.ocr_statuses_by_event_id[event_id] = status_body
+            upload_state.latest_ocr_status = status_body
+            if processing_status not in {"OCR_QUEUED", "OCR_RUNNING", "UNKNOWN"}:
+                upload_state.pending_ocr_event_ids.discard(event_id)
 
 
 def get_latest_response_packet(
@@ -1545,6 +1784,7 @@ def upload_worker(
     upload_queue: queue.Queue[UploadTask],
     stop_event: threading.Event,
     upload_state: UploadState,
+    base_url: str,
     url: str,
     highres_ocr_url: str,
     video_path: Path,
@@ -1577,6 +1817,12 @@ def upload_worker(
                 speed_config_json=speed_config_json,
                 high_res_crop_bytes=task.high_res_crop_bytes,
                 high_res_crop_frame_number=task.high_res_crop_frame_number,
+            )
+            remember_ocr_event_from_response(upload_state, response_body)
+            refresh_pending_ocr_statuses(
+                base_url=base_url,
+                upload_state=upload_state,
+                timeout=timeout,
             )
 
             if highres_ocr_enabled and should_run_finalized_highres_ocr(response_body):
@@ -1705,17 +1951,35 @@ def main() -> None:
         )
 
     speed_config_json: str | None = None
-    if args.configure_speed_zone:
+    if args.auto_full_frame_speed_zone:
+        speed_config_json = build_auto_full_frame_speed_config(args, video_path)
+        speed_overlay = (
+            parse_speed_overlay_config(
+                speed_config_json,
+                camera_code=args.camera_code,
+            )
+            if args.preview_speed_overlay
+            else None
+        )
+    elif args.configure_speed_zone:
         speed_config_json = configure_speed_zone_from_video(args, video_path)
-        speed_overlay = parse_speed_overlay_config(
-            speed_config_json,
-            camera_code=args.camera_code,
+        speed_overlay = (
+            parse_speed_overlay_config(
+                speed_config_json,
+                camera_code=args.camera_code,
+            )
+            if args.preview_speed_overlay
+            else None
         )
     else:
         try:
-            speed_overlay = parse_speed_overlay_config(
-                args.speed_config_json,
-                camera_code=args.camera_code,
+            speed_overlay = (
+                parse_speed_overlay_config(
+                    args.speed_config_json,
+                    camera_code=args.camera_code,
+                )
+                if args.preview_speed_overlay
+                else None
             )
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             raise SystemExit(f"invalid --speed-config-json: {exc}") from exc
@@ -1790,6 +2054,7 @@ def main() -> None:
                 "upload_queue": upload_queue,
                 "stop_event": stop_event,
                 "upload_state": upload_state,
+                "base_url": base_url,
                 "url": url,
                 "highres_ocr_url": highres_ocr_url,
                 "video_path": video_path,
@@ -2058,6 +2323,7 @@ def main() -> None:
                         max_bbox_area_ratio=args.preview_max_bbox_area_ratio,
                         min_bbox_confidence=args.preview_min_bbox_confidence,
                         primary_bbox_only=args.preview_primary_bbox_only,
+                        ocr_status=get_latest_ocr_status(upload_state),
                     )
                     should_quit, should_toggle_pause = handle_preview_key(key)
                 else:
@@ -2096,6 +2362,7 @@ def main() -> None:
                         max_bbox_area_ratio=args.preview_max_bbox_area_ratio,
                         min_bbox_confidence=args.preview_min_bbox_confidence,
                         primary_bbox_only=args.preview_primary_bbox_only,
+                        ocr_status=get_latest_ocr_status(upload_state),
                     )
                     should_quit, should_toggle_pause = handle_preview_key(key)
 
@@ -2221,6 +2488,7 @@ def main() -> None:
                     max_bbox_area_ratio=args.preview_max_bbox_area_ratio,
                     min_bbox_confidence=args.preview_min_bbox_confidence,
                     primary_bbox_only=args.preview_primary_bbox_only,
+                    ocr_status=get_latest_ocr_status(upload_state),
                 )
                 should_quit, should_toggle_pause = handle_preview_key(key)
 

@@ -41,6 +41,34 @@ inference_service = InferenceService()
 backend_client = BackendClient()
 duplicate_detection_guard = DuplicateDetectionGuard()
 stream_detection_service = StreamEventService(inference_service=inference_service)
+stream_ocr_statuses: dict[str, dict] = {}
+
+
+def remember_stream_ocr_status(
+    event_id: str | None,
+    *,
+    camera_code: str,
+    processing_status: str,
+    message: str,
+    result=None,
+    analysis_status: str | None = None,
+    error: str | None = None,
+) -> None:
+    if not event_id:
+        return
+
+    data = result.model_dump(by_alias=True, mode="json") if result is not None else None
+    stream_ocr_statuses[event_id] = {
+        "eventId": event_id,
+        "cameraCode": camera_code,
+        "processingStatus": processing_status,
+        "analysisStatus": analysis_status,
+        "message": message,
+        "data": data,
+        "plateNumber": data.get("plateNumber") if data else None,
+        "updatedAt": datetime.now().isoformat(timespec="seconds"),
+        "error": error,
+    }
 
 
 def warmup_detection_models_sync() -> list[str]:
@@ -76,6 +104,24 @@ async def warmup_detection_models() -> dict:
         "loadedModels": loaded_models,
         "elapsedSeconds": round(elapsed_seconds, 3),
     }
+
+
+@router.get(
+    "/stream-events/{event_id}/ocr-status",
+    status_code=status.HTTP_200_OK,
+)
+async def get_stream_ocr_status(event_id: str) -> dict:
+    status_payload = stream_ocr_statuses.get(event_id)
+    if status_payload is None:
+        return {
+            "eventId": event_id,
+            "processingStatus": "UNKNOWN",
+            "message": "OCR status is not available yet",
+            "data": None,
+            "plateNumber": None,
+        }
+
+    return status_payload
 
 
 def build_unrecognized_plate_response(result) -> DetectionResponse:
@@ -311,11 +357,23 @@ async def process_finalized_stream_detection_background(
     stream_result: StreamProcessingResult,
 ) -> None:
     try:
+        remember_stream_ocr_status(
+            stream_result.event_id,
+            camera_code=stream_result.camera_code,
+            processing_status="OCR_RUNNING",
+            message="OCR is running",
+        )
         result = stream_result.result
         if result is None:
             result = await analyze_stream_best_candidate(stream_result)
 
         if result is None:
+            remember_stream_ocr_status(
+                stream_result.event_id,
+                camera_code=stream_result.camera_code,
+                processing_status="NO_OCR_CANDIDATE",
+                message="Vehicle event finalized without OCR candidate",
+            )
             logger.info(
                 "stream event finalized without OCR candidate: eventId=%s cameraCode=%s",
                 stream_result.event_id,
@@ -327,6 +385,14 @@ async def process_finalized_stream_detection_background(
             stream_result,
             result,
         )
+        remember_stream_ocr_status(
+            stream_result.event_id,
+            camera_code=stream_result.camera_code,
+            processing_status=result.processing_status,
+            analysis_status=analysis_status,
+            message="OCR and backend save completed",
+            result=result,
+        )
         logger.info(
             "stream event background OCR/DB save completed: eventId=%s cameraCode=%s status=%s plateNumber=%s",
             stream_result.event_id,
@@ -335,6 +401,13 @@ async def process_finalized_stream_detection_background(
             result.plate_number,
         )
     except Exception:
+        remember_stream_ocr_status(
+            stream_result.event_id,
+            camera_code=stream_result.camera_code,
+            processing_status="OCR_FAILED",
+            message="OCR or backend save failed",
+            error="background task failed",
+        )
         logger.exception(
             "stream event background OCR/DB save failed: eventId=%s cameraCode=%s",
             stream_result.event_id,
@@ -631,6 +704,12 @@ async def process_stream_frame(
         result = stream_result.result
 
         if result is None and stream_result.best_candidate_frame is not None:
+            remember_stream_ocr_status(
+                stream_result.event_id,
+                camera_code=stream_result.camera_code,
+                processing_status="OCR_QUEUED",
+                message="OCR and backend save queued",
+            )
             background_tasks.add_task(
                 process_finalized_stream_detection_background,
                 stream_result,
