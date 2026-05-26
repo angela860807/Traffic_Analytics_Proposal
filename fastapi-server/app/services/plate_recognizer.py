@@ -85,12 +85,42 @@ class PlateRecognizer:
         if not candidate.text and current.text:
             return False
 
-        candidate_length = len(candidate.text or "")
-        current_length = len(current.text or "")
-        if candidate_length != current_length:
-            return candidate_length > current_length
+        candidate_shape_score = self._score_korean_plate_shape(candidate.text)
+        current_shape_score = self._score_korean_plate_shape(current.text)
+        if candidate_shape_score != current_shape_score:
+            return candidate_shape_score > current_shape_score
 
         return candidate.confidence_score > current.confidence_score
+
+    def _score_korean_plate_shape(self, text: str | None) -> int:
+        if not text:
+            return 0
+
+        score = 0
+        text_length = len(text)
+
+        if 7 <= text_length <= 8:
+            score += 10
+        elif 6 <= text_length <= 9:
+            score += 4
+
+        hangul_count = len(re.findall(r"[\uac00-\ud7a3]", text))
+        digit_count = len(re.findall(r"\d", text))
+
+        if hangul_count == 1:
+            score += 20
+        elif hangul_count > 1:
+            score += 5
+
+        if digit_count >= 6:
+            score += 10
+
+        if re.fullmatch(r"\d{2,3}[\uac00-\ud7a3]\d{4}", text):
+            score += 100
+        elif re.search(r"\d{2,3}[\uac00-\ud7a3]\d{3,4}", text):
+            score += 50
+
+        return score
 
     def _load_ocr(self):
         if self._ocr is None:

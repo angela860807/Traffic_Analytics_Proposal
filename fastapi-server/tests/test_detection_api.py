@@ -176,6 +176,15 @@ def test_plate_number_normalization_keeps_korean_plate_characters() -> None:
     for raw_text, expected in cases.items():
         assert recognizer._normalize_plate_number(raw_text) == expected
 
+
+def test_plate_recognizer_prefers_korean_plate_shape_over_longer_digits() -> None:
+    recognizer = PlateRecognizer()
+    korean_plate = PlateRecognition("62시6617", 0.95)
+    longer_digits = PlateRecognition("62116617", 0.99)
+
+    assert recognizer._is_better_recognition(korean_plate, longer_digits)
+    assert not recognizer._is_better_recognition(longer_digits, korean_plate)
+
 def test_vehicle_detector_returns_best_allowed_vehicle_class(
     monkeypatch,
 ) -> None:

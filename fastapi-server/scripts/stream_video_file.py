@@ -210,6 +210,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Hide preview bbox when it covers more than this ratio of the frame. 0 disables.",
     )
     parser.add_argument(
+        "--preview-min-bbox-confidence",
+        type=float,
+        default=0.45,
+        help="Hide preview bbox when vehicle confidence is below this value. 0 disables.",
+    )
+    parser.add_argument(
+        "--preview-primary-bbox-only",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Draw only the primary vehicle bbox in preview instead of every candidate bbox.",
+    )
+    parser.add_argument(
+        "--preview-max-response-lag-seconds",
+        type=float,
+        default=0.25,
+        help="Hide preview bbox when the matched server response is older than this many video seconds. 0 requires the exact response frame.",
+    )
+    parser.add_argument(
         "--model-path",
         default=None,
         help="Deprecated. BBox preview now uses FastAPI response data, not a local model.",
@@ -919,6 +937,8 @@ def draw_preview(
     speed_overlay: SpeedOverlayConfig | None = None,
     max_event_age_seconds: float = 0.0,
     max_bbox_area_ratio: float = 0.0,
+    min_bbox_confidence: float = 0.0,
+    primary_bbox_only: bool = True,
 ) -> int:
     if scale != 1.0:
         display_frame = cv2.resize(
@@ -941,6 +961,11 @@ def draw_preview(
     bbox_confidence = response.get("bboxConfidenceScore", 0.0)
     event_age_seconds = response.get("eventAgeSeconds", 0.0)
 
+    if primary_bbox_only and tracker_bbox is None:
+        primary_bbox = bbox if bbox is not None else (bboxes[0] if bboxes else None)
+        bbox = primary_bbox
+        bboxes = [primary_bbox] if primary_bbox is not None else []
+
     if speed_overlay is not None:
         draw_speed_overlay(
             display_frame,
@@ -959,6 +984,14 @@ def draw_preview(
         max_event_age_seconds > 0
         and isinstance(event_age_seconds, (int, float))
         and event_age_seconds > max_event_age_seconds
+    ):
+        bboxes = []
+        bbox = None
+
+    if (
+        min_bbox_confidence > 0
+        and isinstance(bbox_confidence, (int, float))
+        and bbox_confidence < min_bbox_confidence
     ):
         bboxes = []
         bbox = None
@@ -1146,9 +1179,14 @@ def select_response_bbox(
     response_body: dict[str, Any] | None,
     *,
     response_coord_scale: float = 1.0,
+    min_confidence: float = 0.0,
 ) -> tuple[tuple[int, int, int, int] | None, float]:
     if not isinstance(response_body, dict):
         return None, 0.0
+
+    confidence_score = float(response_body.get("bboxConfidenceScore", 0.0))
+    if min_confidence > 0 and confidence_score < min_confidence:
+        return None, confidence_score
 
     bboxes = response_body.get("bboxes") or []
     bbox = bboxes[0] if bboxes else response_body.get("bbox")
@@ -1160,7 +1198,7 @@ def select_response_bbox(
         int(round(float(value) * response_coord_scale))
         for value in bbox
     ]
-    return (x1, y1, x2, y2), float(response_body.get("bboxConfidenceScore", 0.0))
+    return (x1, y1, x2, y2), confidence_score
 
 
 def encode_highres_crop_from_bbox(
@@ -1174,13 +1212,17 @@ def encode_highres_crop_from_bbox(
     x1, y1, x2, y2 = bbox
     bbox_w = max(1, x2 - x1)
     bbox_h = max(1, y2 - y1)
-    pad_x = round(bbox_w * padding_ratio)
-    pad_y = round(bbox_h * padding_ratio)
+    side = round(max(bbox_w, bbox_h) * (1 + (padding_ratio * 2)))
+    side = max(1, min(side, width, height))
 
-    left = max(0, x1 - pad_x)
-    top = max(0, y1 - pad_y)
-    right = min(width, x2 + pad_x)
-    bottom = min(height, y2 + pad_y)
+    center_x = x1 + (bbox_w / 2)
+    center_y = y1 + (bbox_h / 2)
+    left = round(center_x - (side / 2))
+    top = round(center_y - (side / 2))
+    left = min(max(0, left), max(0, width - side))
+    top = min(max(0, top), max(0, height - side))
+    right = left + side
+    bottom = top + side
 
     if right <= left or bottom <= top:
         return None
@@ -1364,10 +1406,12 @@ def rebuild_tracker_from_response(
     response_body: dict[str, Any] | None,
     frame_history: deque[tuple[int, Any]],
     response_coord_scale: float,
+    min_bbox_confidence: float = 0.0,
 ) -> PreviewTracker | None:
     bbox, confidence_score = select_response_bbox(
         response_body,
         response_coord_scale=response_coord_scale,
+        min_confidence=min_bbox_confidence,
     )
 
     if bbox is None:
@@ -1608,6 +1652,16 @@ def main() -> None:
             "--preview-max-bbox-area-ratio must be greater than or equal to 0"
         )
 
+    if args.preview_min_bbox_confidence < 0 or args.preview_min_bbox_confidence > 1:
+        raise SystemExit(
+            "--preview-min-bbox-confidence must be between 0 and 1"
+        )
+
+    if args.preview_max_response_lag_seconds < 0:
+        raise SystemExit(
+            "--preview-max-response-lag-seconds must be greater than or equal to 0"
+        )
+
     speed_config_json: str | None = None
     if args.configure_speed_zone:
         speed_config_json = configure_speed_zone_from_video(args, video_path)
@@ -1737,6 +1791,9 @@ def main() -> None:
                 "previewDelayFrames": preview_delay_frames,
                 "previewMaxEventAgeSeconds": args.preview_max_event_age_seconds,
                 "previewMaxBboxAreaRatio": args.preview_max_bbox_area_ratio,
+                "previewMinBboxConfidence": args.preview_min_bbox_confidence,
+                "previewPrimaryBboxOnly": args.preview_primary_bbox_only,
+                "previewMaxResponseLagSeconds": args.preview_max_response_lag_seconds,
                 "bboxSource": "fastapi-response" if args.preview_bbox else None,
                 "speedOverlay": speed_overlay is not None,
                 "speedConfigSent": speed_config_json is not None,
@@ -1859,6 +1916,20 @@ def main() -> None:
                     response_frame_number, response_body = get_latest_response_packet(upload_state)
 
                 if (
+                    response_frame_number is not None
+                    and args.preview_max_response_lag_seconds >= 0
+                ):
+                    max_response_lag_frames = round(
+                        source_fps * args.preview_max_response_lag_seconds
+                    )
+                    response_frame_lag = display_frame_number - response_frame_number
+                    if response_frame_lag > max_response_lag_frames:
+                        response_frame_number = None
+                        response_body = None
+                        active_overlay = None
+                        active_tracker = None
+
+                if (
                     should_preview_frame
                     and response_frame_number is not None
                     and response_frame_number != consumed_response_frame_number
@@ -1869,15 +1940,20 @@ def main() -> None:
                             response_body=response_body,
                             frame_history=frame_history,
                             response_coord_scale=response_coord_scale,
+                            min_bbox_confidence=args.preview_min_bbox_confidence,
                         )
 
                         if rebuilt_tracker is not None:
                             active_tracker = rebuilt_tracker
                             active_overlay = None
+                        else:
+                            active_tracker = None
+                            active_overlay = None
                     else:
                         bbox, confidence_score = select_response_bbox(
                             response_body,
                             response_coord_scale=response_coord_scale,
+                            min_confidence=args.preview_min_bbox_confidence,
                         )
 
                         if bbox is not None:
@@ -1886,6 +1962,9 @@ def main() -> None:
                                 response_frame_number=response_frame_number,
                                 confidence_score=confidence_score,
                             )
+                        else:
+                            active_overlay = None
+                            active_tracker = None
 
                     consumed_response_frame_number = response_frame_number
 
@@ -1894,7 +1973,7 @@ def main() -> None:
 
                     if (
                         active_overlay is not None
-                        and read_count - active_overlay.response_frame_number > hold_frames
+                        and display_frame_number - active_overlay.response_frame_number > hold_frames
                     ):
                         active_overlay = None
 
@@ -1930,6 +2009,8 @@ def main() -> None:
                         speed_overlay=speed_overlay,
                         max_event_age_seconds=args.preview_max_event_age_seconds,
                         max_bbox_area_ratio=args.preview_max_bbox_area_ratio,
+                        min_bbox_confidence=args.preview_min_bbox_confidence,
+                        primary_bbox_only=args.preview_primary_bbox_only,
                     )
                     should_quit, should_toggle_pause = handle_preview_key(key)
                 else:
@@ -1966,6 +2047,8 @@ def main() -> None:
                         speed_overlay=speed_overlay,
                         max_event_age_seconds=args.preview_max_event_age_seconds,
                         max_bbox_area_ratio=args.preview_max_bbox_area_ratio,
+                        min_bbox_confidence=args.preview_min_bbox_confidence,
+                        primary_bbox_only=args.preview_primary_bbox_only,
                     )
                     should_quit, should_toggle_pause = handle_preview_key(key)
 
@@ -2089,6 +2172,8 @@ def main() -> None:
                     speed_overlay=speed_overlay,
                     max_event_age_seconds=args.preview_max_event_age_seconds,
                     max_bbox_area_ratio=args.preview_max_bbox_area_ratio,
+                    min_bbox_confidence=args.preview_min_bbox_confidence,
+                    primary_bbox_only=args.preview_primary_bbox_only,
                 )
                 should_quit, should_toggle_pause = handle_preview_key(key)
 
