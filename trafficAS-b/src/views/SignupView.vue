@@ -592,7 +592,7 @@ const steps = [
 }
 .logo {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.4px;
   color: #fff;
@@ -625,7 +625,7 @@ const steps = [
 }
 .ey {
   font-family: "JetBrains Mono", monospace;
-  font-size: 14px;
+  font-size: 15.5px;
   font-weight: 700;
   letter-spacing: 0.22em;
   color: #bfdbfe;
@@ -645,7 +645,7 @@ const steps = [
 }
 h1 {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: clamp(36px, 3.8vw, 58px);
+  font-size: clamp(42px, 4.2vw, 64px);
   font-weight: 800;
   line-height: 1.02;
   letter-spacing: -2px;
@@ -659,7 +659,7 @@ h1 em {
   text-shadow: 0 3px 24px rgba(0, 0, 0, 0.95), 0 0 6px rgba(37, 99, 235, 0.4);
 }
 .brand-copy p {
-  font-size: 17px;
+  font-size: 18.5px;
   color: #ffffff;
   line-height: 1.75;
   font-weight: 500;
@@ -682,7 +682,7 @@ h1 em {
 }
 .snum {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 32px;
+  font-size: 36px;
   font-weight: 800;
   letter-spacing: -1px;
   color: #93c5fd;
@@ -692,14 +692,14 @@ h1 em {
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
 }
 .st {
-  font-size: 16.5px;
+  font-size: 18px;
   font-weight: 700;
   color: #ffffff;
   margin-bottom: 4px;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.95), 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 .sd {
-  font-size: 14px;
+  font-size: 15.5px;
   color: rgba(255, 255, 255, 0.9);
   line-height: 1.6;
   font-weight: 500;
@@ -707,7 +707,7 @@ h1 em {
 }
 .left-foot {
   font-family: "JetBrains Mono", monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   color: rgba(255, 255, 255, 0.75);
   letter-spacing: 0.08em;
   margin-top: 40px;
@@ -729,7 +729,7 @@ h1 em {
 }
 .form-ey {
   font-family: "JetBrains Mono", monospace;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   letter-spacing: 0.22em;
   color: var(--a);
@@ -748,14 +748,14 @@ h1 em {
 }
 h2 {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 38px;
+  font-size: 42px;
   font-weight: 800;
   letter-spacing: -1px;
   color: var(--t);
   margin-bottom: 8px;
 }
 .form-sub {
-  font-size: 16px;
+  font-size: 17.5px;
   color: var(--t2);
   font-weight: 400;
   margin-bottom: 28px;
@@ -788,7 +788,7 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--t2);
   transition: all 0.3s;
@@ -804,7 +804,7 @@ h2 {
   border-color: var(--a);
 }
 .prog-step small {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--t3);
   letter-spacing: 0.05em;
   white-space: nowrap;
@@ -821,7 +821,7 @@ h2 {
 }
 
 .back-step {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--t3);
   cursor: pointer;
   display: inline-flex;
@@ -851,7 +851,7 @@ h2 {
   background: var(--a);
   color: var(--bg);
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 14px;
+  font-size: 15.5px;
   font-weight: 800;
   display: flex;
   align-items: center;
@@ -864,12 +864,12 @@ h2 {
   gap: 2px;
 }
 .up-name {
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--t);
 }
 .up-sub {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--t3);
 }
 
@@ -885,7 +885,7 @@ h2 {
   gap: 6px;
 }
 .field label {
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--t2);
@@ -896,7 +896,7 @@ h2 {
 }
 .req {
   font-family: "JetBrains Mono", monospace;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--t3);
   text-transform: none;
   letter-spacing: 0.04em;
@@ -942,7 +942,7 @@ input {
   padding: 14px 0;
   background: none;
   border: none;
-  font-size: 16px;
+  font-size: 17.5px;
   color: var(--t);
   outline: none;
 }
@@ -1001,7 +1001,7 @@ input::placeholder {
   border: 1px solid var(--b);
   border-radius: 8px;
   font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
+  font-size: 11.5px;
   color: var(--t2);
   cursor: pointer;
   white-space: nowrap;
@@ -1022,7 +1022,7 @@ input::placeholder {
   animation: spin 0.9s linear infinite;
 }
 .check-msg {
-  font-size: 11px;
+  font-size: 12.5px;
   margin: 0;
 }
 .check-msg.ok {
@@ -1058,7 +1058,7 @@ input::placeholder {
   background: var(--a);
 }
 .pw-hint {
-  font-size: 10px;
+  font-size: 11.5px;
 }
 .pw-hint.weak {
   color: #f87171;
@@ -1083,7 +1083,7 @@ input::placeholder {
   transform: translateY(-4px);
 }
 .err {
-  font-size: 12px;
+  font-size: 13.5px;
   color: #f87171;
   margin: 0;
   padding: 8px 12px;
@@ -1101,7 +1101,7 @@ input::placeholder {
   border: none;
   border-radius: 8px;
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 15.5px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
@@ -1141,7 +1141,7 @@ input::placeholder {
   gap: 12px;
   margin: 24px 0;
   color: var(--t2);
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.04em;
 }
@@ -1154,7 +1154,7 @@ input::placeholder {
 }
 
 .switch {
-  font-size: 14.5px;
+  font-size: 16px;
   color: var(--t2);
   text-align: center;
   margin: 0 0 12px;
@@ -1168,7 +1168,7 @@ input::placeholder {
   text-decoration: underline;
 }
 .back {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--t3);
   text-align: center;
   margin: 0;
@@ -1182,7 +1182,7 @@ input::placeholder {
   color: var(--t);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .wrap {
     grid-template-columns: 1fr;
   }

@@ -236,7 +236,7 @@ const feats = [
 }
 .logo {
   font-family: "Syne", sans-serif;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.4px;
   color: #fff;
@@ -269,7 +269,7 @@ const feats = [
 }
 .ey {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 14px;
+  font-size: 15.5px;
   font-weight: 700;
   letter-spacing: 0.22em;
   color: #bfdbfe;
@@ -289,7 +289,7 @@ const feats = [
 }
 h1 {
   font-family: "Syne", sans-serif;
-  font-size: clamp(36px, 3.8vw, 60px);
+  font-size: clamp(42px, 4.2vw, 66px);
   font-weight: 800;
   line-height: 1.02;
   letter-spacing: -2px;
@@ -303,7 +303,7 @@ h1 em {
   text-shadow: 0 3px 24px rgba(0, 0, 0, 0.95), 0 0 6px rgba(37, 99, 235, 0.4);
 }
 .brand-copy p {
-  font-size: 17px;
+  font-size: 18.5px;
   color: #ffffff;
   line-height: 1.75;
   font-weight: 500;
@@ -321,7 +321,7 @@ h1 em {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 15.5px;
+  font-size: 17px;
   font-weight: 600;
   color: #ffffff;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 0.85);
@@ -336,7 +336,7 @@ h1 em {
 }
 .left-foot {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   color: rgba(255, 255, 255, 0.75);
   letter-spacing: 0.08em;
   margin-top: 48px;
@@ -357,7 +357,7 @@ h1 em {
 }
 .form-ey {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   letter-spacing: 0.22em;
   color: var(--a);
@@ -376,14 +376,14 @@ h1 em {
 }
 h2 {
   font-family: "Syne", sans-serif;
-  font-size: 38px;
+  font-size: 42px;
   font-weight: 800;
   letter-spacing: -1px;
   color: var(--t);
   margin-bottom: 8px;
 }
 .form-sub {
-  font-size: 16px;
+  font-size: 17.5px;
   color: var(--t2);
   font-weight: 400;
   margin-bottom: 36px;
@@ -401,7 +401,7 @@ h2 {
   gap: 6px;
 }
 .field label {
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--t2);
@@ -432,7 +432,7 @@ input {
   padding: 14px 0;
   background: none;
   border: none;
-  font-size: 16px;
+  font-size: 17.5px;
   color: var(--t);
   outline: none;
 }
@@ -463,7 +463,7 @@ input::placeholder {
   transform: translateY(-4px);
 }
 .err {
-  font-size: 12px;
+  font-size: 13.5px;
   color: #f87171;
   margin: 0;
   padding: 8px 12px;
@@ -481,7 +481,7 @@ input::placeholder {
   border: none;
   border-radius: 8px;
   font-family: "Syne", sans-serif;
-  font-size: 15.5px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
@@ -521,7 +521,7 @@ input::placeholder {
   gap: 12px;
   margin: 24px 0;
   color: var(--t2);
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.04em;
 }
@@ -534,7 +534,7 @@ input::placeholder {
 }
 
 .switch {
-  font-size: 14.5px;
+  font-size: 16px;
   color: var(--t2);
   text-align: center;
   margin: 0 0 12px;
@@ -548,7 +548,7 @@ input::placeholder {
   text-decoration: underline;
 }
 .back {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--t3);
   text-align: center;
   margin: 0;
@@ -562,7 +562,7 @@ input::placeholder {
   color: var(--t);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .wrap {
     grid-template-columns: 1fr;
   }

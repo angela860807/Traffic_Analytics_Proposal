@@ -55,7 +55,7 @@
   display: inline-flex; align-items: center; gap: 4px;
 }
 .rev-dl-btn:hover { background: #047857; }
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
 .st-card { background: #0f1d34; border: 1px solid #1f3055; border-radius: 10px; padding: 18px 22px; display: flex; align-items: center; gap: 12px; }
 .st-card > i { font-size: 22px; }
 .ocr-cir { width: 30px; height: 30px; border-radius: 50%; background: rgba(96,165,250,.18); color: #60a5fa; font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
@@ -63,6 +63,14 @@
 .st-val { font-size: 22px; font-weight: 800; }
 .st-u { font-size: 13px; font-weight: 500; opacity: .65; margin-left: 2px; }
 .grid { display: grid; grid-template-columns: 0.85fr 1.6fr 1fr; gap: 14px; }
+@media (max-width: 1440px) {
+  .rev-shell .grid { grid-template-columns: 0.9fr 2fr; }
+  .rev-shell .grid > .card:nth-child(3) { grid-column: 1 / -1; }
+}
+@media (max-width: 1100px) {
+  .rev-shell .grid { grid-template-columns: 1fr; }
+  .rev-shell .grid > .card:nth-child(3) { grid-column: auto; }
+}
 .card { background: #0f1d34; border: 1px solid #1f3055; border-radius: 10px; padding: 14px; }
 .card h3 { font-size: 14px; font-weight: 700; margin: 0; }
 .lh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 10px; }

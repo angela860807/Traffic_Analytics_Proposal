@@ -121,10 +121,13 @@
 
 .grid-mid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1.4fr) minmax(380px, 1fr);
   gap: 10px;
   align-items: stretch;
   flex: 1; min-height: 0;
+}
+@media (max-width: 1280px) {
+  .grid-mid { grid-template-columns: 1fr; }
 }
 .right-stack {
   display: flex; flex-direction: column; gap: 10px;
@@ -403,7 +406,7 @@
 }
 
 .pnl { padding: 18px; }
-.pnl h3 { font-size: 14px; font-weight: 700; margin: 0 0 14px; }.cam-tab-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.pnl h3 { font-size: 14px; font-weight: 700; margin: 0 0 14px; }.cam-tab-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
 .cam-tab {
   border: 1px solid #c9d4e3; border-radius: 6px; overflow: hidden;
   cursor: pointer; background: #ffffff; position: relative;
