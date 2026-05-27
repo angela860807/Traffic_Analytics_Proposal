@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 import math
+from statistics import median
 
 from app.schemas.speed import (
     ESTIMATED_SPEED_ACCURACY_NOTE,
@@ -18,6 +19,8 @@ from app.services.speed_config import (
     get_speed_camera_config,
     get_speed_tracking_config,
 )
+
+SPEED_SMOOTHING_WINDOW_SIZE = 5
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,7 @@ class VehicleTrackState:
     line_b_crossed_at: datetime | None = None
     line_b_crossed_position: Point | None = None
     position_history: list[tuple[datetime, Point]] = field(default_factory=list)
+    speed_history_kmh: list[float] = field(default_factory=list)
 
 
 class SpeedTracker:
@@ -175,9 +179,10 @@ class SpeedTracker:
         if distance_meters <= 0:
             return None
 
-        measured_speed = (distance_meters / elapsed_seconds) * 3.6
-        if measured_speed > tracking_config.max_reasonable_kmh:
+        raw_speed = (distance_meters / elapsed_seconds) * 3.6
+        if raw_speed > tracking_config.max_reasonable_kmh:
             return None
+        measured_speed = self._smooth_speed(track, raw_speed)
 
         return SpeedMeasurementResult(
             track_id=track.track_id,
@@ -299,9 +304,10 @@ class SpeedTracker:
             camera_config=camera_config,
             track=track,
         )
-        measured_speed = (distance_meters / elapsed_seconds) * 3.6
-        if measured_speed > tracking_config.max_reasonable_kmh:
+        raw_speed = (distance_meters / elapsed_seconds) * 3.6
+        if raw_speed > tracking_config.max_reasonable_kmh:
             return None
+        measured_speed = self._smooth_speed(track, raw_speed)
 
         # Prevent duplicate speed events for the same track after a valid measurement.
         track.line_a_crossed_at = None
@@ -343,6 +349,15 @@ class SpeedTracker:
                 best_distance = distance
 
         return best_track
+
+    def _smooth_speed(self, track: VehicleTrackState, speed_kmh: float) -> float:
+        track.speed_history_kmh.append(speed_kmh)
+        if len(track.speed_history_kmh) > SPEED_SMOOTHING_WINDOW_SIZE:
+            track.speed_history_kmh = track.speed_history_kmh[
+                -SPEED_SMOOTHING_WINDOW_SIZE:
+            ]
+
+        return float(median(track.speed_history_kmh))
 
     def _expire_tracks(
         self,

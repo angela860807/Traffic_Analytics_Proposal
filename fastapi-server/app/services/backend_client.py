@@ -40,19 +40,15 @@ class BackendClient:
         if analysis_status is not None:
             payload["status"] = analysis_status
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                url,
-                json=payload,
-                headers=headers
-            )
+        response = await self._post_with_retry(
+            url=url,
+            payload=payload,
+            headers=headers,
+            operation_name="detection send",
+        )
 
-        response.raise_for_status()
+        return self._parse_json_response(response)
 
-        if not response.content:
-            return {"status": "sent"}
-
-        return response.json()
 
     async def send_speed_violation(
         self,
@@ -67,6 +63,23 @@ class BackendClient:
             "Content-Type": "application/json",
         }
         payload = request.model_dump(by_alias=True, mode="json")
+        response = await self._post_with_retry(
+            url=url,
+            payload=payload,
+            headers=headers,
+            operation_name="speed violation send",
+        )
+
+        return self._parse_json_response(response)
+
+    async def _post_with_retry(
+        self,
+        *,
+        url: str,
+        payload: dict,
+        headers: dict[str, str],
+        operation_name: str,
+    ) -> httpx.Response:
         attempts = max(1, SPRING_SPEED_VIOLATION_RETRY_ATTEMPTS)
 
         for attempt in range(1, attempts + 1):
@@ -83,21 +96,34 @@ class BackendClient:
                 if not self._should_retry_status(exc.response.status_code) or attempt >= attempts:
                     raise
 
-                await self._sleep_before_retry(attempt, attempts, exc)
+                await self._sleep_before_retry(
+                    attempt,
+                    attempts,
+                    exc,
+                    operation_name=operation_name,
+                )
                 continue
             except httpx.RequestError as exc:
                 if attempt >= attempts:
                     raise
 
-                await self._sleep_before_retry(attempt, attempts, exc)
+                await self._sleep_before_retry(
+                    attempt,
+                    attempts,
+                    exc,
+                    operation_name=operation_name,
+                )
                 continue
 
-            if not response.content:
-                return {"status": "sent"}
+            return response
 
-            return response.json()
+        raise RuntimeError(f"{operation_name} retry loop exited unexpectedly")
 
-        raise RuntimeError("speed violation send retry loop exited unexpectedly")
+    def _parse_json_response(self, response: httpx.Response) -> dict:
+        if not response.content:
+            return {"status": "sent"}
+
+        return response.json()
 
     def _should_retry_status(self, status_code: int) -> bool:
         return status_code == 429 or 500 <= status_code <= 599
@@ -107,9 +133,12 @@ class BackendClient:
         attempt: int,
         attempts: int,
         exc: Exception,
+        *,
+        operation_name: str,
     ) -> None:
         logger.warning(
-            "speed violation send failed; retrying attempt %s/%s: %s",
+            "%s failed; retrying attempt %s/%s: %s",
+            operation_name,
             attempt + 1,
             attempts,
             exc,

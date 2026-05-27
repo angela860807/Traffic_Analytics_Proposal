@@ -1,6 +1,7 @@
 from datetime import datetime
 import asyncio
 import logging
+import time
 
 import httpx
 from fastapi import (
@@ -36,12 +37,27 @@ from app.services.vehicle_detector import VehicleDetection
 router = APIRouter(prefix="/api/detections", tags=["detections"])
 logger = logging.getLogger(__name__)
 SPRING_ERROR_BODY_LIMIT = 500
+STREAM_OCR_STATUS_TTL_SECONDS = 600.0
 
 inference_service = InferenceService()
 backend_client = BackendClient()
 duplicate_detection_guard = DuplicateDetectionGuard()
 stream_detection_service = StreamEventService(inference_service=inference_service)
 stream_ocr_statuses: dict[str, dict] = {}
+stream_ocr_status_seen_at: dict[str, float] = {}
+
+
+def cleanup_stream_ocr_statuses(*, now_monotonic: float | None = None) -> None:
+    now_value = time.monotonic() if now_monotonic is None else now_monotonic
+    expired_event_ids = [
+        event_id
+        for event_id, seen_at in stream_ocr_status_seen_at.items()
+        if now_value - seen_at > STREAM_OCR_STATUS_TTL_SECONDS
+    ]
+
+    for event_id in expired_event_ids:
+        stream_ocr_status_seen_at.pop(event_id, None)
+        stream_ocr_statuses.pop(event_id, None)
 
 
 def remember_stream_ocr_status(
@@ -57,6 +73,7 @@ def remember_stream_ocr_status(
     if not event_id:
         return
 
+    cleanup_stream_ocr_statuses()
     data = result.model_dump(by_alias=True, mode="json") if result is not None else None
     stream_ocr_statuses[event_id] = {
         "eventId": event_id,
@@ -69,6 +86,7 @@ def remember_stream_ocr_status(
         "updatedAt": datetime.now().isoformat(timespec="seconds"),
         "error": error,
     }
+    stream_ocr_status_seen_at[event_id] = time.monotonic()
 
 
 def warmup_detection_models_sync() -> list[str]:
@@ -111,6 +129,7 @@ async def warmup_detection_models() -> dict:
     status_code=status.HTTP_200_OK,
 )
 async def get_stream_ocr_status(event_id: str) -> dict:
+    cleanup_stream_ocr_statuses()
     status_payload = stream_ocr_statuses.get(event_id)
     if status_payload is None:
         return {
