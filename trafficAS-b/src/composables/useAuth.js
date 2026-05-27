@@ -1,5 +1,12 @@
 import { ref, computed } from 'vue'
-import { apiPost } from '@/api/client'
+import router from '@/router/index.js'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+
+/* 인증 상태 변경 후 홈으로 안전하게 이동 (라우터 미초기화 시 무시) */
+function goHome() {
+  try { router.push('/') } catch {}
+}
 
 const _user = ref(JSON.parse(localStorage.getItem('tas_user') || 'null'))
 const _showModal = ref(false)
@@ -23,6 +30,17 @@ function parseJwtPayload(token) {
   }
 }
 
+async function readApiBody(res) {
+  const text = await res.text()
+  if (!text) return {}
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { message: text }
+  }
+}
+
 export function useAuth() {
   const isLoggedIn = computed(() => !!_user.value)
   const currentUser = computed(() => _user.value)
@@ -35,22 +53,66 @@ export function useAuth() {
   const closeModal = () => { _showModal.value = false }
 
   const signup = async (name, email, phone, password) => {
-    const body = await apiPost('/api/auth/signup', { name, email, phone, password })
+    const res = await fetch(`${API_BASE_URL}/api/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, phone, password }),
+    })
+    const body = await readApiBody(res)
 
-    if (body.success === false) {
+    if (!res.ok || body.success === false) {
       throw new Error(body.message || '회원가입에 실패했습니다.')
     }
 
     const user = body.data
     localStorage.setItem('tas_user', JSON.stringify(user))
     _user.value = user
+    closeModal()
+    goHome()
     return user
   }
 
-  const login = async (email, password) => {
-    const body = await apiPost('/api/auth/login', { email, password })
+  // ── 프론트 임시 계정 (백엔드 미연동 시 시연용) ──
+  const LOCAL_ACCOUNTS = [
+    // 관리자 계정 (모든 대시보드 접근 가능)
+    { email: 'admin',           password: '1234',  name: '관리자',          role: 'ADMIN' },
+    { email: 'admin@local',     password: 'admin', name: '임시 관리자',     role: 'ADMIN' },
+    { email: 'admin@test.com',  password: '1234',  name: '테스트 관리자',   role: 'ADMIN' },
+    { email: 'super',           password: '1234',  name: '슈퍼 관리자',     role: 'ADMIN' },
 
-    if (body.success === false) {
+    // 부서별 매니저 계정
+    { email: 'ops',             password: '1234',  name: '시설운영팀 매니저',  role: 'ADMIN' },
+    { email: 'control',         password: '1234',  name: '교통정보센터 매니저', role: 'ADMIN' },
+    { email: 'review',          password: '1234',  name: '단속관리팀 매니저',  role: 'ADMIN' },
+    { email: 'analytics',       password: '1234',  name: '교통분석팀 매니저',  role: 'ADMIN' },
+
+    // 일반 사용자
+    { email: 'user',            password: '1234',  name: '일반 사용자',     role: 'USER' },
+    { email: 'user@local',      password: 'user',  name: '임시 사용자',     role: 'USER' },
+  ]
+
+  const login = async (email, password) => {
+    // 1) 프론트 임시 계정 우선 체크 (백엔드 없이 즉시 통과)
+    const local = LOCAL_ACCOUNTS.find(a => a.email === email && a.password === password)
+    if (local) {
+      const user = { email: local.email, role: local.role, name: local.name }
+      localStorage.setItem('tas_access_token', 'local-' + Date.now())
+      localStorage.setItem('tas_user', JSON.stringify(user))
+      _user.value = user
+      closeModal()
+      goHome()
+      return user
+    }
+
+    // 2) 백엔드 정상 로그인
+    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    const body = await readApiBody(res)
+
+    if (!res.ok || body.success === false) {
       throw new Error(body.message || '이메일 또는 비밀번호가 올바르지 않습니다.')
     }
 
@@ -63,7 +125,8 @@ export function useAuth() {
     localStorage.setItem('tas_refresh_token', body.data?.refreshToken || '')
     localStorage.setItem('tas_user', JSON.stringify(user))
     _user.value = user
-
+    closeModal()
+    goHome()
     return user
   }
 
@@ -72,6 +135,7 @@ export function useAuth() {
     localStorage.removeItem('tas_refresh_token')
     localStorage.removeItem('tas_user')
     _user.value = null
+    goHome()
   }
 
   return { isLoggedIn, isAdmin, currentUser, showModal, modalMode, openLogin, openSignup, closeModal, signup, login, logout }

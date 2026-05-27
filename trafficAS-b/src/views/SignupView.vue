@@ -432,13 +432,12 @@
 
 <script setup>
 import { ref, computed } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { RouterLink } from "vue-router";
 import { useTheme } from "@/composables/useTheme";
 import { useAuth } from "@/composables/useAuth";
 
 const { isDark } = useTheme();
 const { signup } = useAuth();
-const router = useRouter();
 
 const step = ref(1);
 const name = ref("");
@@ -533,7 +532,7 @@ const handleSubmit = async () => {
   await new Promise((r) => setTimeout(r, 700));
   try {
     await signup(name.value, email.value, phone.value, password.value);
-    router.push("/");
+    // useAuth.signup()이 내부적으로 홈으로 이동시킴
   } catch (e) {
     error.value = e.message;
   } finally {
@@ -617,7 +616,7 @@ const steps = [
 }
 .ey {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.22em;
   color: #60a5fa;
   opacity: 0.7;
@@ -647,7 +646,7 @@ h1 em {
   font-style: normal;
 }
 .brand-copy p {
-  font-size: 13px;
+  font-size: 15px;
   color: rgba(255, 255, 255, 0.45);
   line-height: 1.85;
   font-weight: 300;
@@ -678,13 +677,13 @@ h1 em {
   width: 38px;
 }
 .st {
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.65);
   margin-bottom: 3px;
 }
 .sd {
-  font-size: 11px;
+  font-size: 12.5px;
   color: rgba(255, 255, 255, 0.3);
   line-height: 1.6;
   font-weight: 300;
@@ -712,7 +711,7 @@ h1 em {
 }
 .form-ey {
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.22em;
   color: var(--a);
   opacity: 0.65;
@@ -737,7 +736,7 @@ h2 {
   margin-bottom: 6px;
 }
 .form-sub {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--t2);
   font-weight: 300;
   margin-bottom: 28px;
@@ -867,7 +866,7 @@ h2 {
   gap: 6px;
 }
 .field label {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--t2);
@@ -924,7 +923,7 @@ input {
   padding: 12px 0;
   background: none;
   border: none;
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--t);
   outline: none;
 }
