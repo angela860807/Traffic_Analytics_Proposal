@@ -183,7 +183,7 @@ const values = [
   color: var(--t); margin: 0;
 }
 .values-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px;
 }
 .value-card {
   background: var(--card);

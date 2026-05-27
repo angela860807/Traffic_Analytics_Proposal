@@ -1365,6 +1365,12 @@
   min-height: 0;
   overflow: hidden;
 }
+@media (max-width: 1440px) {
+  .main-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 1100px) {
+  .main-grid { grid-template-columns: 1fr; grid-template-rows: none; overflow-y: auto; }
+}
 .main-grid > .card,
 .main-grid > .bot-row > .card,
 .main-grid > .col3-stack > .card {

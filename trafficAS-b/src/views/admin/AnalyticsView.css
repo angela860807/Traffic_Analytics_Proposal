@@ -32,6 +32,10 @@
   grid-template-columns: 1fr 1fr !important;
   gap: 20px;
 }
+@media (max-width: 1280px) {
+  .an-shell .cmp-grid { grid-template-columns: 1fr !important; }
+  .an-shell .row-mid { grid-template-columns: 1fr !important; }
+}
 .an-shell .cm-chart {
   display: flex; flex-direction: column; min-height: 0;
   background: #ffffff;
@@ -86,7 +90,7 @@
 .an-shell .kpi-tbl-card .ch-link:hover { text-decoration: underline; }
 .an-shell .kpi-head h3 i { color: #2563eb; margin-right: 5px; }
 .an-shell .kpi-mini-row {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px;
   margin-bottom: 10px;
 }
 .an-shell .kpi-mini {
@@ -176,7 +180,7 @@
 
 /* === 추가 디테일 === */
 .an-shell .tp-stat-row {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;
   margin-bottom: 14px;
 }
 .an-shell .tp-st {
@@ -219,7 +223,7 @@
 .an-shell .tp-dl-sm:hover { background: #059669; color: #fff; }
 
 .an-shell .tp-set-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;
 }
 .an-shell .tp-set-blk {
   background: #f1f5fb; border: 1px solid #c9d4e3; border-radius: 4px;
@@ -274,7 +278,7 @@
 .an-shell .id-impact.gr { background: rgba(5,150,105,.12); color: #047857; }
 .an-shell .id-impact.bl { background: rgba(37,99,235,.12); color: #1d4ed8; }
 .an-shell .id-metrics {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px;
 }
 .an-shell .id-m {
   background: #f1f5fb; border-radius: 3px; padding: 6px 8px;
@@ -310,7 +314,7 @@
 
 /* 교차로 분석 그리드 */
 .an-shell .tp-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px;
   flex: 1; min-height: 0;
 }
 .an-shell .tp-card {
@@ -448,7 +452,7 @@
 .an-shell .stats-t:last-child { border-right: 0; }
 .an-shell .stats-t.on { background: #2563eb; color: #fff; }
 .an-shell .stats-kpi-row {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;
 }
 .an-shell .stats-kpi {
   background: #f1f5fb; border: 1px solid #c9d4e3; border-radius: 3px;

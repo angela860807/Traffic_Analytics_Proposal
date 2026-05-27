@@ -359,7 +359,7 @@ const coreFeatures = [
 /* features */
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 55px;
 }
 .feat-card {
@@ -496,7 +496,7 @@ const coreFeatures = [
 /* process */
 .process-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 20px;
 }
 .process-step {
@@ -589,7 +589,7 @@ const coreFeatures = [
 }
 .core-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
   border-top: 1px solid var(--b);
   border-bottom: 1px solid var(--b);

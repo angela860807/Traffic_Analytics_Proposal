@@ -880,7 +880,7 @@ const setMaintWindow = ref("03:00 ~ 04:00");
 .seg-h h2 { font-size: 15px; font-weight: 700; margin: 0; }
 .seg-ts { font-size: 12px; opacity: .55; }
 
-.kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
 .kpi { background: #0f1d34; border: 1px solid #1f3055; border-radius: 10px; padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; }
 .kpi > i { font-size: 18px; padding-top: 2px; }
 .kpi.gr > i { color: #34d399; }
@@ -897,12 +897,12 @@ const setMaintWindow = ref("03:00 ~ 04:00");
 .kpi-u { font-size: 11px; font-weight: 500; opacity: .65; margin-left: 1px; }
 .kpi-sub { font-size: 10.5px; opacity: .55; margin-top: 2px; }
 
-.row-top { display: grid; grid-template-columns: 1.1fr 1.4fr 1.1fr; gap: 12px; }
-.row-bot { display: grid; grid-template-columns: 1.3fr 1fr 1.2fr; gap: 12px; }
-.row-top2 { display: grid; grid-template-columns: 1.1fr 1fr; gap: 12px; }
+.row-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+.row-bot { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+.row-top2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 12px; }
 .row-bot2 { display: grid; grid-template-columns: 1fr; gap: 12px; }
-.org-tiles.wide { grid-template-columns: repeat(3, 1fr); }
-.perm-grid.wide { grid-template-columns: repeat(3, 1fr); }
+.org-tiles.wide { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.perm-grid.wide { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .card { background: #0f1d34; border: 1px solid #1f3055; border-radius: 10px; padding: 16px; }
 .card h3 { font-size: 14px; font-weight: 700; margin: 0 0 12px; }
 .card-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
@@ -1088,7 +1088,7 @@ const setMaintWindow = ref("03:00 ~ 04:00");
 /* 설정 그리드 */
 .su-set-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 14px;
   margin-bottom: 14px;
 }
@@ -1109,9 +1109,5 @@ const setMaintWindow = ref("03:00 ~ 04:00");
 
 @media (max-width: 1100px) {
   .map-overview { grid-template-columns: 1fr; }
-  .su-set-grid { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 720px) {
-  .su-set-grid { grid-template-columns: 1fr; }
 }
 </style>

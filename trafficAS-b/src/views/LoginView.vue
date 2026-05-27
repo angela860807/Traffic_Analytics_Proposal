@@ -562,7 +562,7 @@ input::placeholder {
   color: var(--t);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .wrap {
     grid-template-columns: 1fr;
   }

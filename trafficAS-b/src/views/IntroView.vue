@@ -610,7 +610,7 @@ const kpis = [
 /* modules */
 .mod-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 18px;
 }
 .mod-card {
@@ -707,7 +707,7 @@ const kpis = [
 }
 .deploy-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 10px;
 }
 .deploy-item {
@@ -744,7 +744,7 @@ const kpis = [
 }
 /* deploy 박스 3-col */
 .deploy-row .deploy-box:last-of-type .deploy-grid {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
 /* impact (dark banner) */
@@ -792,7 +792,7 @@ const kpis = [
 }
 .impact-row {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 14px;
 }
 .kpi-card {
@@ -883,7 +883,7 @@ const kpis = [
     display: none;
   }
   .impact-row {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 }
 @media (max-width: 768px) {

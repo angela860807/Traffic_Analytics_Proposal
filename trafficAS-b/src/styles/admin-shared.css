@@ -217,17 +217,23 @@
   .stats { grid-template-columns: repeat(2, 1fr) !important; }
   .grid { grid-template-columns: 1fr !important; }
 }
+@media (max-width: 1280px) {
+  .cc-shell .side, .ops-shell .side, .sa-shell .side, .an-shell .filter {
+    width: 170px !important;
+  }
+  .stat-row, .stat-bar { flex-wrap: wrap; gap: 10px !important; }
+  .grid-bot { grid-template-columns: 1fr !important; }
+}
 @media (max-width: 1024px) {
-  .cc-shell .side, .ops-shell .side, .sa-shell .side {
+  .cc-shell .side, .ops-shell .side, .sa-shell .side, .an-shell .filter {
     width: 64px !important;
   }
-  .snav-i { font-size: 0; padding: 12px 0; justify-content: center; }
-  .snav-i i { font-size: 18px; }
+  .snav-i, .an-shell .snav-i { font-size: 0; padding: 12px 0; justify-content: center; }
+  .snav-i i, .an-shell .snav-i i { font-size: 18px; }
   .snav-lab { display: none; }
   .brand { font-size: 0; justify-content: center; }
   .brand em { display: none; }
-  .stat-row, .stat-bar { flex-wrap: wrap; gap: 12px !important; }
-  .grid-bot { grid-template-columns: 1fr !important; }
+  .brand-img { height: 36px !important; }
 }
 @media (max-width: 768px) {
   .cc-shell, .ops-shell, .sa-shell { display: block !important; }
