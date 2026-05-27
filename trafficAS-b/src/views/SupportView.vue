@@ -10,7 +10,7 @@
             <div class="hero-tag">ANNOUNCEMENTS</div>
             <h1>공지<em>사항</em></h1>
             <p class="hero-sub">
-              최신 업데이트와 중요한 소식을 확인하세요.<br />
+              최신 업데이트와 <br>중요한 소식을 확인하세요.<br />
               운영 시간 안내와 함께 빠르고 정확한 정보를 제공합니다.
             </p>
           </div>
@@ -86,20 +86,20 @@ const values = [
 .hero-left { align-self: center; min-width: 0; }
 .hero-tag {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 14px; font-weight: 700; letter-spacing: 0.16em;
+  font-size: 15.5px; font-weight: 700; letter-spacing: 0.16em;
   color: var(--a); margin-bottom: 14px;
 }
 .hero h1 {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: clamp(28px, 3vw, 40px);
+  font-size: clamp(32px, 3.4vw, 46px);
   font-weight: 800; letter-spacing: -1.2px; line-height: 1.15;
   color: var(--t); margin: 0 0 14px;
 }
 .hero h1 em { color: var(--a); font-style: normal; }
 .hero-sub {
-  font-size: 14px; font-weight: 500;
-  color: var(--t); opacity: 0.78;
-  line-height: 1.65; margin: 0;
+  font-size: 19px; font-weight: 500;
+  color: var(--t); opacity: 0.85;
+  line-height: 1.75; margin: 0;
   word-break: keep-all;
 }
 
@@ -178,7 +178,7 @@ const values = [
 }
 .values-head h2 {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 22px; font-weight: 800;
+  font-size: 24px; font-weight: 800;
   letter-spacing: -0.5px;
   color: var(--t); margin: 0;
 }
@@ -202,16 +202,16 @@ const values = [
   width: 56px; height: 56px; border-radius: 50%;
   background: rgba(96, 165, 250, 0.12);
   display: inline-flex; align-items: center; justify-content: center;
-  color: var(--a); font-size: 24px;
+  color: var(--a); font-size: 26px;
   margin-bottom: 18px;
 }
 .theme-navy.light .value-icon { background: rgba(37, 99, 235, 0.08); }
 .value-title {
-  font-size: 17px; font-weight: 700;
+  font-size: 18.5px; font-weight: 700;
   color: var(--t); margin-bottom: 8px;
 }
 .value-desc {
-  font-size: 14px; font-weight: 500;
+  font-size: 15.5px; font-weight: 500;
   color: var(--t); opacity: 0.7;
   line-height: 1.65;
   margin: 0;

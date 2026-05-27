@@ -1,7 +1,12 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 100%; min-height: 100vh; }
 html { scroll-behavior: smooth; overflow-x: hidden; background: #f1f5fb; }
-body { -webkit-font-smoothing: antialiased; background: #f1f5fb; }
+body {
+  -webkit-font-smoothing: antialiased;
+  background: #f1f5fb;
+}
+/* 빔프로젝터 시연용 전체 확대 (Chrome/Edge) — Ctrl+Shift+D 로 토글 */
+body.demo-mode { zoom: 1.15; }
 a { text-decoration: none; color: inherit; }
 
 /* 헤더 고정 */

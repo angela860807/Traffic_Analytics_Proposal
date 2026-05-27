@@ -102,3 +102,6 @@ desktop.ini
 # Local agent/tooling
 .claude/settings.local.json
 trafficAS-b/public/1_web.mp4
+
+# Claude Code local settings
+**/.claude/

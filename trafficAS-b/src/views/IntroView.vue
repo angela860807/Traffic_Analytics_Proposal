@@ -356,7 +356,7 @@ const kpis = [
 }
 .hero-tag {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: 0.16em;
   color: var(--a);
@@ -364,7 +364,7 @@ const kpis = [
 }
 .hero h1 {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: clamp(28px, 3vw, 40px);
+  font-size: clamp(38px, 3.8vw, 52px);
   font-weight: 800;
   letter-spacing: -1.2px;
   line-height: 1.15;
@@ -376,7 +376,7 @@ const kpis = [
   font-style: normal;
 }
 .hero-sub {
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 500;
   color: var(--t);
   opacity: 0.78;
@@ -435,14 +435,14 @@ const kpis = [
 }
 .sec-head h2 {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 800;
   letter-spacing: -0.6px;
   color: var(--t);
   margin: 0 0 8px;
 }
 .sec-head p {
-  font-size: 15px;
+  font-size: 18px;
   color: var(--t);
   opacity: 0.75;
   margin: 0;
@@ -476,7 +476,7 @@ const kpis = [
 .arch-num {
   flex-shrink: 0;
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 800;
   color: var(--a);
   letter-spacing: -0.5px;
@@ -488,14 +488,14 @@ const kpis = [
   min-width: 0;
 }
 .arch-en {
-  font-size: 16.5px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--t);
   letter-spacing: -0.2px;
   margin-bottom: 4px;
 }
 .arch-ko {
-  font-size: 14px;
+  font-size: 17px;
   color: var(--t);
   opacity: 0.78;
   font-weight: 500;
@@ -531,7 +531,7 @@ const kpis = [
   gap: 8px;
 }
 .arch-list li {
-  font-size: 13px;
+  font-size: 16px;
   color: var(--t);
   opacity: 0.78;
   font-weight: 500;
@@ -543,7 +543,7 @@ const kpis = [
 }
 .arch-list .dot {
   color: var(--a);
-  font-size: 14px;
+  font-size: 17px;
   line-height: 1.35;
   flex-shrink: 0;
 }
@@ -583,13 +583,13 @@ const kpis = [
   background: rgba(37, 99, 235, 0.06);
 }
 .lc-title {
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--t);
   margin-bottom: 10px;
 }
 .lc-desc {
-  font-size: 13.5px;
+  font-size: 16.5px;
   color: var(--t);
   opacity: 0.78;
   font-weight: 500;
@@ -628,13 +628,13 @@ const kpis = [
   box-shadow: 0 2px 14px rgba(15, 40, 90, 0.04);
 }
 .mod-num {
-  font-size: 14.5px;
+  font-size: 17.5px;
   font-weight: 700;
   color: var(--a);
   margin-bottom: 8px;
 }
 .mod-title {
-  font-size: 19px;
+  font-size: 23px;
   font-weight: 800;
   color: var(--t);
   letter-spacing: -0.4px;
@@ -649,7 +649,7 @@ const kpis = [
   margin-bottom: 18px;
 }
 .mod-desc {
-  font-size: 13.5px;
+  font-size: 16.5px;
   color: var(--t);
   opacity: 0.8;
   font-weight: 500;
@@ -664,7 +664,7 @@ const kpis = [
   justify-content: center;
 }
 .mod-tag {
-  font-size: 12.5px;
+  font-size: 15.5px;
   font-weight: 600;
   color: var(--a);
   background: rgba(96, 165, 250, 0.12);
@@ -693,13 +693,13 @@ const kpis = [
   box-shadow: 0 2px 14px rgba(15, 40, 90, 0.04);
 }
 .deploy-h {
-  font-size: 17px;
+  font-size: 20.5px;
   font-weight: 700;
   color: var(--t);
   margin-bottom: 18px;
 }
 .deploy-h-en {
-  font-size: 13.5px;
+  font-size: 16.5px;
   font-weight: 500;
   color: var(--t);
   opacity: 0.65;
@@ -724,13 +724,13 @@ const kpis = [
   margin-bottom: 10px;
 }
 .deploy-title {
-  font-size: 14.5px;
+  font-size: 17.5px;
   font-weight: 700;
   color: var(--t);
   margin-bottom: 4px;
 }
 .deploy-desc {
-  font-size: 12.5px;
+  font-size: 15.5px;
   color: var(--t);
   opacity: 0.72;
   font-weight: 500;
@@ -779,14 +779,14 @@ const kpis = [
 }
 .impact-head h2 {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 800;
   letter-spacing: -0.6px;
   color: #fff;
   margin: 0 0 8px;
 }
 .impact-head p {
-  font-size: 15px;
+  font-size: 18px;
   color: rgba(255, 255, 255, 0.7);
   margin: 0;
 }
@@ -833,14 +833,14 @@ const kpis = [
   transition: color 0.22s;
 }
 .kpi-title {
-  font-size: 14.5px;
+  font-size: 17.5px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.85);
   margin-bottom: 10px;
 }
 .kpi-value {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
-  font-size: 36px;
+  font-size: 44px;
   font-weight: 800;
   letter-spacing: -1.3px;
   line-height: 1;
@@ -848,7 +848,7 @@ const kpis = [
   margin-bottom: 12px;
 }
 .kpi-desc {
-  font-size: 13px;
+  font-size: 16px;
   color: rgba(255, 255, 255, 0.7);
   font-weight: 500;
   line-height: 1.55;
