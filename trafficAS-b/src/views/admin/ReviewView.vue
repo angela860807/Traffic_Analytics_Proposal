@@ -114,6 +114,7 @@
             <div class="plate-snap">
               <img v-if="ocrSnapUrl" :src="ocrSnapUrl" alt="OCR 캡처" @error="handlePlateCropError" />
               <div v-else class="plate-snap-ph"><i class="bi bi-image"></i> Crop 이미지 없음</div>
+              <div class="snap-plate">{{ selected.plate }}</div>
             </div>
             <div>
               <div class="ocr-lab">인식 결과</div>

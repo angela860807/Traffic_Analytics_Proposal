@@ -1,9 +1,10 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; overflow-x: hidden; scrollbar-gutter: stable; }
-body { -webkit-font-smoothing: antialiased; }
+html, body { width: 100%; min-height: 100vh; }
+html { scroll-behavior: smooth; overflow-x: hidden; background: #f1f5fb; }
+body { -webkit-font-smoothing: antialiased; background: #f1f5fb; }
 a { text-decoration: none; color: inherit; }
 
-/* 헤더 고정 - 전역 스타일로 강제 고정 */
+/* 헤더 고정 */
 .appnav-line {
   position: fixed !important;
   top: 0; left: 0; right: 0;
@@ -14,16 +15,16 @@ a { text-decoration: none; color: inherit; }
 nav.appnav {
   position: fixed !important;
   top: 0; left: 0; right: 0;
-  z-index: 200; height: 62px;
+  z-index: 200; height: 68px;
   background: var(--nav);
   backdrop-filter: blur(22px);
   border-bottom: 1px solid var(--b);
 }
 
-/* ── NAVY THEME (Dark) ── */
+/* navy theme - dark */
 .theme-navy {
   --bg:   #020b18; --bg2:  #03101f; --bg3:  #041528;
-  --card: rgba(255,255,255,.03);
+  --card: rgba(2, 11, 24, .92);
   --b:    rgba(255,255,255,.07);  --ba: rgba(96,165,250,.42);
   --t:    #e4eeff;
   --t2:   rgba(228,238,255,.48);
@@ -38,7 +39,7 @@ nav.appnav {
   transition: background .3s, color .3s;
 }
 
-/* ── NAVY THEME (Light) ── */
+/* navy theme - light */
 .theme-navy.light {
   --bg:   #f1f5fb; --bg2:  #e8eff8; --bg3:  #dde8f4;
   --card: rgba(255,255,255,.9);
