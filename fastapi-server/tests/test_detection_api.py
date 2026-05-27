@@ -14,6 +14,7 @@ from app.main import app
 from app.schemas.detection import DetectionResult
 import app.services.image_preprocessor as image_preprocessor
 from app.services.backend_client import BackendClient
+from app.services.bbox_tracker import BboxTracker
 from app.services.inference_service import InferenceService
 from app.services.plate_detector import PlateDetection
 from app.services.plate_recognizer import PlateRecognition, PlateRecognizer
@@ -33,9 +34,9 @@ from app.services.speed_config import (
 )
 from app.schemas.speed import SpeedMeasurementResult, SpeedViolationCreateRequest
 from app.services.speed_tracker import SpeedTracker, VehicleTrackInput
-from app.services.vehicle_detector import VehicleDetection
+from app.services.vehicle_detector import VehicleDetection, VehicleDetectionBox
 from app.services.vehicle_detector import VehicleDetector
-from app.services.frame_buffer import FrameBuffer
+from app.services.frame_buffer import BufferedFrame, FrameBuffer
 from app.services.stream_event_service import (
     STREAM_STATUS_FINALIZED,
     STREAM_STATUS_IDLE,
@@ -128,7 +129,10 @@ def make_unrecognized_detection() -> DetectionResult:
         confidence_score=0.0,
         image_path="storage/detections/2026/04/30/CAM_001_103000_frame.jpg",
         image_url="/static/detections/2026/04/30/CAM_001_103000_frame.jpg",
+        frame_image_path="storage/detections/2026/04/30/CAM_001_103000_frame.jpg",
+        frame_image_url="/static/detections/2026/04/30/CAM_001_103000_frame.jpg",
         detected_at=datetime(2026, 4, 30, 10, 30, 0),
+        processing_status="NO_VEHICLE",
     )
 
 
@@ -143,11 +147,16 @@ def make_recognized_detection(
         confidence_score=0.9321,
         image_path="storage/detections/2026/04/30/CAM_001_103000_frame.jpg",
         image_url="/static/detections/2026/04/30/CAM_001_103000_frame.jpg",
+        frame_image_path="storage/detections/2026/04/30/CAM_001_103000_frame.jpg",
+        frame_image_url="/static/detections/2026/04/30/CAM_001_103000_frame.jpg",
+        vehicle_crop_image_path="storage/detections/2026/04/30/CAM_001_103000_vehicle_crop.jpg",
+        vehicle_crop_image_url="/static/detections/2026/04/30/CAM_001_103000_vehicle_crop.jpg",
         plate_crop_image_path="storage/detections/2026/04/30/CAM_001_103000_plate_crop.jpg",
         plate_crop_image_url="/static/detections/2026/04/30/CAM_001_103000_plate_crop.jpg",
         ocr_image_path="storage/detections/2026/04/30/CAM_001_103000_ocr.jpg",
         ocr_image_url="/static/detections/2026/04/30/CAM_001_103000_ocr.jpg",
         detected_at=detected_at,
+        processing_status="OCR_COMPLETED",
     )
 
 
@@ -159,6 +168,84 @@ def test_health_check() -> None:
         "status": "ok",
         "service": "traffic-ai-server",
     }
+
+
+def test_detection_warmup_endpoint_loads_models(monkeypatch) -> None:
+    loaded = []
+
+    monkeypatch.setattr(detection_route, "VEHICLE_MODEL_SOURCE", "vehicle.pt")
+    monkeypatch.setattr(detection_route, "PLATE_MODEL_PATH", "plate.pt")
+    monkeypatch.setattr(
+        detection_route.inference_service.vehicle_detector,
+        "_load_model",
+        lambda: loaded.append("vehicle"),
+    )
+    monkeypatch.setattr(
+        detection_route.inference_service.plate_detector,
+        "_load_model",
+        lambda: loaded.append("plate"),
+    )
+    monkeypatch.setattr(
+        detection_route.inference_service.plate_recognizer,
+        "_load_ocr",
+        lambda: loaded.append("ocr"),
+    )
+
+    response = client.post("/api/detections/warmup")
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert response.json()["loadedModels"] == [
+        "vehicleYolo",
+        "plateYolo",
+        "paddleOcr",
+    ]
+    assert loaded == ["vehicle", "plate", "ocr"]
+
+
+def test_stream_ocr_status_endpoint_returns_saved_status() -> None:
+    detection_route.stream_ocr_statuses.clear()
+    detection_route.stream_ocr_status_seen_at.clear()
+    result = make_recognized_detection()
+    detection_route.remember_stream_ocr_status(
+        "event-1",
+        camera_code="CAM_001",
+        processing_status="OCR_COMPLETED",
+        analysis_status="FLOW_EVENT_CREATED",
+        message="done",
+        result=result,
+    )
+
+    response = client.get("/api/detections/stream-events/event-1/ocr-status")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["eventId"] == "event-1"
+    assert body["processingStatus"] == "OCR_COMPLETED"
+    assert body["plateNumber"] == "123A4567"
+
+    detection_route.stream_ocr_statuses.clear()
+    detection_route.stream_ocr_status_seen_at.clear()
+
+
+def test_stream_ocr_status_cleanup_removes_expired_status(monkeypatch) -> None:
+    detection_route.stream_ocr_statuses.clear()
+    detection_route.stream_ocr_status_seen_at.clear()
+    monkeypatch.setattr(detection_route, "STREAM_OCR_STATUS_TTL_SECONDS", 10.0)
+
+    detection_route.remember_stream_ocr_status(
+        "event-old",
+        camera_code="CAM_001",
+        processing_status="OCR_COMPLETED",
+        message="done",
+        result=make_recognized_detection(),
+    )
+    detection_route.stream_ocr_status_seen_at["event-old"] = 100.0
+
+    detection_route.cleanup_stream_ocr_statuses(now_monotonic=111.0)
+
+    assert "event-old" not in detection_route.stream_ocr_statuses
+    assert "event-old" not in detection_route.stream_ocr_status_seen_at
 
 
 def test_plate_number_normalization_keeps_korean_plate_characters() -> None:
@@ -175,6 +262,22 @@ def test_plate_number_normalization_keeps_korean_plate_characters() -> None:
 
     for raw_text, expected in cases.items():
         assert recognizer._normalize_plate_number(raw_text) == expected
+
+
+def test_plate_recognizer_prefers_korean_plate_shape_over_longer_digits() -> None:
+    recognizer = PlateRecognizer()
+    korean_plate = PlateRecognition("62시6617", 0.95)
+    longer_digits = PlateRecognition("62116617", 0.99)
+
+    assert recognizer._is_better_recognition(korean_plate, longer_digits)
+    assert not recognizer._is_better_recognition(longer_digits, korean_plate)
+
+
+def test_plate_number_normalization_extracts_plate_shape_from_noise() -> None:
+    recognizer = PlateRecognizer()
+
+    assert recognizer._normalize_plate_number("ABC 62\uc2dc6617!!XYZ") == "62\uc2dc6617"
+
 
 def test_vehicle_detector_returns_best_allowed_vehicle_class(
     monkeypatch,
@@ -226,6 +329,74 @@ def test_vehicle_detector_returns_unknown_when_no_vehicle_class(
     assert result.confidence_score == 0.0
     assert result.bbox is None
     assert result.boxes == []
+
+
+def test_bbox_tracker_keeps_track_id_for_nearby_bbox() -> None:
+    tracker = BboxTracker(
+        ttl_seconds=2.0,
+        min_iou=0.10,
+        max_center_distance_pixels=80.0,
+    )
+    captured_at = datetime(2026, 5, 14, 14, 30, 0)
+
+    first = tracker.update(
+        camera_code="CAM_001",
+        captured_at=captured_at,
+        boxes=[
+            VehicleDetectionBox(
+                bbox=(10, 20, 80, 60),
+                confidence_score=0.92,
+                class_name="car",
+            )
+        ],
+    )
+    second = tracker.update(
+        camera_code="CAM_001",
+        captured_at=captured_at + timedelta(seconds=0.3),
+        boxes=[
+            VehicleDetectionBox(
+                bbox=(16, 24, 86, 64),
+                confidence_score=0.91,
+                class_name="car",
+            )
+        ],
+    )
+
+    assert first[0].track_id == second[0].track_id
+
+
+def test_bbox_tracker_creates_new_track_after_ttl() -> None:
+    tracker = BboxTracker(
+        ttl_seconds=0.2,
+        min_iou=0.10,
+        max_center_distance_pixels=80.0,
+    )
+    captured_at = datetime(2026, 5, 14, 14, 30, 0)
+
+    first = tracker.update(
+        camera_code="CAM_001",
+        captured_at=captured_at,
+        boxes=[
+            VehicleDetectionBox(
+                bbox=(10, 20, 80, 60),
+                confidence_score=0.92,
+                class_name="car",
+            )
+        ],
+    )
+    second = tracker.update(
+        camera_code="CAM_001",
+        captured_at=captured_at + timedelta(seconds=0.5),
+        boxes=[
+            VehicleDetectionBox(
+                bbox=(16, 24, 86, 64),
+                confidence_score=0.91,
+                class_name="car",
+            )
+        ],
+    )
+
+    assert first[0].track_id != second[0].track_id
 
 
 def test_parse_virtual_line_from_string() -> None:
@@ -770,6 +941,7 @@ def test_detection_saves_frame_crop_and_ocr_images_when_enabled(
         str(tmp_path / "detections"),
     )
     monkeypatch.setattr("app.services.inference_service.SAVE_PLATE_CROP", True)
+    monkeypatch.setattr("app.services.inference_service.SAVE_VEHICLE_CROP", True)
     monkeypatch.setattr(
         "app.services.inference_service.SAVE_OCR_PREPROCESSED_IMAGE",
         True,
@@ -795,6 +967,16 @@ def test_detection_saves_frame_crop_and_ocr_images_when_enabled(
             confidence_score=0.95,
         ),
     )
+    monkeypatch.setattr(
+        service.plate_recognizer,
+        "recognize_best",
+        lambda variants: PlateRecognition(
+            text="123A4567",
+            confidence_score=0.95,
+            variant_name=variants[-1][0],
+            variant_image=variants[-1][1],
+        ),
+    )
 
     image_bytes = make_test_image_bytes()
 
@@ -810,14 +992,19 @@ def test_detection_saves_frame_crop_and_ocr_images_when_enabled(
 
     assert result.image_path.endswith("CAM_001_103000_frame.jpg")
     assert result.image_url.endswith("/2026/04/30/CAM_001_103000_frame.jpg")
+    assert result.frame_image_path == result.image_path
+    assert result.frame_image_url == result.image_url
+    assert result.vehicle_crop_image_path.endswith("CAM_001_103000_vehicle_crop.jpg")
+    assert result.vehicle_crop_image_url.endswith("/2026/04/30/CAM_001_103000_vehicle_crop.jpg")
     assert result.plate_crop_image_path.endswith("CAM_001_103000_plate_crop.jpg")
     assert result.plate_crop_image_url.endswith("/2026/04/30/CAM_001_103000_plate_crop.jpg")
     assert result.ocr_image_path.endswith("CAM_001_103000_ocr.jpg")
     assert result.ocr_image_url.endswith("/2026/04/30/CAM_001_103000_ocr.jpg")
     assert (storage_dir / "CAM_001_103000_frame.jpg").exists()
+    assert (storage_dir / "CAM_001_103000_vehicle_crop.jpg").exists()
     assert (storage_dir / "CAM_001_103000_plate_crop.jpg").exists()
     assert (storage_dir / "CAM_001_103000_ocr.jpg").exists()
-
+    assert result.processing_status == "OCR_COMPLETED"
 
 def test_detection_includes_crop_and_ocr_images_when_ocr_fails_after_bbox(
     monkeypatch,
@@ -1272,7 +1459,9 @@ def test_stream_frame_endpoint_returns_tracking(monkeypatch) -> None:
                 bbox=(10, 20, 80, 50),
                 bboxes=[(10, 20, 80, 50), (90, 20, 150, 50)],
                 bbox_confidence_score=0.93,
+                track_id=3,
                 event_age_seconds=1.5,
+                processing_status="TRACKING",
             )
 
     monkeypatch.setattr(
@@ -1300,7 +1489,9 @@ def test_stream_frame_endpoint_returns_tracking(monkeypatch) -> None:
     assert body["bbox"] == [10, 20, 80, 50]
     assert body["bboxes"] == [[10, 20, 80, 50], [90, 20, 150, 50]]
     assert body["bboxConfidenceScore"] == 0.93
+    assert body["trackId"] == 3
     assert body["eventAgeSeconds"] == 1.5
+    assert body["processingStatus"] == "TRACKING"
     assert body["analysisStatus"] is None
     assert body["data"] is None
 
@@ -1527,6 +1718,98 @@ def test_stream_frame_endpoint_sends_finalized_detection_to_backend(monkeypatch)
     assert body["analysisStatus"] == "FLOW_EVENT_CREATED"
     assert body["data"]["plateNumber"] == "123A4567"
     assert sent_statuses == [None]
+
+    detection_route.duplicate_detection_guard.clear()
+
+
+def test_stream_frame_endpoint_queues_background_ocr_when_result_is_deferred(
+    monkeypatch,
+) -> None:
+    detection_route.duplicate_detection_guard.clear()
+
+    captured = {}
+    captured_at = datetime(2026, 5, 14, 14, 30, 0)
+    image_bytes = make_test_image_bytes()
+
+    class FakeStreamService:
+        async def process_frame(self, *, camera_code, captured_at, content_type, image_bytes):
+            best_candidate = BufferedFrame(
+                camera_code=camera_code,
+                captured_at=captured_at,
+                content_type=content_type,
+                image_bytes=image_bytes,
+                frame_number=7,
+                bbox=(10, 20, 80, 50),
+                confidence_score=0.93,
+            )
+            return StreamProcessingResult(
+                stream_status=STREAM_STATUS_FINALIZED,
+                camera_code=camera_code,
+                event_id="CAM_001-20260514143000-test",
+                frame_count=6,
+                best_candidate_frame_number=7,
+                best_candidate_bbox=(10, 20, 80, 50),
+                best_candidate_captured_at=captured_at,
+                best_candidate_frame=best_candidate,
+            )
+
+    def return_detection_from_best_candidate(
+        *,
+        camera_code,
+        captured_at,
+        image_bytes,
+        vehicle_detection=None,
+    ):
+        captured["camera_code"] = camera_code
+        captured["captured_at"] = captured_at
+        captured["image_bytes"] = image_bytes
+        captured["vehicle_detection"] = vehicle_detection
+        return make_recognized_detection(detected_at=captured_at)
+
+    async def record_backend_send(result, detection_status=None):
+        captured["backend_result"] = result
+        captured["backend_status"] = detection_status
+        return {"data": {"status": "FLOW_EVENT_CREATED"}}
+
+    monkeypatch.setattr(
+        detection_route,
+        "stream_detection_service",
+        FakeStreamService(),
+    )
+    monkeypatch.setattr(
+        detection_route.inference_service,
+        "detect_from_image_bytes_sync",
+        return_detection_from_best_candidate,
+    )
+    monkeypatch.setattr(
+        detection_route.backend_client,
+        "send_detection",
+        record_backend_send,
+    )
+
+    response = client.post(
+        "/api/detections/stream-frame",
+        data={
+            "cameraCode": "CAM_001",
+            "capturedAt": captured_at.isoformat(),
+        },
+        files={
+            "image": ("frame.jpg", image_bytes, "image/jpeg"),
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["streamStatus"] == "FINALIZED"
+    assert body["message"] == "Vehicle event finalized; OCR and backend save queued"
+    assert body["analysisStatus"] is None
+    assert body["data"] is None
+    assert captured["camera_code"] == "CAM_001"
+    assert captured["captured_at"] == captured_at
+    assert captured["image_bytes"] == image_bytes
+    assert captured["vehicle_detection"].bbox == (10, 20, 80, 50)
+    assert captured["backend_result"].plate_number == "123A4567"
+    assert captured["backend_status"] is None
 
     detection_route.duplicate_detection_guard.clear()
 
@@ -1868,11 +2151,62 @@ def test_backend_client_payload_includes_crop_and_ocr_image_fields(monkeypatch) 
     payload = captured["json"]
 
     assert payload["status"] == "DUPLICATE_SKIPPED"
+    assert payload["frameImagePath"] == payload["imagePath"]
+    assert payload["frameImageUrl"] == payload["imageUrl"]
+    assert payload["processingStatus"] == "OCR_COMPLETED"
     assert payload["plateCropImagePath"].endswith("_plate_crop.jpg")
     assert payload["plateCropImageUrl"].endswith("_plate_crop.jpg")
     assert payload["ocrImagePath"].endswith("_ocr.jpg")
     assert payload["ocrImageUrl"].endswith("_ocr.jpg")
     assert captured["headers"]["X-Internal-Api-Key"] == "test-key"
+
+
+def test_backend_client_retries_detection_transient_failure(monkeypatch) -> None:
+    captured = {"attempts": 0}
+
+    class FakeResponse:
+        content = b'{"status":"ok"}'
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"status": "ok"}
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return None
+
+        async def post(self, url, json, headers):
+            captured["attempts"] += 1
+            if captured["attempts"] == 1:
+                raise httpx.ConnectError("temporary detection outage")
+            captured["json"] = json
+            return FakeResponse()
+
+    monkeypatch.setattr("app.services.backend_client.BACKEND_INTERNAL_API_KEY", "test-key")
+    monkeypatch.setattr("app.services.backend_client.httpx.AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr("app.services.backend_client.SPRING_SPEED_VIOLATION_RETRY_ATTEMPTS", 2)
+    monkeypatch.setattr(
+        "app.services.backend_client.SPRING_SPEED_VIOLATION_RETRY_DELAY_SECONDS",
+        0.0,
+    )
+
+    asyncio.run(
+        BackendClient().send_detection(
+            make_recognized_detection(),
+            "FLOW_EVENT_CREATED",
+        )
+    )
+
+    assert captured["attempts"] == 2
+    assert captured["json"]["status"] == "FLOW_EVENT_CREATED"
 
 
 def test_backend_client_speed_violation_payload(monkeypatch) -> None:

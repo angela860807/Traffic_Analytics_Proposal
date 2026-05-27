@@ -1,8 +1,18 @@
 from datetime import datetime
+import asyncio
 import logging
+import time
 
 import httpx
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+    status,
+)
 
 from app.schemas.detection import (
     DetectionResponse,
@@ -10,6 +20,7 @@ from app.schemas.detection import (
     StreamFrameResponse,
 )
 from app.schemas.speed import SpeedViolationCreateRequest
+from app.core.config import PLATE_MODEL_PATH, VEHICLE_MODEL_SOURCE
 from app.services.backend_client import BackendClient
 from app.services.duplicate_detection_guard import DuplicateDetectionGuard
 from app.services.inference_service import InferenceService
@@ -26,15 +37,110 @@ from app.services.vehicle_detector import VehicleDetection
 router = APIRouter(prefix="/api/detections", tags=["detections"])
 logger = logging.getLogger(__name__)
 SPRING_ERROR_BODY_LIMIT = 500
+STREAM_OCR_STATUS_TTL_SECONDS = 600.0
 
 inference_service = InferenceService()
 backend_client = BackendClient()
 duplicate_detection_guard = DuplicateDetectionGuard()
 stream_detection_service = StreamEventService(inference_service=inference_service)
+stream_ocr_statuses: dict[str, dict] = {}
+stream_ocr_status_seen_at: dict[str, float] = {}
+
+
+def cleanup_stream_ocr_statuses(*, now_monotonic: float | None = None) -> None:
+    now_value = time.monotonic() if now_monotonic is None else now_monotonic
+    expired_event_ids = [
+        event_id
+        for event_id, seen_at in stream_ocr_status_seen_at.items()
+        if now_value - seen_at > STREAM_OCR_STATUS_TTL_SECONDS
+    ]
+
+    for event_id in expired_event_ids:
+        stream_ocr_status_seen_at.pop(event_id, None)
+        stream_ocr_statuses.pop(event_id, None)
+
+
+def remember_stream_ocr_status(
+    event_id: str | None,
+    *,
+    camera_code: str,
+    processing_status: str,
+    message: str,
+    result=None,
+    analysis_status: str | None = None,
+    error: str | None = None,
+) -> None:
+    if not event_id:
+        return
+
+    cleanup_stream_ocr_statuses()
+    data = result.model_dump(by_alias=True, mode="json") if result is not None else None
+    stream_ocr_statuses[event_id] = {
+        "eventId": event_id,
+        "cameraCode": camera_code,
+        "processingStatus": processing_status,
+        "analysisStatus": analysis_status,
+        "message": message,
+        "data": data,
+        "plateNumber": data.get("plateNumber") if data else None,
+        "updatedAt": datetime.now().isoformat(timespec="seconds"),
+        "error": error,
+    }
+    stream_ocr_status_seen_at[event_id] = time.monotonic()
+
+
+def warmup_detection_models_sync() -> list[str]:
+    loaded_models: list[str] = []
+
+    if VEHICLE_MODEL_SOURCE:
+        inference_service.vehicle_detector._load_model()
+        loaded_models.append("vehicleYolo")
+
+    if PLATE_MODEL_PATH:
+        inference_service.plate_detector._load_model()
+        loaded_models.append("plateYolo")
+
+    inference_service.plate_recognizer._load_ocr()
+    loaded_models.append("paddleOcr")
+
+    return loaded_models
 
 
 def should_send_to_backend(result) -> bool:
     return result.detection_type == "PLATE" and bool(result.plate_number)
+
+
+@router.post("/warmup", status_code=status.HTTP_200_OK)
+async def warmup_detection_models() -> dict:
+    started_at = asyncio.get_running_loop().time()
+    loaded_models = await asyncio.to_thread(warmup_detection_models_sync)
+    elapsed_seconds = asyncio.get_running_loop().time() - started_at
+
+    return {
+        "success": True,
+        "message": "Detection models warmed up",
+        "loadedModels": loaded_models,
+        "elapsedSeconds": round(elapsed_seconds, 3),
+    }
+
+
+@router.get(
+    "/stream-events/{event_id}/ocr-status",
+    status_code=status.HTTP_200_OK,
+)
+async def get_stream_ocr_status(event_id: str) -> dict:
+    cleanup_stream_ocr_statuses()
+    status_payload = stream_ocr_statuses.get(event_id)
+    if status_payload is None:
+        return {
+            "eventId": event_id,
+            "processingStatus": "UNKNOWN",
+            "message": "OCR status is not available yet",
+            "data": None,
+            "plateNumber": None,
+        }
+
+    return status_payload
 
 
 def build_unrecognized_plate_response(result) -> DetectionResponse:
@@ -127,6 +233,7 @@ def build_stream_frame_response(
             for bbox in (stream_result.bboxes or [])
         ],
         bbox_confidence_score=stream_result.bbox_confidence_score,
+        track_id=stream_result.track_id,
         best_candidate_frame_number=stream_result.best_candidate_frame_number,
         best_candidate_bbox=(
             list(stream_result.best_candidate_bbox)
@@ -140,6 +247,7 @@ def build_stream_frame_response(
         speed_violation_sent=stream_result.speed_violation_sent,
         speed_violation_send_error=stream_result.speed_violation_send_error,
         analysis_status=analysis_status,
+        processing_status=stream_result.processing_status,
         data=stream_result.result,
     )
 
@@ -197,6 +305,132 @@ async def send_speed_violation_if_ready(
             result.plate_number,
             flow_event_id,
             exc,
+        )
+
+
+async def analyze_stream_best_candidate(
+    stream_result: StreamProcessingResult,
+):
+    best_candidate = stream_result.best_candidate_frame
+    if best_candidate is None:
+        return None
+
+    detection_kwargs = {
+        "camera_code": best_candidate.camera_code,
+        "captured_at": best_candidate.captured_at,
+        "image_bytes": best_candidate.image_bytes,
+        "vehicle_detection": VehicleDetection(
+            detection_type="VEHICLE",
+            confidence_score=best_candidate.confidence_score,
+            bbox=best_candidate.bbox,
+        ),
+    }
+    if best_candidate.high_res_crop_bytes is not None:
+        detection_kwargs["high_res_crop_bytes"] = (
+            best_candidate.high_res_crop_bytes
+        )
+
+    return await asyncio.to_thread(
+        inference_service.detect_from_image_bytes_sync,
+        **detection_kwargs,
+    )
+
+
+async def persist_stream_detection_result(
+    stream_result: StreamProcessingResult,
+    result,
+) -> str:
+    stream_result.result = result
+
+    if not should_send_to_backend(result):
+        await backend_client.send_detection(result, "OCR_FAILED")
+        return "OCR_FAILED"
+
+    if duplicate_detection_guard.is_duplicate(result):
+        backend_response = await backend_client.send_detection(
+            result,
+            "DUPLICATE_SKIPPED",
+        )
+        await send_speed_violation_if_ready(
+            stream_result=stream_result,
+            backend_response=backend_response,
+        )
+        return extract_backend_analysis_status(
+            backend_response,
+            "DUPLICATE_SKIPPED",
+        )
+
+    backend_response = await backend_client.send_detection(result)
+    duplicate_detection_guard.remember(result)
+    await send_speed_violation_if_ready(
+        stream_result=stream_result,
+        backend_response=backend_response,
+    )
+    return extract_backend_analysis_status(
+        backend_response,
+        "FLOW_EVENT_CREATED",
+    )
+
+
+async def process_finalized_stream_detection_background(
+    stream_result: StreamProcessingResult,
+) -> None:
+    try:
+        remember_stream_ocr_status(
+            stream_result.event_id,
+            camera_code=stream_result.camera_code,
+            processing_status="OCR_RUNNING",
+            message="OCR is running",
+        )
+        result = stream_result.result
+        if result is None:
+            result = await analyze_stream_best_candidate(stream_result)
+
+        if result is None:
+            remember_stream_ocr_status(
+                stream_result.event_id,
+                camera_code=stream_result.camera_code,
+                processing_status="NO_OCR_CANDIDATE",
+                message="Vehicle event finalized without OCR candidate",
+            )
+            logger.info(
+                "stream event finalized without OCR candidate: eventId=%s cameraCode=%s",
+                stream_result.event_id,
+                stream_result.camera_code,
+            )
+            return
+
+        analysis_status = await persist_stream_detection_result(
+            stream_result,
+            result,
+        )
+        remember_stream_ocr_status(
+            stream_result.event_id,
+            camera_code=stream_result.camera_code,
+            processing_status=result.processing_status,
+            analysis_status=analysis_status,
+            message="OCR and backend save completed",
+            result=result,
+        )
+        logger.info(
+            "stream event background OCR/DB save completed: eventId=%s cameraCode=%s status=%s plateNumber=%s",
+            stream_result.event_id,
+            stream_result.camera_code,
+            analysis_status,
+            result.plate_number,
+        )
+    except Exception:
+        remember_stream_ocr_status(
+            stream_result.event_id,
+            camera_code=stream_result.camera_code,
+            processing_status="OCR_FAILED",
+            message="OCR or backend save failed",
+            error="background task failed",
+        )
+        logger.exception(
+            "stream event background OCR/DB save failed: eventId=%s cameraCode=%s",
+            stream_result.event_id,
+            stream_result.camera_code,
         )
 
 
@@ -403,6 +637,7 @@ async def create_and_send_detection_from_image(
     status_code=status.HTTP_200_OK,
 )
 async def process_stream_frame(
+    background_tasks: BackgroundTasks,
     camera_code: str = Form(..., alias="cameraCode"),
     captured_at: datetime = Form(..., alias="capturedAt"),
     speed_config_json: str | None = Form(default=None, alias="speedConfigJson"),
@@ -460,6 +695,8 @@ async def process_stream_frame(
                 )
         if speed_camera_config is not None:
             process_frame_kwargs["speed_camera_config"] = speed_camera_config
+        if isinstance(stream_detection_service, StreamEventService):
+            process_frame_kwargs["finalize_with_ocr"] = False
 
         stream_result = await stream_detection_service.process_frame(
             **process_frame_kwargs,
@@ -485,40 +722,33 @@ async def process_stream_frame(
 
         result = stream_result.result
 
+        if result is None and stream_result.best_candidate_frame is not None:
+            remember_stream_ocr_status(
+                stream_result.event_id,
+                camera_code=stream_result.camera_code,
+                processing_status="OCR_QUEUED",
+                message="OCR and backend save queued",
+            )
+            background_tasks.add_task(
+                process_finalized_stream_detection_background,
+                stream_result,
+            )
+            return build_stream_frame_response(
+                stream_result,
+                message=(
+                    "Vehicle event finalized; OCR and backend save queued"
+                ),
+            )
+
         if result is None:
             return build_stream_frame_response(
                 stream_result,
                 message="Vehicle event finalized without OCR candidate",
             )
 
-        if not should_send_to_backend(result):
-            await backend_client.send_detection(result, "OCR_FAILED")
-            return build_stream_frame_response(
-                stream_result,
-                message="Vehicle event finalized and sent to backend as OCR_FAILED",
-                analysis_status="OCR_FAILED",
-            )
-
-        if duplicate_detection_guard.is_duplicate(result):
-            backend_response = await backend_client.send_detection(
-                result,
-                "DUPLICATE_SKIPPED",
-            )
-            await send_speed_violation_if_ready(
-                stream_result=stream_result,
-                backend_response=backend_response,
-            )
-            return build_stream_frame_response(
-                stream_result,
-                message="Vehicle event finalized and sent to backend as DUPLICATE_SKIPPED",
-                analysis_status="DUPLICATE_SKIPPED",
-            )
-
-        backend_response = await backend_client.send_detection(result)
-        duplicate_detection_guard.remember(result)
-        await send_speed_violation_if_ready(
-            stream_result=stream_result,
-            backend_response=backend_response,
+        analysis_status = await persist_stream_detection_result(
+            stream_result,
+            result,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -538,10 +768,6 @@ async def process_stream_frame(
             detail=str(exc),
         ) from exc
 
-    analysis_status = extract_backend_analysis_status(
-        backend_response,
-        "FLOW_EVENT_CREATED",
-    )
     return build_stream_frame_response(
         stream_result,
         message=f"Vehicle event finalized and saved as {analysis_status}",

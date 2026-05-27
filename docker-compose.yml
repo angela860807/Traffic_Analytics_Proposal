@@ -42,14 +42,15 @@ services:
       IMAGE_STORAGE_DIR: storage/detections
       MODEL_PATH: /app/models/best.pt
       PLATE_MODEL_PATH: /app/models/best.pt
-      VEHICLE_MODEL_NAME: yolo26s.pt
+      VEHICLE_MODEL_NAME: yolo11s.pt
       VEHICLE_YOLO_CONF_THRESHOLD: 0.35
       VEHICLE_YOLO_IOU_THRESHOLD: 0.45
       VEHICLE_YOLO_MAX_DET: 10
       VEHICLE_CLASS_NAMES: car,bus,truck,motorcycle
       DETECTION_PREPROCESS_MODE: none
       SAVE_PLATE_CROP: "true"
-      SAVE_OCR_PREPROCESSED_IMAGE: "true"
+      SAVE_VEHICLE_CROP: "false"
+      SAVE_OCR_PREPROCESSED_IMAGE: "false"
       STREAM_FPS: 5
       PRE_BUFFER_SECONDS: 2
       POST_MISS_FRAMES: 5
@@ -87,7 +88,7 @@ services:
       - spring-backend
       - fastapi-server
     ports:
-      - "5173:80"
+      - "5174:80"
 
 volumes:
   traffic_postgres_data:

@@ -1,9 +1,30 @@
 import re
 from dataclasses import dataclass
+import logging
 
 import numpy as np
 
 from app.core.config import OCR_LANG, OCR_MIN_CONFIDENCE
+
+logger = logging.getLogger(__name__)
+
+KOREAN_PLATE_PATTERN = re.compile(r"\d{2,3}[\uac00-\ud7a3]\d{4}")
+PARTIAL_KOREAN_PLATE_PATTERN = re.compile(r"\d{2,3}[\uac00-\ud7a3]\d{3,4}")
+KOREAN_PLATE_SYLLABLES = set(
+    "가나다라마거너더러머버서어저고노도로모보소오조구누두루무부수우주"
+    "허하호배"
+)
+OCR_DIGIT_CORRECTIONS = str.maketrans(
+    {
+        "O": "0",
+        "o": "0",
+        "I": "1",
+        "l": "1",
+        "|": "1",
+        "S": "5",
+        "s": "5",
+    }
+)
 
 
 @dataclass
@@ -32,6 +53,13 @@ class PlateRecognizer:
                 variant_image,
                 variant_name=variant_name,
             )
+            logger.debug(
+                "OCR variant result: variant=%s text=%s confidence=%.4f shapeScore=%s",
+                variant_name,
+                recognition.text,
+                recognition.confidence_score,
+                self._score_korean_plate_shape(recognition.text),
+            )
 
             if best_recognition is None:
                 best_recognition = recognition
@@ -46,6 +74,13 @@ class PlateRecognizer:
                 confidence_score=0.0,
             )
 
+        logger.debug(
+            "OCR best variant selected: variant=%s text=%s confidence=%.4f shapeScore=%s",
+            best_recognition.variant_name,
+            best_recognition.text,
+            best_recognition.confidence_score,
+            self._score_korean_plate_shape(best_recognition.text),
+        )
         return best_recognition
 
     def _recognize_single(
@@ -85,12 +120,46 @@ class PlateRecognizer:
         if not candidate.text and current.text:
             return False
 
-        candidate_length = len(candidate.text or "")
-        current_length = len(current.text or "")
-        if candidate_length != current_length:
-            return candidate_length > current_length
+        candidate_shape_score = self._score_korean_plate_shape(candidate.text)
+        current_shape_score = self._score_korean_plate_shape(current.text)
+        if candidate_shape_score != current_shape_score:
+            return candidate_shape_score > current_shape_score
 
         return candidate.confidence_score > current.confidence_score
+
+    def _score_korean_plate_shape(self, text: str | None) -> int:
+        if not text:
+            return 0
+
+        score = 0
+        text_length = len(text)
+
+        if 7 <= text_length <= 8:
+            score += 10
+        elif 6 <= text_length <= 9:
+            score += 4
+
+        hangul_count = len(re.findall(r"[\uac00-\ud7a3]", text))
+        digit_count = len(re.findall(r"\d", text))
+
+        if hangul_count == 1:
+            score += 20
+        elif hangul_count > 1:
+            score += 5
+
+        if digit_count >= 6:
+            score += 10
+
+        if KOREAN_PLATE_PATTERN.fullmatch(text):
+            score += 100
+        elif PARTIAL_KOREAN_PLATE_PATTERN.search(text):
+            score += 50
+
+        hangul_match = re.search(r"[\uac00-\ud7a3]", text)
+        if hangul_match and hangul_match.group(0) in KOREAN_PLATE_SYLLABLES:
+            score += 15
+
+        return score
 
     def _load_ocr(self):
         if self._ocr is None:
@@ -192,6 +261,27 @@ class PlateRecognizer:
         if not text:
             return None
 
-        normalized = re.sub(r"[^0-9\uac00-\ud7a3]", "", text)
+        if not re.search(r"[0-9\uac00-\ud7a3]", text):
+            return None
+
+        corrected_text = text.translate(OCR_DIGIT_CORRECTIONS)
+        normalized = re.sub(r"[^0-9\uac00-\ud7a3]", "", corrected_text)
+        plate_match = KOREAN_PLATE_PATTERN.search(normalized)
+        if plate_match:
+            if plate_match.start() > 0 and re.fullmatch(
+                r"[\uac00-\ud7a3]+",
+                normalized[: plate_match.start()],
+            ):
+                return normalized
+            return plate_match.group(0)
+
+        partial_match = PARTIAL_KOREAN_PLATE_PATTERN.search(normalized)
+        if partial_match:
+            if partial_match.start() > 0 and re.fullmatch(
+                r"[\uac00-\ud7a3]+",
+                normalized[: partial_match.start()],
+            ):
+                return normalized
+            return partial_match.group(0)
 
         return normalized or None
