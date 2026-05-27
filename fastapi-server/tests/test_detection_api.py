@@ -205,6 +205,7 @@ def test_detection_warmup_endpoint_loads_models(monkeypatch) -> None:
 
 def test_stream_ocr_status_endpoint_returns_saved_status() -> None:
     detection_route.stream_ocr_statuses.clear()
+    detection_route.stream_ocr_status_seen_at.clear()
     result = make_recognized_detection()
     detection_route.remember_stream_ocr_status(
         "event-1",
@@ -224,6 +225,27 @@ def test_stream_ocr_status_endpoint_returns_saved_status() -> None:
     assert body["plateNumber"] == "123A4567"
 
     detection_route.stream_ocr_statuses.clear()
+    detection_route.stream_ocr_status_seen_at.clear()
+
+
+def test_stream_ocr_status_cleanup_removes_expired_status(monkeypatch) -> None:
+    detection_route.stream_ocr_statuses.clear()
+    detection_route.stream_ocr_status_seen_at.clear()
+    monkeypatch.setattr(detection_route, "STREAM_OCR_STATUS_TTL_SECONDS", 10.0)
+
+    detection_route.remember_stream_ocr_status(
+        "event-old",
+        camera_code="CAM_001",
+        processing_status="OCR_COMPLETED",
+        message="done",
+        result=make_recognized_detection(),
+    )
+    detection_route.stream_ocr_status_seen_at["event-old"] = 100.0
+
+    detection_route.cleanup_stream_ocr_statuses(now_monotonic=111.0)
+
+    assert "event-old" not in detection_route.stream_ocr_statuses
+    assert "event-old" not in detection_route.stream_ocr_status_seen_at
 
 
 def test_plate_number_normalization_keeps_korean_plate_characters() -> None:
@@ -2137,6 +2159,54 @@ def test_backend_client_payload_includes_crop_and_ocr_image_fields(monkeypatch) 
     assert payload["ocrImagePath"].endswith("_ocr.jpg")
     assert payload["ocrImageUrl"].endswith("_ocr.jpg")
     assert captured["headers"]["X-Internal-Api-Key"] == "test-key"
+
+
+def test_backend_client_retries_detection_transient_failure(monkeypatch) -> None:
+    captured = {"attempts": 0}
+
+    class FakeResponse:
+        content = b'{"status":"ok"}'
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"status": "ok"}
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return None
+
+        async def post(self, url, json, headers):
+            captured["attempts"] += 1
+            if captured["attempts"] == 1:
+                raise httpx.ConnectError("temporary detection outage")
+            captured["json"] = json
+            return FakeResponse()
+
+    monkeypatch.setattr("app.services.backend_client.BACKEND_INTERNAL_API_KEY", "test-key")
+    monkeypatch.setattr("app.services.backend_client.httpx.AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr("app.services.backend_client.SPRING_SPEED_VIOLATION_RETRY_ATTEMPTS", 2)
+    monkeypatch.setattr(
+        "app.services.backend_client.SPRING_SPEED_VIOLATION_RETRY_DELAY_SECONDS",
+        0.0,
+    )
+
+    asyncio.run(
+        BackendClient().send_detection(
+            make_recognized_detection(),
+            "FLOW_EVENT_CREATED",
+        )
+    )
+
+    assert captured["attempts"] == 2
+    assert captured["json"]["status"] == "FLOW_EVENT_CREATED"
 
 
 def test_backend_client_speed_violation_payload(monkeypatch) -> None:

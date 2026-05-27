@@ -244,7 +244,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--preview-max-response-lag-seconds",
         type=float,
-        default=0.25,
+        default=0.35,
         help="Hide preview bbox when the matched server response is older than this many video seconds. 0 requires the exact response frame.",
     )
     parser.add_argument(
@@ -291,7 +291,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--preview-delay-seconds",
         type=float,
-        default=2.0,
+        default=10.0,
         help="Delay GUI playback so bbox responses can be drawn on their matching frames.",
     )
     parser.add_argument(
@@ -685,11 +685,15 @@ def build_tracking_log_text(
     bbox_confidence: float,
 ) -> str:
     stream_status = response.get("streamStatus") or "-"
-    track_id = response.get("trackId")
-    track_text = f" / Track ID: {track_id}" if track_id is not None else ""
+    status_label = {
+        "IDLE": "대기",
+        "TRACKING": "추적 중",
+        "FINALIZED": "완료",
+        "-": "-",
+    }.get(str(stream_status), str(stream_status))
     return (
-        f"Tracking: {stream_status}{track_text} / "
-        f"차량 {visible_bbox_count}대 / 신뢰도 {bbox_confidence:.3f}"
+        f"상태: {status_label} / "
+        f"신뢰도 {bbox_confidence:.3f}"
     )
 
 
@@ -1178,9 +1182,14 @@ def draw_preview(
     bboxes = response.get("bboxes") or []
     bbox_confidence = response.get("bboxConfidenceScore", 0.0)
     event_age_seconds = response.get("eventAgeSeconds", 0.0)
+    stream_status = response.get("streamStatus")
     speed_violation_active = has_speed_violation(response)
     bbox_color = (0, 0, 255) if speed_violation_active else (0, 255, 0)
     bbox_label_prefix = "OVERSPEED" if speed_violation_active else "VEHICLE"
+
+    if stream_status in {"IDLE", "FINALIZED"}:
+        bboxes = []
+        bbox = None
 
     if primary_bbox_only and tracker_bbox is None:
         primary_bbox = bbox if bbox is not None else (bboxes[0] if bboxes else None)
