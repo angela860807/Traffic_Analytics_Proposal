@@ -4,6 +4,7 @@ import { ref } from "vue";
 
 const STORAGE_KEY = "tas_violation_queue";
 const MAX_ITEMS = 20;
+const DEFAULT_SPEED_LIMIT_KMH = 70;
 
 function loadFromStorage() {
   try {
@@ -63,7 +64,7 @@ function submitViolation(payload) {
     conf: payload.conf ?? (90 + Math.floor(Math.random() * 9)),
     st: "검토 대기",
     detectSpeed: payload.detectSpeed ?? (85 + Math.floor(Math.random() * 45)),
-    limitSpeed: payload.limitSpeed ?? 80,
+    limitSpeed: payload.limitSpeed ?? DEFAULT_SPEED_LIMIT_KMH,
     camera: payload.camera || "CTRL-AUTO",
     lane: payload.lane ?? Math.ceil(Math.random() * 3),
     image: payload.image || "",

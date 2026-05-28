@@ -156,21 +156,10 @@
             <span>저장된 캡처 이미지가 없습니다.</span>
           </div>
         </div>
-<<<<<<< Updated upstream
         <div class="ocr-evt-row">
           <div class="ocr-section">
             <div class="ocr-h">
               <i class="bi bi-camera"></i> 차량 정보 (OCR)
-=======
-        <div class="ocr-section">
-          <div class="ocr-h">
-            <i class="bi bi-camera"></i> 차량 정보 (OCR)
-          </div>
-          <div class="ocr-grid">
-            <div class="plate-snap">
-              <img v-if="ocrSnapUrl" :src="ocrSnapUrl" alt="OCR 캡처" @error="handlePlateCropError" />
-              <div v-else class="plate-snap-ph"><i class="bi bi-image"></i> Crop 이미지 없음</div>
->>>>>>> Stashed changes
             </div>
             <div class="ocr-grid">
               <div class="plate-snap">
@@ -329,7 +318,7 @@ const guideOpen = ref(false);
 /* ── 헤더 실시간 알림 ── */
 const showAlerts = ref(false);
 const liveAlerts = ref([
-  { id: 1, sev: "critical", icon: "bi bi-speedometer2",          title: "신규 과속 후보 5건",         detail: "교통정보센터에서 일괄 전송됨 — 검토 대기 큐 추가",  place: "강변북로 한남TG",      time: "14:32" },
+  { id: 1, sev: "critical", icon: "bi bi-speedometer2",          title: "신규 과속 후보 5건",         detail: "교통정보센터에서 일괄 전송됨 — 검토 대기 큐 추가",  place: "단속관리팀 큐",      time: "14:32" },
   { id: 2, sev: "serious",  icon: "bi bi-exclamation-octagon-fill", title: "OCR 신뢰도 임계 미만",       detail: "최근 3건의 OCR 신뢰도가 85% 미만 — 수동 확인 필요", place: "내부순환로 정릉",       time: "14:24" },
   { id: 3, sev: "caution",  icon: "bi bi-clock-history",          title: "처리 마감 임박",            detail: "검토 대기 7건 중 2건이 오늘 마감 시한 도래",         place: "단속관리팀 큐",         time: "13:50" },
   { id: 4, sev: "info",     icon: "bi bi-file-earmark-text",      title: "일일 보고서 자동 발행",      detail: "16:00 일일 단속 보고서가 자동 발행될 예정입니다",    place: "교통분석팀 · 경영본부", time: "13:00" },
@@ -377,6 +366,7 @@ function downloadRangeReport() {
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 const FASTAPI_BASE_URL = (import.meta.env.VITE_FASTAPI_BASE_URL || "").replace(/\/+$/, "");
+const REVIEW_SPEED_LIMIT_KMH = 70;
 const STATUS_LABELS = {
   UNPROCESSED: "보류",
   NOTIFIED: "과속 확정",
@@ -384,43 +374,7 @@ const STATUS_LABELS = {
   CLOSED: "종결/보관",
 };
 
-const DUMMY_REVIEW_EVENT = {
-  id: "DUMMY-001",
-  violationId: "DUMMY-001",
-  flowEventId: null,
-  evtId: "SV-DUMMY-001",
-  time: "14:32:18",
-  date: "2026-05-28",
-  place: "강변북로 한남TG",
-  type: "속도 위반",
-  typeTone: "tg-rd",
-  plate: "12가 3456",
-  conf: 0.97,
-  st: "보류",
-  stCode: "UNPROCESSED",
-  reviewedManually: false,
-  latestReviewStatus: "",
-  latestReviewReason: "",
-  latestReviewMemo: "",
-  latestReviewedBy: "",
-  latestReviewedAt: "",
-  detectSpeed: 112.4,
-  limitSpeed: 80,
-  camera: "CAM-한남01",
-  cameraId: 1,
-  vehicleId: null,
-  lane: 2,
-  image: "",
-  imagePath: "",
-  imageName: "",
-  plateCropImage: "",
-  plateCropPath: "",
-  plateCropName: "",
-  source: "dummy",
-  raw: {},
-};
-
-const speedEvents = ref([{ ...DUMMY_REVIEW_EVENT }]);
+const speedEvents = ref([]);
 const isLoading = ref(false);
 const isUpdatingStatus = ref(false);
 const loadError = ref("");
@@ -529,7 +483,7 @@ function displayViolationStatus(row, measuredSpeed, speedLimit) {
 function mapSpeedViolation(row) {
   const occurred = splitDateTime(row.violatedAt || row.createdAt);
   const measuredSpeed = asNumber(row.measuredSpeed);
-  const speedLimit = asNumber(row.speedLimit);
+  const speedLimit = REVIEW_SPEED_LIMIT_KMH;
   const imagePath = row.violationImageUrl || row.violationImagePath || "";
   const plateCropPath = row.plateCropImageUrl || row.plateCropImagePath || derivePlateCropPath(imagePath);
   return {
@@ -585,14 +539,14 @@ async function loadSpeedViolationEvents({ silent = false } = {}) {
   loadError.value = "";
   try {
     const rows = await listSpeedViolations(selectedDateRange());
-    speedEvents.value = [{ ...DUMMY_REVIEW_EVENT }, ...rows.map(mapSpeedViolation)];
+    speedEvents.value = rows.map(mapSpeedViolation);
     lastUpdated.value = fmtDateTime();
     if (selected.value) {
       selected.value = speedEvents.value.find((e) => e.id === selected.value.id) || null;
     }
   } catch (error) {
     console.warn("[ReviewView] failed to load speed violations", error);
-    speedEvents.value = [{ ...DUMMY_REVIEW_EVENT }];
+    speedEvents.value = [];
     lastUpdated.value = fmtDateTime();
   } finally {
     if (!silent) isLoading.value = false;
