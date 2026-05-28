@@ -156,47 +156,37 @@
             <span>저장된 캡처 이미지가 없습니다.</span>
           </div>
         </div>
-        <div class="ocr-section">
-          <div class="ocr-h">
-            <i class="bi bi-camera"></i> 차량 정보 (OCR)
-          </div>
-          <div class="ocr-grid">
-            <div class="plate-snap">
-              <img v-if="ocrSnapUrl" :src="ocrSnapUrl" alt="OCR 캡처" @error="handlePlateCropError" />
-              <div v-else class="plate-snap-ph"><i class="bi bi-image"></i> Crop 이미지 없음</div>
-              <div class="snap-plate">{{ selected.plate }}</div>
+        <div class="ocr-evt-row">
+          <div class="ocr-section">
+            <div class="ocr-h">
+              <i class="bi bi-camera"></i> 차량 정보 (OCR)
             </div>
-            <div>
-              <div class="ocr-lab">인식 결과</div>
-              <div class="ocr-val">{{ selected.plate }}</div>
-              <div class="ocr-conf">OCR 신뢰도 <strong class="bl">{{ formatPercent(selected.conf) }}</strong></div>
-              <div class="ocr-conf">Crop 파일 <strong class="bl">{{ selected.plateCropName || 'N/A' }}</strong></div>
+            <div class="ocr-grid">
+              <div class="plate-snap">
+                <img v-if="ocrSnapUrl" :src="ocrSnapUrl" alt="OCR 캡처" @error="handlePlateCropError" />
+                <div v-else class="plate-snap-ph"><i class="bi bi-image"></i> Crop 이미지 없음</div>
+              </div>
+              <div>
+                <div class="ocr-lab">인식 결과</div>
+                <div class="ocr-val">{{ selected.plate }}</div>
+                <div class="ocr-conf">OCR 신뢰도 <strong class="bl">{{ formatPercent(selected.conf) }}</strong></div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="evt-info">
-          <div class="ei-h">이벤트 정보</div>
-          <div class="ei-grid">
-            <div class="ei-row"><span>발생 시간</span><strong>{{ selected.date }} {{ selected.time }}</strong></div>
-            <div class="ei-row"><span>위치</span><strong>{{ selected.place }}</strong></div>
-            <div class="ei-row"><span>위반 내용</span><strong>{{ selected.type }}</strong></div>
-            <div class="ei-row"><span>검지 구간</span><strong>드론 구간</strong></div>
-            <div class="ei-row"><span>감지 속도</span><strong class="rd">{{ formatSpeed(selected.detectSpeed) }}</strong></div>
-            <div class="ei-row"><span>단속 일시</span><strong>{{ selected.date }} {{ selected.time }}</strong></div>
-            <div class="ei-row"><span>제한 속도</span><strong>{{ formatSpeed(selected.limitSpeed) }}</strong></div>
-            <div class="ei-row"><span>장비/카메라</span><strong>KBR-123 ({{ selected.camera }})</strong></div>
-            <div class="ei-row"><span>초과 속도</span><strong class="rd">{{ overSpeedText(selected) }}</strong></div>
-            <div class="ei-row"><span>OCR 신뢰도</span><strong class="bl">{{ formatPercent(selected.conf) }}</strong></div>
+          <div class="evt-info">
+            <div class="ei-h">이벤트 정보</div>
+            <div class="ei-grid">
+              <div class="ei-row"><span>발생 시간</span><strong>{{ selected.date }} {{ selected.time }}</strong></div>
+              <div class="ei-row"><span>위반 내용</span><strong>{{ selected.type }}</strong></div>
+              <div class="ei-row"><span>감지 속도</span><strong class="rd">{{ formatSpeed(selected.detectSpeed) }}</strong></div>
+              <div class="ei-row"><span>제한 속도</span><strong>{{ formatSpeed(selected.limitSpeed) }}</strong></div>
+              <div class="ei-row"><span>초과 속도</span><strong class="rd">{{ overSpeedText(selected) }}</strong></div>
+            </div>
           </div>
         </div>
 
         <div class="mini-map">
-          <svg viewBox="0 0 400 90" class="mm-svg">
-            <rect width="400" height="90" fill="#1a2a45"/>
-            <path d="M0,55 Q80,45 160,50 T320,40 T400,45" stroke="#3b82f6" stroke-width="3" fill="none"/>
-            <path d="M0,60 Q140,68 280,62 T400,58" stroke="#1f3055" stroke-width="2" fill="none"/>
-          </svg>
           <div class="mm-pin"><i class="bi bi-geo-alt-fill"></i><span>{{ selected.place }}</span></div>
         </div>
       </div>
@@ -383,7 +373,43 @@ const STATUS_LABELS = {
   CLOSED: "종결/보관",
 };
 
-const speedEvents = ref([]);
+const DUMMY_REVIEW_EVENT = {
+  id: "DUMMY-001",
+  violationId: "DUMMY-001",
+  flowEventId: null,
+  evtId: "SV-DUMMY-001",
+  time: "14:32:18",
+  date: "2026-05-28",
+  place: "강변북로 한남TG",
+  type: "속도 위반",
+  typeTone: "tg-rd",
+  plate: "12가 3456",
+  conf: 0.97,
+  st: "보류",
+  stCode: "UNPROCESSED",
+  reviewedManually: false,
+  latestReviewStatus: "",
+  latestReviewReason: "",
+  latestReviewMemo: "",
+  latestReviewedBy: "",
+  latestReviewedAt: "",
+  detectSpeed: 112.4,
+  limitSpeed: 80,
+  camera: "CAM-한남01",
+  cameraId: 1,
+  vehicleId: null,
+  lane: 2,
+  image: "",
+  imagePath: "",
+  imageName: "",
+  plateCropImage: "",
+  plateCropPath: "",
+  plateCropName: "",
+  source: "dummy",
+  raw: {},
+};
+
+const speedEvents = ref([{ ...DUMMY_REVIEW_EVENT }]);
 const isLoading = ref(false);
 const isUpdatingStatus = ref(false);
 const loadError = ref("");
@@ -548,13 +574,15 @@ async function loadSpeedViolationEvents({ silent = false } = {}) {
   loadError.value = "";
   try {
     const rows = await listSpeedViolations(selectedDateRange());
-    speedEvents.value = rows.map(mapSpeedViolation);
+    speedEvents.value = [{ ...DUMMY_REVIEW_EVENT }, ...rows.map(mapSpeedViolation)];
     lastUpdated.value = fmtDateTime();
     if (selected.value) {
       selected.value = speedEvents.value.find((e) => e.id === selected.value.id) || null;
     }
   } catch (error) {
-    loadError.value = getErrorMessage(error);
+    console.warn("[ReviewView] failed to load speed violations", error);
+    speedEvents.value = [{ ...DUMMY_REVIEW_EVENT }];
+    lastUpdated.value = fmtDateTime();
   } finally {
     if (!silent) isLoading.value = false;
   }
