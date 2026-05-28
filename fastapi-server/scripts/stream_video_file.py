@@ -45,7 +45,11 @@ class UploadState:
     responses_by_frame: dict[int, dict[str, Any]] = field(default_factory=dict)
     pending_ocr_event_ids: set[str] = field(default_factory=set)
     ocr_statuses_by_event_id: dict[str, dict[str, Any]] = field(default_factory=dict)
+    ocr_display_frame_by_event_id: dict[str, int] = field(default_factory=dict)
+    logged_ocr_status_keys_by_event_id: dict[str, str] = field(default_factory=dict)
     latest_ocr_status: dict[str, Any] | None = None
+    last_stream_log_key: str | None = None
+    last_speed_log_value: float | None = None
     uploaded_count: int = 0
     finalized_count: int = 0
     dropped_count: int = 0
@@ -67,6 +71,13 @@ class PreviewOverlay:
     bbox_xyxy: tuple[int, int, int, int]
     response_frame_number: int
     confidence_score: float = 0.0
+
+
+@dataclass
+class PreviewLogState:
+    response_body: dict[str, Any] | None = None
+    ocr_status: dict[str, Any] | None = None
+    updated_frame_number: int | None = None
 
 
 @dataclass
@@ -372,15 +383,107 @@ def summarize_response(frame_number: int, response_body: dict[str, Any]) -> str:
     return (
         f"frame={frame_number} "
         f"streamStatus={response_body.get('streamStatus')} "
-        f"eventId={response_body.get('eventId') or '-'} "
         f"frameCount={response_body.get('frameCount')} "
         f"bestFrame={response_body.get('bestCandidateFrameNumber') or '-'} "
         f"analysisStatus={response_body.get('analysisStatus') or '-'} "
         f"speed={speed_text} "
         f"overSpeed={over_speed} "
-        f"speedSent={response_body.get('speedViolationSent', False)} "
         f"plateNumber={data.get('plateNumber') or '-'}"
     )
+
+
+def summarize_ocr_status(status_body: dict[str, Any]) -> str:
+    data = status_body.get("data") or {}
+    plate_number = status_body.get("plateNumber") or data.get("plateNumber") or "-"
+    return (
+        "ocrStatus "
+        f"analysisStatus={status_body.get('analysisStatus') or '-'} "
+        f"plateNumber={plate_number}"
+    )
+
+
+def should_log_ocr_status(status_body: dict[str, Any]) -> bool:
+    data = status_body.get("data") or {}
+    analysis_status = status_body.get("analysisStatus")
+    plate_number = status_body.get("plateNumber") or data.get("plateNumber")
+    error = status_body.get("error")
+    return bool(analysis_status or plate_number or error)
+
+
+def log_ocr_status_if_changed(
+    upload_state: UploadState,
+    status_body: dict[str, Any],
+) -> None:
+    if not should_log_ocr_status(status_body):
+        return
+
+    event_id = status_body.get("eventId")
+    if not isinstance(event_id, str) or not event_id:
+        return
+
+    data = status_body.get("data") or {}
+    status_key = "|".join(
+        [
+            str(status_body.get("processingStatus") or "-"),
+            str(status_body.get("analysisStatus") or "-"),
+            str(status_body.get("plateNumber") or data.get("plateNumber") or "-"),
+            str(status_body.get("error") or "-"),
+        ]
+    )
+
+    should_print = False
+    with upload_state.lock:
+        if upload_state.logged_ocr_status_keys_by_event_id.get(event_id) != status_key:
+            upload_state.logged_ocr_status_keys_by_event_id[event_id] = status_key
+            should_print = True
+
+    if should_print:
+        print(summarize_ocr_status(status_body), flush=True)
+
+
+def get_response_speed_value(response_body: dict[str, Any]) -> float | None:
+    speed_violation = response_body.get("speedViolation")
+    if isinstance(speed_violation, dict):
+        measured_speed = speed_violation.get("measuredSpeed")
+        return float(measured_speed) if isinstance(measured_speed, (int, float)) else None
+
+    speed_measurements = response_body.get("speedMeasurements") or []
+    if isinstance(speed_measurements, list):
+        for measurement in reversed(speed_measurements):
+            if not isinstance(measurement, dict):
+                continue
+            measured_speed = measurement.get("measuredSpeed")
+            if isinstance(measured_speed, (int, float)):
+                return float(measured_speed)
+
+    return None
+
+
+def should_log_stream_response(
+    upload_state: UploadState,
+    response_body: dict[str, Any],
+) -> bool:
+    stream_status = response_body.get("streamStatus")
+    frame_count = response_body.get("frameCount") or 0
+    speed_value = get_response_speed_value(response_body)
+    over_speed = has_speed_violation(response_body)
+
+    if stream_status == "FINALIZED":
+        log_key = f"FINALIZED:{response_body.get('bestCandidateFrameNumber')}"
+    elif stream_status == "TRACKING" and frame_count == 10:
+        log_key = "TRACKING_START"
+    elif over_speed and speed_value is not None:
+        speed_bucket = round(speed_value / 10) * 10
+        log_key = f"OVERSPEED:{speed_bucket}"
+    else:
+        return False
+
+    with upload_state.lock:
+        if upload_state.last_stream_log_key == log_key:
+            return False
+        upload_state.last_stream_log_key = log_key
+        upload_state.last_speed_log_value = speed_value
+        return True
 
 
 def format_speed_text(measurement: dict[str, Any], *, prefix: str = "") -> str:
@@ -699,35 +802,19 @@ def build_tracking_log_text(
 
 def build_ocr_log_text(ocr_status: dict[str, Any] | None) -> str:
     if not isinstance(ocr_status, dict):
-        return "번호판 결과: 대기"
+        return "번호판 결과: -"
 
-    processing_status = str(ocr_status.get("processingStatus") or "UNKNOWN")
-    status_label = {
-        "OCR_QUEUED": "대기 중",
-        "OCR_RUNNING": "인식 중",
-        "OCR_COMPLETED": "완료",
-        "OCR_FAILED": "실패",
-        "PLATE_NOT_DETECTED": "번호판 미검출",
-        "NO_OCR_CANDIDATE": "후보 없음",
-        "UNKNOWN": "확인 중",
-    }.get(processing_status, processing_status)
     plate_number = ocr_status.get("plateNumber") or "-"
-    return f"번호판 결과: {status_label} / {plate_number}"
+    return f"번호판 결과: {plate_number}"
 
 
 def build_speed_log_text(response: dict[str, Any]) -> str:
     speed_violation = response.get("speedViolation")
     if isinstance(speed_violation, dict):
         measured_speed = speed_violation.get("measuredSpeed")
-        speed_limit = speed_violation.get("speedLimit")
         if isinstance(measured_speed, (int, float)):
-            if isinstance(speed_limit, (int, float)):
-                return (
-                    f"속도 계산: 과속 {measured_speed:.1f}km/h "
-                    f"(제한 {speed_limit:.1f}km/h)"
-                )
-            return f"속도 계산: 과속 {measured_speed:.1f}km/h"
-        return "속도 계산: 과속 감지"
+            return f"계산 속도: {measured_speed:.1f}km/h (과속)"
+        return "계산 속도: 과속 감지"
 
     speed_measurements = response.get("speedMeasurements") or []
     if isinstance(speed_measurements, list) and speed_measurements:
@@ -741,18 +828,12 @@ def build_speed_log_text(response: dict[str, Any]) -> str:
         )
         if latest_measurement is not None:
             measured_speed = latest_measurement.get("measuredSpeed")
-            speed_limit = latest_measurement.get("speedLimit")
             is_violation = bool(latest_measurement.get("isViolation", False))
-            label = "과속" if is_violation else "정상"
             if isinstance(measured_speed, (int, float)):
-                if isinstance(speed_limit, (int, float)):
-                    return (
-                        f"속도 계산: {label} {measured_speed:.1f}km/h "
-                        f"(제한 {speed_limit:.1f}km/h)"
-                    )
-                return f"속도 계산: {label} {measured_speed:.1f}km/h"
+                suffix = " (과속)" if is_violation else ""
+                return f"계산 속도: {measured_speed:.1f}km/h{suffix}"
 
-    return "속도 계산: 대기"
+    return "계산 속도: -"
 
 
 def parse_speed_overlay_config(
@@ -1161,6 +1242,7 @@ def draw_preview(
     min_bbox_confidence: float = 0.0,
     primary_bbox_only: bool = True,
     ocr_status: dict[str, Any] | None = None,
+    log_state: PreviewLogState | None = None,
 ) -> int:
     if scale != 1.0:
         display_frame = cv2.resize(
@@ -1175,8 +1257,8 @@ def draw_preview(
         display_frame = frame.copy()
         coord_scale = 1.0
 
-    overlay_font_scale = min(0.50, max(0.30, display_frame.shape[0] / 1080 * 0.55))
-    overlay_line_height = max(18, round(overlay_font_scale * 52))
+    overlay_font_scale = min(0.95, max(0.70, display_frame.shape[0] / 540 * 0.82))
+    overlay_line_height = max(34, round(overlay_font_scale * 48))
     response = response_body if isinstance(response_body, dict) else {}
     bbox = response.get("bbox")
     bboxes = response.get("bboxes") or []
@@ -1212,6 +1294,7 @@ def draw_preview(
 
     if (
         max_event_age_seconds > 0
+        and stream_status != "TRACKING"
         and isinstance(event_age_seconds, (int, float))
         and event_age_seconds > max_event_age_seconds
     ):
@@ -1228,6 +1311,7 @@ def draw_preview(
 
     bbox_response_coord_scale = 1.0 if tracker_bbox is not None else response_coord_scale
     display_area = max(display_frame.shape[0] * display_frame.shape[1], 1)
+    bbox_thickness = 1
 
     for index, current_bbox in enumerate(bboxes):
         x1, y1, x2, y2 = [
@@ -1239,7 +1323,7 @@ def draw_preview(
             continue
 
         color = bbox_color
-        cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
+        cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, bbox_thickness)
         label = (
             f"{'OVERSPEED ' if speed_violation_active else ''}TRACK {index + 1}"
             if tracker_bbox is not None
@@ -1272,7 +1356,7 @@ def draw_preview(
             for value in bbox
         ]
         color = bbox_color
-        cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
+        cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, bbox_thickness)
         draw_text(
             display_frame,
             f"{bbox_label_prefix} {bbox_confidence:.3f}",
@@ -1281,33 +1365,58 @@ def draw_preview(
             overlay_font_scale,
         )
 
-    tracking_text = build_tracking_log_text(
-        response=response,
-        visible_bbox_count=len(bboxes),
-        bbox_confidence=float(bbox_confidence or 0.0),
-    )
-    ocr_text = build_ocr_log_text(ocr_status)
-    speed_text = build_speed_log_text(response)
-    log_color = (0, 0, 255) if speed_violation_active else (0, 255, 255)
+    current_has_visible_bbox = bool(bboxes) or bbox is not None
+    log_response = response
+    log_ocr_status = ocr_status
+    log_hold_frames = 90
+
+    if log_state is not None:
+        if current_has_visible_bbox and response:
+            log_state.response_body = response
+            log_state.ocr_status = ocr_status
+            log_state.updated_frame_number = frame_number
+        elif (
+            ocr_status is not None
+            and log_state.response_body is not None
+            and ocr_status.get("eventId") == log_state.response_body.get("eventId")
+        ):
+            log_state.ocr_status = ocr_status
+            log_state.updated_frame_number = frame_number
+
+        log_is_expired = (
+            log_state.updated_frame_number is not None
+            and frame_number - log_state.updated_frame_number > log_hold_frames
+        )
+
+        if log_is_expired:
+            log_state.response_body = None
+            log_state.ocr_status = None
+            log_state.updated_frame_number = None
+            log_response = {}
+            log_ocr_status = None
+        elif not current_has_visible_bbox and log_state.response_body is not None:
+            log_response = log_state.response_body
+            log_ocr_status = log_state.ocr_status
+        elif current_has_visible_bbox:
+            log_response = log_state.response_body or response
+            log_ocr_status = log_state.ocr_status
+
+    log_speed_violation_active = has_speed_violation(log_response)
+    ocr_text = build_ocr_log_text(log_ocr_status)
+    speed_text = build_speed_log_text(log_response)
+    log_color = (0, 0, 255) if log_speed_violation_active else (0, 255, 255)
 
     draw_text(
         display_frame,
-        tracking_text,
+        ocr_text,
         (12, overlay_line_height),
         log_color,
         overlay_font_scale,
     )
     draw_text(
         display_frame,
-        ocr_text,
-        (12, overlay_line_height * 2),
-        log_color,
-        overlay_font_scale,
-    )
-    draw_text(
-        display_frame,
         speed_text,
-        (12, overlay_line_height * 3),
+        (12, overlay_line_height * 2),
         log_color,
         overlay_font_scale,
     )
@@ -1336,14 +1445,36 @@ def get_latest_response_body(upload_state: UploadState) -> dict[str, Any] | None
         return upload_state.latest_response_body
 
 
-def get_latest_ocr_status(upload_state: UploadState) -> dict[str, Any] | None:
+def get_ocr_status_for_response(
+    upload_state: UploadState,
+    response_body: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not isinstance(response_body, dict):
+        return None
+
+    event_id = response_body.get("eventId")
+    if not isinstance(event_id, str) or not event_id:
+        return None
+
     with upload_state.lock:
-        return upload_state.latest_ocr_status
+        return upload_state.ocr_statuses_by_event_id.get(event_id)
+
+
+def get_ocr_status_for_preview_log(
+    upload_state: UploadState,
+    response_body: dict[str, Any] | None,
+    log_state: PreviewLogState,
+) -> dict[str, Any] | None:
+    return (
+        get_ocr_status_for_response(upload_state, response_body)
+        or get_ocr_status_for_response(upload_state, log_state.response_body)
+    )
 
 
 def remember_ocr_event_from_response(
     upload_state: UploadState,
     response_body: dict[str, Any],
+    response_frame_number: int,
 ) -> None:
     event_id = response_body.get("eventId")
     if (
@@ -1356,13 +1487,17 @@ def remember_ocr_event_from_response(
     queued_status = {
         "eventId": event_id,
         "processingStatus": response_body.get("processingStatus") or "OCR_QUEUED",
+        "analysisStatus": response_body.get("analysisStatus"),
         "message": "OCR queued",
         "plateNumber": None,
+        "data": None,
     }
     with upload_state.lock:
         upload_state.pending_ocr_event_ids.add(event_id)
         upload_state.ocr_statuses_by_event_id[event_id] = queued_status
+        upload_state.ocr_display_frame_by_event_id[event_id] = response_frame_number
         upload_state.latest_ocr_status = queued_status
+    log_ocr_status_if_changed(upload_state, queued_status)
 
 
 def refresh_pending_ocr_statuses(
@@ -1389,6 +1524,32 @@ def refresh_pending_ocr_statuses(
             upload_state.latest_ocr_status = status_body
             if processing_status not in {"OCR_QUEUED", "OCR_RUNNING", "UNKNOWN"}:
                 upload_state.pending_ocr_event_ids.discard(event_id)
+        log_ocr_status_if_changed(upload_state, status_body)
+
+
+def has_pending_ocr_status(upload_state: UploadState) -> bool:
+    with upload_state.lock:
+        return bool(upload_state.pending_ocr_event_ids)
+
+
+def ocr_status_worker(
+    *,
+    base_url: str,
+    upload_state: UploadState,
+    timeout: float,
+    stop_event: threading.Event,
+    poll_interval_seconds: float = 0.5,
+) -> None:
+    while True:
+        if stop_event.is_set() and not has_pending_ocr_status(upload_state):
+            break
+
+        refresh_pending_ocr_statuses(
+            base_url=base_url,
+            upload_state=upload_state,
+            timeout=timeout,
+        )
+        time.sleep(poll_interval_seconds)
 
 
 def get_latest_response_packet(
@@ -1827,7 +1988,11 @@ def upload_worker(
                 high_res_crop_bytes=task.high_res_crop_bytes,
                 high_res_crop_frame_number=task.high_res_crop_frame_number,
             )
-            remember_ocr_event_from_response(upload_state, response_body)
+            remember_ocr_event_from_response(
+                upload_state,
+                response_body,
+                task.frame_number,
+            )
             refresh_pending_ocr_statuses(
                 base_url=base_url,
                 upload_state=upload_state,
@@ -1867,7 +2032,8 @@ def upload_worker(
                     summarize_highres_response(
                         best_frame_number,
                         highres_response_body,
-                    )
+                    ),
+                    flush=True,
                 )
 
             with upload_state.lock:
@@ -1891,7 +2057,8 @@ def upload_worker(
                         upload_state.stopped_by_finalized_limit = True
                         stop_event.set()
 
-            print(summarize_response(task.frame_number, response_body))
+            if should_log_stream_response(upload_state, response_body):
+                print(summarize_response(task.frame_number, response_body), flush=True)
         except Exception as exc:
             with upload_state.lock:
                 upload_state.error = f"{type(exc).__name__}: {exc}"
@@ -2051,9 +2218,11 @@ def main() -> None:
     )
     active_tracker: PreviewTracker | None = None
     active_overlay: PreviewOverlay | None = None
+    preview_log_state = PreviewLogState()
     consumed_response_frame_number: int | None = None
     stop_event = threading.Event()
     worker_thread: threading.Thread | None = None
+    ocr_status_thread: threading.Thread | None = None
 
     if use_async_upload:
         upload_queue = queue.Queue(maxsize=args.upload_queue_size)
@@ -2079,6 +2248,17 @@ def main() -> None:
             daemon=True,
         )
         worker_thread.start()
+        ocr_status_thread = threading.Thread(
+            target=ocr_status_worker,
+            kwargs={
+                "base_url": base_url,
+                "upload_state": upload_state,
+                "timeout": args.timeout,
+                "stop_event": stop_event,
+            },
+            daemon=True,
+        )
+        ocr_status_thread.start()
 
     print(
         json.dumps(
@@ -2332,7 +2512,12 @@ def main() -> None:
                         max_bbox_area_ratio=args.preview_max_bbox_area_ratio,
                         min_bbox_confidence=args.preview_min_bbox_confidence,
                         primary_bbox_only=args.preview_primary_bbox_only,
-                        ocr_status=get_latest_ocr_status(upload_state),
+                        ocr_status=get_ocr_status_for_preview_log(
+                            upload_state,
+                            response_body,
+                            preview_log_state,
+                        ),
+                        log_state=preview_log_state,
                     )
                     should_quit, should_toggle_pause = handle_preview_key(key)
                 else:
@@ -2371,7 +2556,12 @@ def main() -> None:
                         max_bbox_area_ratio=args.preview_max_bbox_area_ratio,
                         min_bbox_confidence=args.preview_min_bbox_confidence,
                         primary_bbox_only=args.preview_primary_bbox_only,
-                        ocr_status=get_latest_ocr_status(upload_state),
+                        ocr_status=get_ocr_status_for_preview_log(
+                            upload_state,
+                            latest_response_body,
+                            preview_log_state,
+                        ),
+                        log_state=preview_log_state,
                     )
                     should_quit, should_toggle_pause = handle_preview_key(key)
 
@@ -2441,6 +2631,16 @@ def main() -> None:
                     high_res_crop_bytes=high_res_crop_bytes,
                     high_res_crop_frame_number=high_res_crop_frame_number,
                 )
+                remember_ocr_event_from_response(
+                    upload_state,
+                    response_body,
+                    read_count,
+                )
+                refresh_pending_ocr_statuses(
+                    base_url=base_url,
+                    upload_state=upload_state,
+                    timeout=args.timeout,
+                )
                 if args.finalized_highres_ocr and should_run_finalized_highres_ocr(
                     response_body
                 ):
@@ -2476,13 +2676,15 @@ def main() -> None:
                         summarize_highres_response(
                             best_frame_number,
                             highres_response_body,
-                        )
+                        ),
+                        flush=True,
                     )
                 latest_response_body = response_body
                 latest_response_frame_number = read_count
                 uploaded_count += 1
 
-                print(summarize_response(read_count, response_body))
+                if should_log_stream_response(upload_state, response_body):
+                    print(summarize_response(read_count, response_body), flush=True)
 
             if args.preview_bbox:
                 key = draw_preview(
@@ -2497,7 +2699,12 @@ def main() -> None:
                     max_bbox_area_ratio=args.preview_max_bbox_area_ratio,
                     min_bbox_confidence=args.preview_min_bbox_confidence,
                     primary_bbox_only=args.preview_primary_bbox_only,
-                    ocr_status=get_latest_ocr_status(upload_state),
+                    ocr_status=get_ocr_status_for_preview_log(
+                        upload_state,
+                        response_body,
+                        preview_log_state,
+                    ),
+                    log_state=preview_log_state,
                 )
                 should_quit, should_toggle_pause = handle_preview_key(key)
 
@@ -2537,6 +2744,17 @@ def main() -> None:
             upload_queue.join()
         if worker_thread is not None:
             worker_thread.join(timeout=2)
+        if use_async_upload:
+            ocr_poll_deadline = time.monotonic() + max(2.0, args.timeout)
+            while has_pending_ocr_status(upload_state) and time.monotonic() < ocr_poll_deadline:
+                refresh_pending_ocr_statuses(
+                    base_url=base_url,
+                    upload_state=upload_state,
+                    timeout=args.timeout,
+                )
+                time.sleep(0.5)
+        if ocr_status_thread is not None:
+            ocr_status_thread.join(timeout=max(2, args.timeout))
 
     if use_async_upload:
         with upload_state.lock:
