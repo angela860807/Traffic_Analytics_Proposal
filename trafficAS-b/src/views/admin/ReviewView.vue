@@ -156,10 +156,21 @@
             <span>저장된 캡처 이미지가 없습니다.</span>
           </div>
         </div>
+<<<<<<< Updated upstream
         <div class="ocr-evt-row">
           <div class="ocr-section">
             <div class="ocr-h">
               <i class="bi bi-camera"></i> 차량 정보 (OCR)
+=======
+        <div class="ocr-section">
+          <div class="ocr-h">
+            <i class="bi bi-camera"></i> 차량 정보 (OCR)
+          </div>
+          <div class="ocr-grid">
+            <div class="plate-snap">
+              <img v-if="ocrSnapUrl" :src="ocrSnapUrl" alt="OCR 캡처" @error="handlePlateCropError" />
+              <div v-else class="plate-snap-ph"><i class="bi bi-image"></i> Crop 이미지 없음</div>
+>>>>>>> Stashed changes
             </div>
             <div class="ocr-grid">
               <div class="plate-snap">
