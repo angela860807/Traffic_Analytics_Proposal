@@ -2091,7 +2091,6 @@ html .ops-shell .snav-i .snav-bdg {
 .rev-shell .ocr-grid { grid-template-columns: 1fr !important; gap: 14px !important; }
 .rev-shell .ocr-grid > div:first-child { order: 1 !important; }
 .rev-shell .ocr-grid > div:last-child { order: 2 !important; text-align: center !important; }
-.rev-shell .snap-plate { font-size: 22px !important; padding: 6px 16px !important; }
 .rev-shell .plate-snap { aspect-ratio: 2 / 1 !important; max-width: 100% !important; }
 .rev-shell .ei-row { font-size: 15px !important; padding: 14px 0 !important; display: flex !important; justify-content: space-between !important; align-items: center !important; border-bottom: 1px dashed rgba(12,31,64,0.08) !important; flex: 1 !important; }
 .rev-shell .ei-row:last-child { border-bottom: 0 !important; }

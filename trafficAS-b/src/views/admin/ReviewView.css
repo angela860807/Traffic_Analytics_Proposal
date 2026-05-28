@@ -168,26 +168,10 @@
   width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
   gap: 6px; color: rgba(255,255,255,0.5); font-size: 11px;
 }
-<<<<<<< Updated upstream
-.snap-plate {
-  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
-  background: #fff; color: #000;
-  font-family: "JetBrains Mono", monospace; font-weight: 800; font-size: 18px;
-  padding: 4px 12px; border-radius: 3px;
-  border: 1.5px solid #1a1a1a;
-  white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-}
 .ocr-lab { font-size: 14px; opacity: .8; }
 .ocr-val { font-size: 32px; font-weight: 800; margin: 4px 0 10px; }
 .ocr-conf { font-size: 14px; opacity: .9; }
 .ocr-conf strong { color: #60a5fa; font-size: 16px; }
-=======
-.ocr-lab { font-size: 11px; opacity: .65; }
-.ocr-val { font-size: 22px; font-weight: 800; margin: 2px 0 6px; }
-.ocr-conf { font-size: 11.5px; opacity: .8; }
-.ocr-conf strong { color: #60a5fa; font-size: 13px; }
->>>>>>> Stashed changes
 .verify-card h3 { margin-bottom: 10px; display: flex; align-items: center; gap: 6px; color: #0c1f40; }
 .verify-card h3 i { color: #2563eb; }
 
