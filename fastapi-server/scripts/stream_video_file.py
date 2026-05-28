@@ -23,6 +23,7 @@ except ImportError:
 STREAM_FRAME_PATH = "/api/detections/stream-frame"
 HIGHRES_OCR_PATH = "/api/detections/stream-frame/highres-ocr"
 OCR_STATUS_PATH_TEMPLATE = "/api/detections/stream-events/{event_id}/ocr-status"
+EVENT_HIGHRES_OCR_PATH_TEMPLATE = "/api/detections/stream-events/{event_id}/highres-ocr"
 WINDOW_NAME = "Traffic Stream + BBox Preview"
 SPEED_ZONE_WINDOW_NAME = "Speed Zone Config"
 _KOREAN_FONT = None
@@ -78,6 +79,7 @@ class PreviewLogState:
     response_body: dict[str, Any] | None = None
     ocr_status: dict[str, Any] | None = None
     updated_frame_number: int | None = None
+    visible_bbox_frame_number: int | None = None
 
 
 @dataclass
@@ -172,8 +174,8 @@ def build_parser() -> argparse.ArgumentParser:
         action=argparse.BooleanOptionalAction,
         default=False,
         help=(
-            "After FINALIZED, synchronously call the legacy high-res OCR endpoint. "
-            "Disabled by default because stream-frame now queues OCR in FastAPI."
+            "After FINALIZED, submit an original best-frame crop for OCR/DB save. "
+            "This keeps bbox streaming lightweight while preserving OCR quality."
         ),
     )
     parser.add_argument(
@@ -221,6 +223,12 @@ def build_parser() -> argparse.ArgumentParser:
         action=argparse.BooleanOptionalAction,
         default=False,
         help="Track response bbox between server responses. Disable for smoother low-end CPU preview.",
+    )
+    parser.add_argument(
+        "--preview-tracker-max-age-seconds",
+        type=float,
+        default=0.0,
+        help="Drop OpenCV tracker bbox after this many video seconds from the source response. 0 disables.",
     )
     parser.add_argument(
         "--bbox-hold-seconds",
@@ -361,7 +369,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--speed-limit-kmh",
         type=float,
-        default=50.0,
+        default=70.0,
         help="Speed limit written to the generated speed config JSON.",
     )
     return parser
@@ -502,6 +510,7 @@ def post_frame(
     frame_bytes: bytes,
     timeout: float,
     speed_config_json: str | None = None,
+    defer_highres_ocr: bool = False,
     high_res_crop_bytes: bytes | None = None,
     high_res_crop_frame_number: int | None = None,
 ) -> dict[str, Any]:
@@ -513,6 +522,8 @@ def post_frame(
         data["frameNumber"] = str(frame_number)
     if speed_config_json is not None:
         data["speedConfigJson"] = speed_config_json
+    if defer_highres_ocr:
+        data["deferHighresOcr"] = "true"
 
     files = {
         "image": ("video-frame.jpg", frame_bytes, "image/jpeg"),
@@ -598,6 +609,38 @@ def post_highres_ocr(
         body = response.text[:500]
         raise RuntimeError(
             f"high-res OCR request failed: status={response.status_code}, body={body}"
+        ) from exc
+
+    return response.json()
+
+
+def post_stream_event_highres_ocr(
+    *,
+    base_url: str,
+    event_id: str,
+    high_res_crop_bytes: bytes,
+    timeout: float,
+) -> dict[str, Any]:
+    path = EVENT_HIGHRES_OCR_PATH_TEMPLATE.format(event_id=event_id)
+    url = f"{base_url.rstrip('/')}{path}"
+    response = requests.post(
+        url,
+        files={
+            "highResCrop": (
+                "best-frame-highres-crop.jpg",
+                high_res_crop_bytes,
+                "image/jpeg",
+            ),
+        },
+        timeout=timeout,
+    )
+
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        body = response.text[:500]
+        raise RuntimeError(
+            f"stream event high-res OCR request failed: status={response.status_code}, body={body}"
         ) from exc
 
     return response.json()
@@ -1272,6 +1315,7 @@ def draw_preview(
     if stream_status in {"IDLE", "FINALIZED"}:
         bboxes = []
         bbox = None
+        tracker_bbox = None
 
     if primary_bbox_only and tracker_bbox is None:
         primary_bbox = bbox if bbox is not None else (bboxes[0] if bboxes else None)
@@ -1375,6 +1419,7 @@ def draw_preview(
             log_state.response_body = response
             log_state.ocr_status = ocr_status
             log_state.updated_frame_number = frame_number
+            log_state.visible_bbox_frame_number = frame_number
         elif (
             ocr_status is not None
             and log_state.response_body is not None
@@ -1384,14 +1429,15 @@ def draw_preview(
             log_state.updated_frame_number = frame_number
 
         log_is_expired = (
-            log_state.updated_frame_number is not None
-            and frame_number - log_state.updated_frame_number > log_hold_frames
+            log_state.visible_bbox_frame_number is not None
+            and frame_number - log_state.visible_bbox_frame_number > log_hold_frames
         )
 
         if log_is_expired:
             log_state.response_body = None
             log_state.ocr_status = None
             log_state.updated_frame_number = None
+            log_state.visible_bbox_frame_number = None
             log_response = {}
             log_ocr_status = None
         elif not current_has_visible_bbox and log_state.response_body is not None:
@@ -1851,6 +1897,31 @@ def xywh_to_xyxy(bbox) -> tuple[int, int, int, int]:
     )
 
 
+def is_preview_bbox_usable(
+    bbox: tuple[int, int, int, int],
+    *,
+    frame_shape,
+    max_bbox_area_ratio: float = 0.0,
+) -> bool:
+    frame_height, frame_width = frame_shape[:2]
+    x1, y1, x2, y2 = bbox
+    bbox_w = x2 - x1
+    bbox_h = y2 - y1
+
+    if bbox_w <= 1 or bbox_h <= 1:
+        return False
+
+    if x2 < 0 or y2 < 0 or x1 > frame_width or y1 > frame_height:
+        return False
+
+    frame_area = max(frame_width * frame_height, 1)
+    bbox_area_ratio = (bbox_w * bbox_h) / frame_area
+    if max_bbox_area_ratio > 0 and bbox_area_ratio > max_bbox_area_ratio:
+        return False
+
+    return True
+
+
 def rebuild_tracker_from_response(
     *,
     response_frame_number: int,
@@ -1858,6 +1929,7 @@ def rebuild_tracker_from_response(
     frame_history: deque[tuple[int, Any]],
     response_coord_scale: float,
     min_bbox_confidence: float = 0.0,
+    max_bbox_area_ratio: float = 0.0,
 ) -> PreviewTracker | None:
     bbox, confidence_score = select_response_bbox(
         response_body,
@@ -1866,6 +1938,9 @@ def rebuild_tracker_from_response(
     )
 
     if bbox is None:
+        return None
+
+    if not frame_history:
         return None
 
     tracker = create_cv_tracker()
@@ -1880,27 +1955,25 @@ def rebuild_tracker_from_response(
             for index, (frame_number, _frame) in enumerate(history)
             if frame_number == response_frame_number
         ),
-        len(history) - 1,
+        None,
     )
+    if start_index is None:
+        return None
+
     start_frame_number, start_frame = history[start_index]
+    if not is_preview_bbox_usable(
+        bbox,
+        frame_shape=start_frame.shape,
+        max_bbox_area_ratio=max_bbox_area_ratio,
+    ):
+        return None
+
     tracker.init(start_frame, xyxy_to_xywh(bbox))
-    current_bbox = bbox
-    current_frame_number = start_frame_number
-
-    for frame_number, frame in history[start_index + 1:]:
-        ok, tracked_bbox = tracker.update(frame)
-
-        if not ok:
-            break
-
-        current_bbox = xywh_to_xyxy(tracked_bbox)
-        current_frame_number = frame_number
-
     return PreviewTracker(
         tracker=tracker,
-        bbox_xyxy=current_bbox,
+        bbox_xyxy=bbox,
         response_frame_number=response_frame_number,
-        last_frame_number=current_frame_number,
+        last_frame_number=start_frame_number,
         confidence_score=confidence_score,
     )
 
@@ -1910,8 +1983,13 @@ def update_preview_tracker(
     *,
     frame_number: int,
     frame,
+    max_age_frames: int = 0,
+    max_bbox_area_ratio: float = 0.0,
 ) -> PreviewTracker | None:
     if tracker_state is None:
+        return None
+
+    if max_age_frames > 0 and frame_number - tracker_state.response_frame_number > max_age_frames:
         return None
 
     if frame_number <= tracker_state.last_frame_number:
@@ -1922,7 +2000,15 @@ def update_preview_tracker(
     if not ok:
         return None
 
-    tracker_state.bbox_xyxy = xywh_to_xyxy(tracked_bbox)
+    candidate_bbox = xywh_to_xyxy(tracked_bbox)
+    if not is_preview_bbox_usable(
+        candidate_bbox,
+        frame_shape=frame.shape,
+        max_bbox_area_ratio=max_bbox_area_ratio,
+    ):
+        return None
+
+    tracker_state.bbox_xyxy = candidate_bbox
     tracker_state.last_frame_number = frame_number
     return tracker_state
 
@@ -1985,6 +2071,7 @@ def upload_worker(
                 frame_bytes=task.frame_bytes,
                 timeout=timeout,
                 speed_config_json=speed_config_json,
+                defer_highres_ocr=highres_ocr_enabled,
                 high_res_crop_bytes=task.high_res_crop_bytes,
                 high_res_crop_frame_number=task.high_res_crop_frame_number,
             )
@@ -2020,11 +2107,13 @@ def upload_worker(
                         "failed to capture original best frame for high-res OCR"
                     )
 
-                highres_response_body = post_highres_ocr(
-                    url=highres_ocr_url,
-                    camera_code=camera_code,
-                    captured_at=best_captured_at,
-                    frame_number=best_frame_number,
+                event_id = response_body.get("eventId")
+                if not isinstance(event_id, str) or not event_id:
+                    raise RuntimeError("finalized response is missing eventId")
+
+                highres_response_body = post_stream_event_highres_ocr(
+                    base_url=base_url,
+                    event_id=event_id,
                     high_res_crop_bytes=crop_bytes,
                     timeout=timeout,
                 )
@@ -2034,6 +2123,11 @@ def upload_worker(
                         highres_response_body,
                     ),
                     flush=True,
+                )
+                refresh_pending_ocr_statuses(
+                    base_url=base_url,
+                    upload_state=upload_state,
+                    timeout=timeout,
                 )
 
             with upload_state.lock:
@@ -2102,6 +2196,11 @@ def main() -> None:
 
     if args.preview_fps < 0:
         raise SystemExit("--preview-fps must be greater than or equal to 0")
+
+    if args.preview_tracker_max_age_seconds < 0:
+        raise SystemExit(
+            "--preview-tracker-max-age-seconds must be greater than or equal to 0"
+        )
 
     if args.bbox_hold_seconds < 0:
         raise SystemExit("--bbox-hold-seconds must be greater than or equal to 0")
@@ -2212,7 +2311,9 @@ def main() -> None:
     source_frame_history: deque[tuple[int, Any]] = deque(
         maxlen=max(30, round(source_fps * 12))
     )
-    frame_history: deque[tuple[int, Any]] = deque(maxlen=max(30, round(source_fps * 6)))
+    frame_history: deque[tuple[int, Any]] = deque(
+        maxlen=max(30, preview_delay_frames + round(source_fps * 2))
+    )
     preview_buffer: deque[PreviewFrame] = deque(
         maxlen=max(30, preview_delay_frames + round(source_fps * 2))
     )
@@ -2277,6 +2378,7 @@ def main() -> None:
                 "previewFps": args.preview_fps,
                 "previewFrameStep": preview_frame_step,
                 "previewTracker": use_preview_tracker,
+                "previewTrackerMaxAgeSeconds": args.preview_tracker_max_age_seconds,
                 "bboxHoldSeconds": args.bbox_hold_seconds,
                 "displayScale": args.scale,
                 "uploadScale": args.upload_scale,
@@ -2338,7 +2440,10 @@ def main() -> None:
             preview_buffer.append(PreviewFrame(read_count, frame.copy()))
             should_preview_frame = (
                 args.preview_bbox
-                and ((read_count - 1) % preview_frame_step == 0)
+                and (
+                    effective_preview_all_frames
+                    or ((read_count - 1) % preview_frame_step == 0)
+                )
             )
 
             if use_preview_tracker:
@@ -2430,9 +2535,18 @@ def main() -> None:
                         active_overlay = None
                         active_tracker = None
 
+                response_is_tracking = (
+                    isinstance(response_body, dict)
+                    and response_body.get("streamStatus") == "TRACKING"
+                )
+                if not response_is_tracking:
+                    active_overlay = None
+                    active_tracker = None
+
                 if (
                     should_preview_frame
                     and response_frame_number is not None
+                    and response_is_tracking
                     and response_frame_number != consumed_response_frame_number
                 ):
                     if use_preview_tracker:
@@ -2442,6 +2556,7 @@ def main() -> None:
                             frame_history=frame_history,
                             response_coord_scale=response_coord_scale,
                             min_bbox_confidence=args.preview_min_bbox_confidence,
+                            max_bbox_area_ratio=args.preview_max_bbox_area_ratio,
                         )
 
                         if rebuilt_tracker is not None:
@@ -2478,11 +2593,15 @@ def main() -> None:
                     ):
                         active_overlay = None
 
-                    if use_preview_tracker:
+                    if use_preview_tracker and response_is_tracking:
                         active_tracker = update_preview_tracker(
                             active_tracker,
                             frame_number=display_frame_number,
                             frame=display_frame,
+                            max_age_frames=round(
+                                source_fps * args.preview_tracker_max_age_seconds
+                            ),
+                            max_bbox_area_ratio=args.preview_max_bbox_area_ratio,
                         )
                     tracker_bbox = (
                         active_tracker.bbox_xyxy
@@ -2494,7 +2613,11 @@ def main() -> None:
                         if active_tracker is not None and use_preview_tracker
                         else 0.0
                     )
-                    if tracker_bbox is None and active_overlay is not None:
+                    if (
+                        response_is_tracking
+                        and tracker_bbox is None
+                        and active_overlay is not None
+                    ):
                         tracker_bbox = active_overlay.bbox_xyxy
                         tracker_confidence = active_overlay.confidence_score
 
@@ -2628,6 +2751,7 @@ def main() -> None:
                     frame_bytes=frame_bytes,
                     timeout=args.timeout,
                     speed_config_json=speed_config_json,
+                    defer_highres_ocr=args.finalized_highres_ocr,
                     high_res_crop_bytes=high_res_crop_bytes,
                     high_res_crop_frame_number=high_res_crop_frame_number,
                 )
@@ -2664,11 +2788,13 @@ def main() -> None:
                             "failed to capture original best frame for high-res OCR"
                         )
 
-                    highres_response_body = post_highres_ocr(
-                        url=highres_ocr_url,
-                        camera_code=args.camera_code,
-                        captured_at=best_captured_at,
-                        frame_number=best_frame_number,
+                    event_id = response_body.get("eventId")
+                    if not isinstance(event_id, str) or not event_id:
+                        raise RuntimeError("finalized response is missing eventId")
+
+                    highres_response_body = post_stream_event_highres_ocr(
+                        base_url=base_url,
+                        event_id=event_id,
                         high_res_crop_bytes=crop_bytes,
                         timeout=args.timeout,
                     )
@@ -2678,6 +2804,11 @@ def main() -> None:
                             highres_response_body,
                         ),
                         flush=True,
+                    )
+                    refresh_pending_ocr_statuses(
+                        base_url=base_url,
+                        upload_state=upload_state,
+                        timeout=args.timeout,
                     )
                 latest_response_body = response_body
                 latest_response_frame_number = read_count
