@@ -45,6 +45,7 @@ duplicate_detection_guard = DuplicateDetectionGuard()
 stream_detection_service = StreamEventService(inference_service=inference_service)
 stream_ocr_statuses: dict[str, dict] = {}
 stream_ocr_status_seen_at: dict[str, float] = {}
+stream_finalized_results: dict[str, StreamProcessingResult] = {}
 
 
 def cleanup_stream_ocr_statuses(*, now_monotonic: float | None = None) -> None:
@@ -58,6 +59,18 @@ def cleanup_stream_ocr_statuses(*, now_monotonic: float | None = None) -> None:
     for event_id in expired_event_ids:
         stream_ocr_status_seen_at.pop(event_id, None)
         stream_ocr_statuses.pop(event_id, None)
+        stream_finalized_results.pop(event_id, None)
+
+
+def remember_stream_finalized_result(
+    stream_result: StreamProcessingResult,
+) -> None:
+    if not stream_result.event_id:
+        return
+
+    cleanup_stream_ocr_statuses()
+    stream_finalized_results[stream_result.event_id] = stream_result
+    stream_ocr_status_seen_at[stream_result.event_id] = time.monotonic()
 
 
 def remember_stream_ocr_status(
@@ -333,6 +346,29 @@ async def analyze_stream_best_candidate(
     return await asyncio.to_thread(
         inference_service.detect_from_image_bytes_sync,
         **detection_kwargs,
+    )
+
+
+async def analyze_stream_best_candidate_with_highres_crop(
+    stream_result: StreamProcessingResult,
+    *,
+    high_res_crop_bytes: bytes,
+):
+    best_candidate = stream_result.best_candidate_frame
+    if best_candidate is None:
+        return None
+
+    return await asyncio.to_thread(
+        inference_service.detect_from_image_bytes_sync,
+        camera_code=best_candidate.camera_code,
+        captured_at=best_candidate.captured_at,
+        image_bytes=best_candidate.image_bytes,
+        high_res_crop_bytes=high_res_crop_bytes,
+        vehicle_detection=VehicleDetection(
+            detection_type="VEHICLE",
+            confidence_score=best_candidate.confidence_score,
+            bbox=best_candidate.bbox,
+        ),
     )
 
 
@@ -642,6 +678,7 @@ async def process_stream_frame(
     captured_at: datetime = Form(..., alias="capturedAt"),
     speed_config_json: str | None = Form(default=None, alias="speedConfigJson"),
     frame_number: int | None = Form(default=None, alias="frameNumber"),
+    defer_highres_ocr: bool = Form(default=False, alias="deferHighresOcr"),
     high_res_crop_frame_number: int | None = Form(
         default=None,
         alias="highResCropFrameNumber",
@@ -723,6 +760,21 @@ async def process_stream_frame(
         result = stream_result.result
 
         if result is None and stream_result.best_candidate_frame is not None:
+            if defer_highres_ocr:
+                remember_stream_finalized_result(stream_result)
+                remember_stream_ocr_status(
+                    stream_result.event_id,
+                    camera_code=stream_result.camera_code,
+                    processing_status="OCR_QUEUED",
+                    message="Waiting for high-resolution best frame crop",
+                )
+                return build_stream_frame_response(
+                    stream_result,
+                    message=(
+                        "Vehicle event finalized; waiting for high-resolution OCR crop"
+                    ),
+                )
+
             remember_stream_ocr_status(
                 stream_result.event_id,
                 camera_code=stream_result.camera_code,
@@ -772,6 +824,95 @@ async def process_stream_frame(
         stream_result,
         message=f"Vehicle event finalized and saved as {analysis_status}",
         analysis_status=analysis_status,
+    )
+
+
+@router.post(
+    "/stream-events/{event_id}/highres-ocr",
+    response_model=DetectionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def process_stream_event_highres_ocr(
+    event_id: str,
+    high_res_crop: UploadFile = File(..., alias="highResCrop"),
+) -> DetectionResponse:
+    if high_res_crop.content_type not in {"image/jpeg", "image/png"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="highResCrop must be jpeg or png",
+        )
+
+    stream_result = stream_finalized_results.get(event_id)
+    if stream_result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="finalized stream event is not available",
+        )
+
+    remember_stream_ocr_status(
+        event_id,
+        camera_code=stream_result.camera_code,
+        processing_status="OCR_RUNNING",
+        message="High-resolution OCR is running",
+    )
+
+    high_res_crop_bytes = await high_res_crop.read()
+
+    try:
+        result = await analyze_stream_best_candidate_with_highres_crop(
+            stream_result,
+            high_res_crop_bytes=high_res_crop_bytes,
+        )
+        if result is None:
+            remember_stream_ocr_status(
+                event_id,
+                camera_code=stream_result.camera_code,
+                processing_status="NO_OCR_CANDIDATE",
+                message="Vehicle event finalized without OCR candidate",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="OCR candidate is not available",
+            )
+
+        analysis_status = await persist_stream_detection_result(
+            stream_result,
+            result,
+        )
+        remember_stream_ocr_status(
+            event_id,
+            camera_code=stream_result.camera_code,
+            processing_status=result.processing_status,
+            analysis_status=analysis_status,
+            message="High-resolution OCR and backend save completed",
+            result=result,
+        )
+        stream_finalized_results.pop(event_id, None)
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="highResCrop must be a valid jpg or png",
+        ) from exc
+    except httpx.HTTPStatusError as exc:
+        raise_spring_http_exception(exc)
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Spring Boot API is not reachable",
+        ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
+
+    return DetectionResponse(
+        accepted=True,
+        message=f"High-resolution stream OCR saved as {analysis_status}",
+        analysis_status=analysis_status,
+        data=result,
     )
 
 

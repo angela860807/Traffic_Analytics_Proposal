@@ -59,11 +59,11 @@ services:
       SAVE_EVENT_DEBUG: "false"
       SPEED_DETECTION_ENABLED: "true"
       SPEED_DEFAULT_DISTANCE_METERS: 14.0
-      SPEED_DEFAULT_LIMIT_KMH: 50.0
+      SPEED_DEFAULT_LIMIT_KMH: 70.0
       SPEED_DEFAULT_MODE: TRACK_DELTA
       SPEED_DEFAULT_LINE_A: 356,289,1000,289
       SPEED_DEFAULT_LINE_B: 356,433,1000,433
-      SPEED_CAMERA_CONFIGS_JSON: '[{"cameraCode":"CAM_001","speedMode":"TRACK_DELTA","lineA":[356,289,1000,289],"lineB":[356,433,1000,433],"roi":[[356,289],[1000,289],[1000,433],[356,433]],"distanceMeters":14.0,"speedLimitKmh":50.0,"enabled":true,"homography":{"imagePoints":[[356,289],[1000,289],[356,433],[1000,433]],"worldPointsMeters":[[0,0],[14,0],[0,14],[14,14]]}}]'
+      SPEED_CAMERA_CONFIGS_JSON: '[{"cameraCode":"CAM_001","speedMode":"TRACK_DELTA","lineA":[356,289,1000,289],"lineB":[356,433,1000,433],"roi":[[356,289],[1000,289],[1000,433],[356,433]],"distanceMeters":14.0,"speedLimitKmh":70.0,"enabled":true,"homography":{"imagePoints":[[356,289],[1000,289],[356,433],[1000,433]],"worldPointsMeters":[[0,0],[14,0],[0,14],[14,14]]}}]'
       SPEED_TRACK_MAX_DISTANCE_PIXELS: 180.0
       SPEED_TRACK_TTL_SECONDS: 4.0
       SPEED_MIN_ELAPSED_SECONDS: 0.05

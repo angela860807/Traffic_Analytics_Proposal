@@ -33,7 +33,7 @@
       ]
     ],
     "distanceMeters": 14.0,
-    "speedLimitKmh": 50.0,
+    "speedLimitKmh": 70.0,
     "enabled": true,
     "homography": {
       "imagePoints": [

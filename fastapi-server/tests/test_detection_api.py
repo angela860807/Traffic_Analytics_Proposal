@@ -1610,6 +1610,76 @@ def test_high_res_stream_ocr_endpoint_sends_detection_to_backend(monkeypatch) ->
     detection_route.duplicate_detection_guard.clear()
 
 
+def test_stream_event_highres_ocr_uses_deferred_finalized_event(monkeypatch) -> None:
+    detection_route.duplicate_detection_guard.clear()
+    detection_route.stream_finalized_results.clear()
+    detection_route.stream_ocr_statuses.clear()
+    detection_route.stream_ocr_status_seen_at.clear()
+
+    event_id = "CAM_001-20260514143000-highres"
+    detected_at = datetime(2026, 5, 14, 14, 30, 0)
+    stream_result = StreamProcessingResult(
+        stream_status=STREAM_STATUS_FINALIZED,
+        camera_code="CAM_001",
+        event_id=event_id,
+        best_candidate_frame=BufferedFrame(
+            camera_code="CAM_001",
+            captured_at=detected_at,
+            content_type="image/jpeg",
+            image_bytes=make_test_image_bytes(),
+            frame_number=123,
+            bbox=(10, 10, 80, 50),
+            confidence_score=0.92,
+        ),
+    )
+    detection_route.stream_finalized_results[event_id] = stream_result
+
+    captured = {}
+
+    async def return_highres_detection(stream_result_arg, *, high_res_crop_bytes):
+        captured["stream_result"] = stream_result_arg
+        captured["high_res_crop_bytes"] = high_res_crop_bytes
+        return make_recognized_detection(detected_at=detected_at)
+
+    async def record_backend_send(result, detection_status=None):
+        captured["backend_result"] = result
+        captured["backend_status"] = detection_status
+        return {"data": {"status": "FLOW_EVENT_CREATED", "flowEventId": 301}}
+
+    monkeypatch.setattr(
+        detection_route,
+        "analyze_stream_best_candidate_with_highres_crop",
+        return_highres_detection,
+    )
+    monkeypatch.setattr(
+        detection_route.backend_client,
+        "send_detection",
+        record_backend_send,
+    )
+
+    response = client.post(
+        f"/api/detections/stream-events/{event_id}/highres-ocr",
+        files={
+            "highResCrop": ("crop.jpg", make_test_image_bytes(), "image/jpeg"),
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["analysisStatus"] == "FLOW_EVENT_CREATED"
+    assert body["data"]["plateNumber"] == "123A4567"
+    assert captured["stream_result"] is stream_result
+    assert captured["high_res_crop_bytes"]
+    assert captured["backend_status"] is None
+    assert event_id not in detection_route.stream_finalized_results
+    assert detection_route.stream_ocr_statuses[event_id]["analysisStatus"] == "FLOW_EVENT_CREATED"
+    assert detection_route.stream_ocr_statuses[event_id]["plateNumber"] == "123A4567"
+
+    detection_route.duplicate_detection_guard.clear()
+    detection_route.stream_ocr_statuses.clear()
+    detection_route.stream_ocr_status_seen_at.clear()
+
+
 def test_stream_frame_endpoint_uses_speed_config_json_override(monkeypatch) -> None:
     captured_config = {}
 

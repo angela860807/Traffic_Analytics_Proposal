@@ -53,6 +53,35 @@ function parseSpeed(value) {
   };
 }
 
+const eventSeparator = "=".repeat(77);
+let currentEvent = {
+  finalized: false,
+  ocr: false,
+};
+
+function resetEvent() {
+  currentEvent = {
+    finalized: false,
+    ocr: false,
+  };
+}
+
+function printEventSeparatorIfComplete() {
+  if (!currentEvent.finalized || !currentEvent.ocr) {
+    return;
+  }
+  console.log(c(eventSeparator, "gray"));
+  resetEvent();
+}
+
+function closeIncompleteEventBeforeNextVehicle() {
+  if (!currentEvent.finalized && !currentEvent.ocr) {
+    return;
+  }
+  console.log(c(eventSeparator, "gray"));
+  resetEvent();
+}
+
 function printConfig(line) {
   try {
     const config = JSON.parse(line);
@@ -79,6 +108,9 @@ function printFrame(line) {
   const status = kv.streamStatus || "-";
 
   if (status === "TRACKING" && speed?.violation) {
+    if (currentEvent.finalized) {
+      closeIncompleteEventBeforeNextVehicle();
+    }
     const speedText =
       speed.limit === null
         ? `${speed.measured.toFixed(1)}km/h`
@@ -88,6 +120,9 @@ function printFrame(line) {
   }
 
   if (status === "TRACKING") {
+    if (currentEvent.finalized) {
+      closeIncompleteEventBeforeNextVehicle();
+    }
     console.log(`${dot("green")} ${c("차량 추적 중", "cyan")}`);
     return;
   }
@@ -97,6 +132,8 @@ function printFrame(line) {
       ? `${speed.measured.toFixed(1)}km/h${speed.violation ? " 과속" : ""}`
       : "-";
     console.log(`${dot("yellow")} ${c("차량 분석 완료", "yellow")}  계산 속도=${speedText}`);
+    currentEvent.finalized = true;
+    printEventSeparatorIfComplete();
     return;
   }
 
@@ -118,11 +155,13 @@ function printOcr(line) {
     OCR_FAILED: "번호판 인식 실패",
   }[status] || "처리 완료";
   console.log(`${dot(tone)} ${c("번호판 인식 결과", tone)}  ${c(plate, tone)}  ${statusLabel}`);
-  console.log(c("=".repeat(77), "gray"));
+  currentEvent.ocr = true;
+  printEventSeparatorIfComplete();
 }
 
 function printSummary(line) {
   const kv = parseKvLine(line);
+  closeIncompleteEventBeforeNextVehicle();
   console.log(c("─".repeat(82), "gray"));
   console.log(
     `${dot("green")} ${c("시연 종료", "bold")}  분석 차량=${kv.finalizedEvents || "-"}대`
@@ -139,6 +178,8 @@ function printLine(line) {
     printFrame(trimmed);
   } else if (trimmed.startsWith("ocrStatus ")) {
     printOcr(trimmed);
+  } else if (trimmed.startsWith("highresFrame=")) {
+    return;
   } else if (trimmed.startsWith("uploadedFrames=")) {
     printSummary(trimmed);
   } else if (trimmed.startsWith("stopReason=")) {
