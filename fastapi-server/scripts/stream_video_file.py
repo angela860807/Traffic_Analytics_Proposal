@@ -21,7 +21,6 @@ except ImportError:
     ImageFont = None
 
 STREAM_FRAME_PATH = "/api/detections/stream-frame"
-HIGHRES_OCR_PATH = "/api/detections/stream-frame/highres-ocr"
 OCR_STATUS_PATH_TEMPLATE = "/api/detections/stream-events/{event_id}/ocr-status"
 EVENT_HIGHRES_OCR_PATH_TEMPLATE = "/api/detections/stream-events/{event_id}/highres-ocr"
 WINDOW_NAME = "Traffic Stream + BBox Preview"
@@ -577,43 +576,6 @@ def get_ocr_status(
     return response.json()
 
 
-def post_highres_ocr(
-    *,
-    url: str,
-    camera_code: str,
-    captured_at: str,
-    frame_number: int,
-    high_res_crop_bytes: bytes,
-    timeout: float,
-) -> dict[str, Any]:
-    response = requests.post(
-        url,
-        data={
-            "cameraCode": camera_code,
-            "capturedAt": captured_at,
-            "frameNumber": str(frame_number),
-        },
-        files={
-            "highResCrop": (
-                "best-frame-highres-crop.jpg",
-                high_res_crop_bytes,
-                "image/jpeg",
-            ),
-        },
-        timeout=timeout,
-    )
-
-    try:
-        response.raise_for_status()
-    except requests.HTTPError as exc:
-        body = response.text[:500]
-        raise RuntimeError(
-            f"high-res OCR request failed: status={response.status_code}, body={body}"
-        ) from exc
-
-    return response.json()
-
-
 def post_stream_event_highres_ocr(
     *,
     base_url: str,
@@ -824,25 +786,6 @@ def has_speed_violation(response_body: dict[str, Any] | None) -> bool:
     return False
 
 
-def build_tracking_log_text(
-    *,
-    response: dict[str, Any],
-    visible_bbox_count: int,
-    bbox_confidence: float,
-) -> str:
-    stream_status = response.get("streamStatus") or "-"
-    status_label = {
-        "IDLE": "대기",
-        "TRACKING": "추적 중",
-        "FINALIZED": "완료",
-        "-": "-",
-    }.get(str(stream_status), str(stream_status))
-    return (
-        f"상태: {status_label} / "
-        f"신뢰도 {bbox_confidence:.3f}"
-    )
-
-
 def build_ocr_log_text(ocr_status: dict[str, Any] | None) -> str:
     if not isinstance(ocr_status, dict):
         return "번호판 결과: -"
@@ -1021,16 +964,6 @@ def build_full_frame_speed_zone_config(
 def flatten_line_points(points: list[tuple[int, int]]) -> list[int]:
     first, second = points
     return [first[0], first[1], second[0], second[1]]
-
-
-def split_clicked_speed_zone_points(
-    points: list[tuple[int, int]],
-) -> tuple[list[tuple[int, int]], list[tuple[int, int]], list[tuple[int, int]]]:
-    if len(points) == 4:
-        return points, [points[0], points[1]], [points[3], points[2]]
-    if len(points) == 8:
-        return points[:4], points[4:6], points[6:8]
-    raise ValueError("speed zone selection requires 4 ROI points")
 
 
 def scale_point(
@@ -1608,24 +1541,6 @@ def get_latest_response_packet(
         )
 
 
-def get_response_for_frame(
-    upload_state: UploadState,
-    frame_number: int,
-    *,
-    allow_latest_fallback: bool = True,
-) -> dict[str, Any] | None:
-    with upload_state.lock:
-        response_body = upload_state.responses_by_frame.get(frame_number)
-
-        if response_body is not None:
-            return response_body
-
-        if allow_latest_fallback:
-            return upload_state.latest_response_body
-
-        return None
-
-
 def get_response_at_or_before_frame(
     upload_state: UploadState,
     frame_number: int,
@@ -2042,7 +1957,6 @@ def upload_worker(
     upload_state: UploadState,
     base_url: str,
     url: str,
-    highres_ocr_url: str,
     video_path: Path,
     camera_code: str,
     timeout: float,
@@ -2271,7 +2185,6 @@ def main() -> None:
     base_url = args.fastapi_base_url.rstrip("/")
     check_stream_endpoint(base_url, args.timeout)
     url = f"{base_url}{STREAM_FRAME_PATH}"
-    highres_ocr_url = f"{base_url}{HIGHRES_OCR_PATH}"
     capture = cv2.VideoCapture(str(video_path))
 
     if not capture.isOpened():
@@ -2335,7 +2248,6 @@ def main() -> None:
                 "upload_state": upload_state,
                 "base_url": base_url,
                 "url": url,
-                "highres_ocr_url": highres_ocr_url,
                 "video_path": video_path,
                 "camera_code": args.camera_code,
                 "timeout": args.timeout,

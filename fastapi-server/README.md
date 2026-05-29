@@ -59,7 +59,7 @@ cd C:\jwdev\Traffic_Analytics_Proposal\fastapi-server
 
 - Raspberry Pi 또는 수동 테스트 클라이언트에서 이미지 수신
 - 원본 프레임, 번호판 crop, OCR 전처리 이미지 저장
-- YOLO 모델(`models/best3.pt`)과 OCR 기반 번호판 인식
+- YOLO 모델(`models/best.pt`)과 OCR 기반 번호판 인식
 - 번호판 미인식, 정상 인식, 중복 인식 상태 분리
 - Spring 내부 API `POST /api/v1/detection-logs`로 결과 전송
 - `/api/camera/live` 기반 Raspberry Pi live preview 제공
@@ -100,15 +100,15 @@ BACKEND_INTERNAL_API_KEY=traffic-ai-internal-key-2026
 DUPLICATE_WINDOW_SECONDS=10
 IMAGE_STORAGE_DIR=storage/detections
 STATIC_DETECTIONS_URL_PREFIX=/static/detections
-MODEL_PATH=models/best3.pt
-PLATE_MODEL_PATH=models/best3.pt
+MODEL_PATH=models/best.pt
+PLATE_MODEL_PATH=models/best.pt
 
 DETECTION_PREPROCESS_MODE=none
 SAVE_PLATE_CROP=true
 SAVE_OCR_PREPROCESSED_IMAGE=true
 ```
 
-Docker Compose에서는 `PLATE_MODEL_PATH=/app/models/best3.pt`와 `fastapi-server/models:/app/models:ro` 볼륨을 사용합니다.
+Docker Compose에서는 `PLATE_MODEL_PATH=/app/models/best.pt`와 `fastapi-server/models:/app/models:ro` 볼륨을 사용합니다.
 
 ## 주요 API
 
@@ -185,7 +185,7 @@ curl.exe -X POST "http://127.0.0.1:8000/api/detections/image" `
 
 ```text
 fastapi-server/storage/detections  # 원본/crop/OCR 산출 이미지
-fastapi-server/models/best3.pt     # 번호판 YOLO 모델 파일
+fastapi-server/models/best.pt      # 번호판 YOLO 모델 파일
 ```
 
 팀 공유용 테스트 이미지는 루트의 `test-media`에 두고, 실제 파일은 각자 로컬에 보관합니다.
@@ -220,7 +220,7 @@ python -m pytest tests/test_detection_api.py -q
 YOLO/OCR 모델 직접 검증:
 
 ```powershell
-$env:PLATE_MODEL_PATH="models/best3.pt"
+$env:PLATE_MODEL_PATH="models/best.pt"
 python scripts/verify_yolo_ocr.py --image samples/sample.jpg --camera-code CAM_001
 ```
 

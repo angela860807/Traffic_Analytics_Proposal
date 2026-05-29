@@ -47,7 +47,6 @@ from app.services.stream_event_service import (
 from scripts.stream_video_file import (
     build_full_frame_speed_zone_config,
     build_speed_zone_config,
-    split_clicked_speed_zone_points,
 )
 
 
@@ -516,15 +515,11 @@ def test_clicked_speed_zone_points_build_config() -> None:
         (110, 80),
         (10, 80),
     ]
-    roi_points, line_a_points, line_b_points = split_clicked_speed_zone_points(
-        clicked_points
-    )
-
     config = build_speed_zone_config(
         camera_code="CAM_001",
-        roi_points=roi_points,
-        line_a_points=line_a_points,
-        line_b_points=line_b_points,
+        roi_points=clicked_points,
+        line_a_points=[clicked_points[0], clicked_points[1]],
+        line_b_points=[clicked_points[3], clicked_points[2]],
         distance_meters=14.0,
         speed_limit_kmh=50.0,
         roi_width_meters=3.5,
