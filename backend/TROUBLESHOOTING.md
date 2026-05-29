@@ -146,10 +146,11 @@
 ### 해결
 
 - 개발 중 필요한 DDL을 `traffic/docs/dev-migration-notes.md`에 정리했다.
-- 실제 적용 가능한 SQL은 `traffic/src/main/resources/db/migration/001_backend_schema_updates.sql`에 분리해 두었다.
+- 실제 적용 가능한 SQL은 `traffic/src/main/resources/db/migration/*.sql`에 단계별로 분리해 두었다.
 - `detection_logs.status`, `traffic_analysis_index.zone_id`, `detection_analysis_results`, `vehicle_flow_events.source_analysis_result_id` 등을 명시적으로 정리했다.
 - `vehicle_flow_events`에는 속도와 체류 시간 컬럼을 추가했다.
 - `hourly_traffic_stats`에는 평균 속도, 혼잡도, 평균 체류 시간, 중복 차량 수, 마지막 로그 ID 컬럼을 추가했다.
+- 과속 위반과 검토 이력을 위해 `speed_violations`, `speed_violation_reviews` 테이블을 추가했다.
 
 ### 효과
 
@@ -160,6 +161,11 @@
 
 - `traffic/docs/dev-migration-notes.md`
 - `traffic/src/main/resources/db/migration/001_backend_schema_updates.sql`
+- `traffic/src/main/resources/db/migration/002_cleanup_detection_logs_legacy_columns.sql`
+- `traffic/src/main/resources/db/migration/003_detection_type_unknown_and_analysis_index.sql`
+- `traffic/src/main/resources/db/migration/004_make_flow_metrics_nullable_until_estimated.sql`
+- `traffic/src/main/resources/db/migration/005_speed_violation_status_values.sql`
+- `traffic/src/main/resources/db/migration/006_speed_violation_reviews.sql`
 - `traffic/src/main/resources/application.yml`
 
 ## 6. 시간대별 통계 집계 기준 문제
@@ -316,6 +322,89 @@ Springdoc 버전에 따라 `/swagger-ui.html`로 접근해도 리다이렉트되
 - `traffic/build.gradle`
 - `traffic/src/main/java/com/example/traffic/config/SwaggerConfig.java`
 - `README.md`
+
+## 12. 과속 위반 저장 API와 차량 흐름 이벤트 연결 문제
+
+### 문제
+
+외부 분석 서버에서 과속 위반 데이터를 별도로 전송할 때, 단순히 차량번호와 속도만 저장하면 기존 차량 흐름 이벤트와 위반 이력이 분리될 수 있었다. 또한 같은 흐름 이벤트에 대해 과속 위반 요청이 반복 전송되면 중복 위반 데이터가 생성될 수 있었다.
+
+### 원인
+
+과속 위반은 독립적인 이벤트가 아니라 이미 생성된 `vehicle_flow_events`를 기준으로 판단되는 후속 데이터다. 따라서 요청의 `flowEventId`, 차량번호, 카메라 코드가 기존 흐름 이벤트와 일치하는지 검증하지 않으면 잘못된 차량 또는 카메라에 위반 이력이 연결될 수 있다.
+
+### 해결
+
+- `POST /api/speed-violations` 엔드포인트를 추가했다.
+- `SpeedViolationCreateRequest`로 과속 위반 저장 요청을 분리했다.
+- 내부 분석 서버 호출이므로 `X-Internal-Api-Key` 헤더를 검증하도록 했다.
+- 측정 속도가 제한 속도보다 큰 경우에만 저장하도록 검증했다.
+- 요청의 `flowEventId`, 차량번호, 카메라 코드가 기존 `VehicleFlowEvent`와 일치하는지 확인했다.
+- 같은 `flowEventId`로 이미 저장된 위반이 있으면 새로 생성하지 않고 기존 위반 정보를 반환하도록 처리했다.
+- 과속 위반 저장 시 `VehicleFlowEvent`의 속도 값도 함께 갱신했다.
+
+### 관련 파일
+
+- `traffic/src/main/java/com/example/traffic/controller/SpeedViolationController.java`
+- `traffic/src/main/java/com/example/traffic/service/SpeedViolationService.java`
+- `traffic/src/main/java/com/example/traffic/domain/SpeedViolation.java`
+- `traffic/src/main/java/com/example/traffic/dto/request/SpeedViolationCreateRequest.java`
+- `traffic/src/main/java/com/example/traffic/repository/SpeedViolationRepository.java`
+- `traffic/src/main/java/com/example/traffic/config/SecurityConfig.java`
+
+## 13. 과속 위반 검토 상태 변경 이력 누락 문제
+
+### 문제
+
+과속 위반 상태를 `UNPROCESSED`, `CONFIRMED`, `REJECTED` 등으로 변경할 수 있어도, 누가 어떤 사유로 상태를 변경했는지 남지 않으면 검토 흐름을 추적하기 어렵다.
+
+### 원인
+
+초기 과속 위반 모델은 현재 상태만 저장하는 구조였다. 상태 변경 이력이 없으면 프론트엔드 검토 화면이나 운영 감사 관점에서 변경 근거를 확인할 수 없다.
+
+### 해결
+
+- `PATCH /api/speed-violations/{violationId}/status` 엔드포인트를 추가했다.
+- `SpeedViolationStatusRequest`에 변경 상태, 사유, 메모, 검토자 값을 받을 수 있도록 했다.
+- `SpeedViolationReview` 엔티티와 `speed_violation_reviews` 테이블을 추가했다.
+- 상태 변경 시 기존 상태와 변경 상태를 함께 저장하고, 최신 검토 이력을 응답에 포함하도록 했다.
+- 프론트엔드 연동 단계에서는 조회 및 상태 변경 API를 임시 공개하고, JWT 연동 완료 후 인증 대상으로 전환할 수 있도록 `SecurityConfig`에 TODO를 명시했다.
+
+### 관련 파일
+
+- `traffic/src/main/java/com/example/traffic/controller/SpeedViolationController.java`
+- `traffic/src/main/java/com/example/traffic/service/SpeedViolationService.java`
+- `traffic/src/main/java/com/example/traffic/domain/SpeedViolationReview.java`
+- `traffic/src/main/java/com/example/traffic/dto/request/SpeedViolationStatusRequest.java`
+- `traffic/src/main/java/com/example/traffic/repository/SpeedViolationReviewRepository.java`
+- `traffic/src/main/resources/db/migration/006_speed_violation_reviews.sql`
+
+## 14. 프론트엔드 개발 서버 포트 변경으로 인한 CORS 차단 문제
+
+### 문제
+
+Vue 개발 서버가 `5173`이 아닌 `5174` 포트에서 실행될 때 브라우저에서 백엔드 API 호출이 CORS 정책에 의해 차단될 수 있었다.
+
+### 원인
+
+Spring Security CORS 설정은 허용 Origin을 명시적으로 제한한다. 기존 설정에는 `localhost:5173`, `127.0.0.1:5173`만 포함되어 있어 Vite가 다른 포트로 실행되는 경우 요청이 허용되지 않았다.
+
+### 해결
+
+`SecurityConfig`의 CORS 허용 Origin에 `5174` 포트를 추가했다.
+
+```java
+configuration.setAllowedOrigins(List.of(
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174"
+));
+```
+
+### 관련 파일
+
+- `traffic/src/main/java/com/example/traffic/config/SecurityConfig.java`
 
 ## 참고 테스트 명령어
 
