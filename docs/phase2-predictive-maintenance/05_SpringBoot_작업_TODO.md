@@ -1,0 +1,291 @@
+# TAS-PM Spring Boot 작업 TODO
+
+## 1. 목표와 담당
+
+Spring Boot는 예지보전의 시스템 오브 레코드다. 상태 샘플과 교통 맥락을 저장하고, FastAPI 탐지 결과를 정책에 따라 이상 이벤트·정비 티켓으로 변환하며, Frontend API와 권한·SLA·이력을 제공한다.
+
+| 역할 | 담당 |
+|---|---|
+| 이벤트·티켓·API 주 담당 | 김승민 |
+| DB·Flyway·인프라 | 전보경 |
+| FastAPI 계약 연동 | 박재웅 |
+
+Controller, Service, Repository, DTO, Entity를 분리하고 Entity를 API에 직접 노출하지 않는다.
+
+## 2. 도메인 구조
+
+권장 package:
+
+```text
+predictive/
+  controller/
+  service/
+  repository/
+  domain/
+  dto/
+    request/
+    response/
+  client/
+  scheduler/
+  exception/
+  mapper/
+```
+
+핵심 Entity:
+
+```text
+CameraHealthSample
+TrafficContextSample
+CameraLink
+AnomalyPolicy
+DetectorVersion
+AnomalyEvent
+AnomalyEventEvidence
+MaintenanceTicket
+MaintenanceTicketHistory
+```
+
+## 3. DB·마이그레이션
+
+- [ ] `V001__baseline_schema.sql` 작성 또는 현재 스키마 기준 확정
+- [ ] `V002__predictive_maintenance_schema.sql` 작성
+- [ ] `V003__predictive_seed_policies.sql` 작성
+- [ ] FK, unique, check constraint와 인덱스 반영
+- [ ] 활성 이벤트 partial unique index 반영
+- [ ] `ddl-auto=validate` 적용
+- [ ] 개발·테스트 DB migration 검증
+- [ ] demo seed를 migration과 분리
+
+필수 unique:
+
+```text
+camera_health_samples(camera_id, sampled_at)
+traffic_context_samples(camera_id, zone_id, sampled_at)
+anomaly_events 활성 camera_id + anomaly_type
+maintenance_tickets(anomaly_event_id)
+detector_versions(detector_name, version)
+```
+
+## 4. 데이터 수집·집계
+
+### 4-1. 카메라 상태 수집
+
+- [ ] `POST /internal/v1/camera-health-samples`
+- [ ] `X-Internal-Api-Key` 인증
+- [ ] DTO validation
+- [ ] `idempotencyKey`와 업무 unique 기준 upsert
+- [ ] 지연 샘플 저장 및 실시간 평가 제외 플래그 처리
+- [ ] 수집 성공 후 Rule 평가 작업 호출
+
+트랜잭션:
+
+- 샘플 저장은 단일 트랜잭션이다.
+- FastAPI 호출은 DB 트랜잭션 밖에서 수행한다.
+- 탐지 서비스 실패 시 샘플 저장은 롤백하지 않고 재평가 대상을 기록한다.
+
+### 4-2. 교통 맥락 집계
+
+- [ ] 5분 scheduler 구현
+- [ ] `vehicle_flow_events` 차량 수·속도 집계
+- [ ] `detection_analysis_results` OCR 시도·성공·실패 집계
+- [ ] `speed_violations` 과속 건수 집계
+- [ ] 원천 event ID 범위와 처리 건수 로그
+- [ ] 동일 구간 재실행 시 upsert
+- [ ] 품질 상태 계산
+
+교통 맥락 자체로 `AnomalyEvent`나 `MaintenanceTicket`을 생성하지 않는다.
+
+## 5. 기준선·탐지 orchestration
+
+### 5-1. Rule 평가
+
+- [ ] 새 상태 샘플 저장 후 최근 연속 구간 조회
+- [ ] 활성 Rule 정책 조회
+- [ ] `POST /internal/v1/anomaly-detection/camera-health/evaluate` 호출
+- [ ] timeout 3초, 제한된 retry 적용
+- [ ] 응답 후보를 이벤트 서비스에 전달
+
+### 5-2. 기준선·추세 평가
+
+- [ ] 5분마다 카메라별 평가
+- [ ] 최근 15분 유효 상태 샘플 조회
+- [ ] 최근 14일 동일 30분 시간대 정상 기준선 조회
+- [ ] 최소 기준선 표본 30개 확인
+- [ ] 현재·인접 카메라 교통 맥락 조회
+- [ ] `POST /internal/v1/anomaly-detection/camera-degradation/evaluate` 호출
+- [ ] 기준선 부족 시 `BASELINE_LEARNING` 상태 제공
+
+기준선 제외:
+
+```text
+data_source != REAL
+quality_status != COMPLETE
+is_imputed = true
+활성 이상 이벤트 구간
+운영자가 DISMISSED가 아닌 장애로 확정한 구간
+```
+
+## 6. 이벤트 처리
+
+- [ ] detector·정책 코드 유효성 검증
+- [ ] 카메라 존재 여부 검증
+- [ ] `AnomalyEvent`와 evidence를 한 트랜잭션으로 저장
+- [ ] 활성 이벤트 partial unique 충돌 시 기존 이벤트 갱신
+- [ ] 심각도 상향만 자동 적용
+- [ ] 정상 3회 연속 시 `RECOVERED`
+- [ ] 30분 내 재발 시 `OPEN` 복귀와 recurrence 증가
+- [ ] acknowledge·resolve·dismiss 상태 전이 검증
+- [ ] 해결 시 confirmed cause·resolution note 필수
+- [ ] 오탐 시 reason 필수
+
+저장 필드:
+
+```text
+detectionMethod
+detectorVersion
+policyCode
+baselineFrom / baselineTo / baselineSampleCount
+trendSlope / trendConfidence
+predictionHorizonMinutes / projectedThresholdCrossingAt
+suspectedCauses
+evidence
+```
+
+## 7. Health Score
+
+- [ ] 최신 유효 지표 조회
+- [ ] 정책 기준으로 지표별 0~100 점수 변환
+- [ ] 가중 평균 계산
+- [ ] 유효 지표 4개 미만은 `INSUFFICIENT_DATA`
+- [ ] 기준선 표본 부족은 `BASELINE_LEARNING`
+- [ ] 카메라 오프라인은 점수 0, 상태 `OFFLINE`
+- [ ] 목록 조회의 N+1 방지
+
+Health Score는 고장 확률이 아니라 운영 요약 지표임을 응답 문서와 발표에 명시한다.
+
+## 8. 정비 티켓·SLA
+
+자동 생성:
+
+```text
+CRITICAL 또는 CAMERA_OFFLINE -> P1
+WARNING 15분 지속 -> P2
+24시간 내 같은 WARNING 3회 -> P2
+10분 내 CRITICAL 도달 예측 -> P2
+운영자 수동 생성 -> P3 기본
+```
+
+- [ ] 이벤트당 티켓 하나 보장
+- [ ] 티켓 번호 원자적 발급
+- [ ] 배정 시 `OPEN -> ASSIGNED`
+- [ ] 허용 상태 전이 검증
+- [ ] 모든 변경을 history에 append
+- [ ] P1/P2/P3 SLA 계산
+- [ ] overdue 계산
+- [ ] MTTA·MTTR 계산 API 제공
+- [ ] `CLOSED` 권한 제한
+
+상태 전이:
+
+```text
+OPEN -> ASSIGNED
+ASSIGNED -> IN_PROGRESS
+IN_PROGRESS -> RESOLVED
+RESOLVED -> CLOSED
+```
+
+관리자 강제 종료가 필요하면 별도 endpoint와 감사 로그를 사용하고 일반 상태 변경에 섞지 않는다.
+
+## 9. Frontend API
+
+- [ ] `GET /api/v1/predictive/summary`
+- [ ] `GET /api/v1/predictive/cameras`
+- [ ] `GET /api/v1/predictive/cameras/{cameraId}/health-history`
+- [ ] `GET /api/v1/predictive/traffic-context`
+- [ ] `GET /api/v1/predictive/anomaly-events`
+- [ ] `GET /api/v1/predictive/anomaly-events/{eventId}`
+- [ ] `POST /api/v1/predictive/anomaly-events/{eventId}/acknowledge`
+- [ ] `POST /api/v1/predictive/anomaly-events/{eventId}/resolve`
+- [ ] `POST /api/v1/predictive/anomaly-events/{eventId}/dismiss`
+- [ ] `GET /api/v1/predictive/maintenance-tickets`
+- [ ] `POST /api/v1/predictive/maintenance-tickets`
+- [ ] `POST /api/v1/predictive/maintenance-tickets/{ticketId}/assign`
+- [ ] `POST /api/v1/predictive/maintenance-tickets/{ticketId}/status`
+- [ ] `GET /api/v1/predictive/policies`
+- [ ] `PATCH /api/v1/predictive/policies/{policyCode}`
+
+목록 API:
+
+- `Pageable`의 size 최대 100
+- 허용 정렬 필드 whitelist
+- Enum·날짜 validation
+- 역할별 데이터 변경 권한
+- 조회 DTO projection으로 N+1 방지
+
+## 10. 예외·보안·관측성
+
+- [ ] `@RestControllerAdvice` 공통 오류 응답
+- [ ] validation field error 매핑
+- [ ] 존재하지 않는 리소스 `404`
+- [ ] 중복·상태 충돌 `409`
+- [ ] JWT 역할 검사
+- [ ] 내부 API key 별도 filter
+- [ ] requestId MDC 적용
+- [ ] cameraId, eventId, ticketId, policyCode, detectorVersion 구조화 로그
+- [ ] FastAPI timeout·실패 metric
+- [ ] scheduler 실행 시간·처리 건수 metric
+
+## 11. 테스트
+
+단위 테스트:
+
+- [ ] Health Score 경계값
+- [ ] 이벤트 중복·심각도 상향
+- [ ] 자동 복구·30분 내 재발
+- [ ] 티켓 자동 생성과 상태 전이
+- [ ] SLA·MTTA·MTTR
+- [ ] 기준선 표본 필터
+
+통합 테스트:
+
+- [ ] Flyway migration
+- [ ] 상태 샘플 멱등 저장
+- [ ] 5분 교통 맥락 upsert
+- [ ] 활성 이벤트 unique 동시성
+- [ ] 이벤트·evidence 원자성
+- [ ] 역할별 API 권한
+- [ ] FastAPI WireMock 계약
+- [ ] 페이지·필터·정렬
+
+## 12. 일정
+
+| 날짜 | 작업 |
+|---|---|
+| 6/9 | 계약·Enum·상태 전이 확정 |
+| 6/10 | Flyway, Entity, Repository |
+| 6/11 | 상태 수집·교통 맥락 집계 |
+| 6/12 | FastAPI client·Rule orchestration |
+| 6/13~6/14 | 기준선·추세 orchestration·이벤트 |
+| 6/15~6/16 | 티켓·SLA·Frontend API |
+| 6/17 | 장애 주입 통합 테스트 |
+| 6/18 | 성능·권한·회귀 테스트 |
+| 6/19 | 버퍼·최종 시연 |
+
+## 13. 배포·실행
+
+- Spring Boot는 기존 TAS 서비스 이미지에 포함한다.
+- PostgreSQL migration 완료 후 애플리케이션을 시작한다.
+- FastAPI base URL과 내부 API key는 환경변수로 주입한다.
+- scheduler 다중 실행을 막기 위해 MVP는 Spring Boot 인스턴스 1개를 기준으로 한다. 다중 인스턴스 배포 시 분산 lock을 추가한다.
+- Docker health check는 DB 연결, migration 상태, FastAPI health를 분리해 확인한다.
+
+## 14. 완료 조건
+
+- [ ] migration으로 새 스키마가 재현된다.
+- [ ] 수집·집계가 멱등하게 동작한다.
+- [ ] 교통 맥락만으로 정비 이벤트가 생성되지 않는다.
+- [ ] Rule·통계·추세 후보가 같은 이벤트 계약으로 저장된다.
+- [ ] 중복 이벤트·티켓이 생성되지 않는다.
+- [ ] 이벤트와 티켓 상태 전이·권한이 강제된다.
+- [ ] MTTA·MTTR과 SLA를 조회할 수 있다.
+- [ ] API 계약과 자동 테스트가 통과한다.

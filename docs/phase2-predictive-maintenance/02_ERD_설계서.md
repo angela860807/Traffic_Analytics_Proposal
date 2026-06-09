@@ -1,0 +1,409 @@
+# TAS 2차 프로젝트 ERD 설계서
+
+## 1. 설계 원칙
+
+- 기존 `cameras`, `zones`, `vehicle_flow_events`, `detection_analysis_results`, `speed_violations`, `members`를 재사용한다.
+- 정비 대상은 CCTV와 영상·AI 처리 파이프라인으로 한정한다.
+- 교통 데이터는 `traffic_context_samples`에 저장하고 CCTV 이상 판별의 보조 근거로 사용한다.
+- 원천 데이터, 집계 데이터, 이상 이벤트, 정비 업무를 분리한다.
+- API는 JPA Entity를 직접 반환하지 않고 DTO로 변환한다.
+- 신규 스키마는 Flyway migration으로 관리한다.
+
+## 2. ERD
+
+```mermaid
+erDiagram
+    ZONES ||--o{ CAMERAS : contains
+    CAMERAS ||--o{ VEHICLE_FLOW_EVENTS : produces
+    CAMERAS ||--o{ DETECTION_ANALYSIS_RESULTS : produces
+    VEHICLE_FLOW_EVENTS ||--o| SPEED_VIOLATIONS : may_create
+
+    CAMERAS ||--o{ CAMERA_HEALTH_SAMPLES : sampled
+    CAMERAS ||--o{ TRAFFIC_CONTEXT_SAMPLES : contextualizes
+    ZONES ||--o{ TRAFFIC_CONTEXT_SAMPLES : groups
+    CAMERAS ||--o{ CAMERA_LINKS : upstream
+    CAMERAS ||--o{ CAMERA_LINKS : downstream
+
+    DETECTOR_VERSIONS ||--o{ ANOMALY_EVENTS : generated_by
+    ANOMALY_POLICIES ||--o{ ANOMALY_EVENTS : applies
+    CAMERAS ||--o{ ANOMALY_EVENTS : maintenance_target
+    ANOMALY_EVENTS ||--o{ ANOMALY_EVENT_EVIDENCE : contains
+    ANOMALY_EVENTS ||--o| MAINTENANCE_TICKETS : creates
+    MEMBERS ||--o{ MAINTENANCE_TICKETS : assigned
+    MAINTENANCE_TICKETS ||--o{ MAINTENANCE_TICKET_HISTORIES : records
+    MEMBERS ||--o{ MAINTENANCE_TICKET_HISTORIES : changed_by
+
+    CAMERA_HEALTH_SAMPLES {
+        bigint id PK
+        bigint camera_id FK
+        varchar processor_code
+        timestamptz sampled_at
+        integer sample_window_seconds
+        numeric fps_avg
+        numeric frame_drop_rate
+        integer latency_p95_ms
+        numeric blur_score_avg
+        numeric brightness_score_avg
+        integer detection_count
+        integer ocr_attempt_count
+        integer ocr_failure_count
+        numeric ocr_fail_rate
+        numeric cpu_usage_pct
+        numeric memory_usage_pct
+        numeric disk_usage_pct
+        integer network_rtt_ms
+        timestamptz last_frame_at
+        varchar data_source
+        varchar quality_status
+        boolean is_imputed
+        varchar idempotency_key UK
+        timestamptz created_at
+    }
+
+    TRAFFIC_CONTEXT_SAMPLES {
+        bigint id PK
+        bigint camera_id FK
+        bigint zone_id FK
+        timestamptz sampled_at
+        integer window_minutes
+        integer vehicle_count
+        numeric avg_speed_kmh
+        integer speed_measurement_count
+        integer speed_violation_count
+        integer ocr_attempt_count
+        integer ocr_success_count
+        integer ocr_failure_count
+        integer in_count
+        integer out_count
+        varchar data_source
+        varchar quality_status
+        boolean is_imputed
+        bigint source_from_flow_event_id
+        bigint source_to_flow_event_id
+        varchar idempotency_key UK
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    CAMERA_LINKS {
+        bigint id PK
+        bigint upstream_camera_id FK
+        bigint downstream_camera_id FK
+        varchar direction
+        integer expected_travel_time_seconds
+        numeric expected_flow_ratio
+        numeric tolerance_ratio
+        boolean enabled
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    ANOMALY_POLICIES {
+        bigint id PK
+        varchar policy_code UK
+        varchar anomaly_type
+        varchar detection_method
+        numeric warning_threshold
+        numeric critical_threshold
+        integer consecutive_windows
+        integer minimum_sample_count
+        integer prediction_horizon_minutes
+        integer cooldown_minutes
+        jsonb config_json
+        boolean enabled
+        bigint updated_by FK
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    DETECTOR_VERSIONS {
+        bigint id PK
+        varchar detector_name
+        varchar version
+        varchar detection_method
+        varchar artifact_path
+        varchar config_hash
+        jsonb metrics_json
+        boolean active
+        timestamptz trained_at
+        timestamptz created_at
+    }
+
+    ANOMALY_EVENTS {
+        bigint id PK
+        varchar target_type
+        bigint target_camera_id FK
+        varchar anomaly_type
+        varchar severity
+        varchar status
+        varchar detection_method
+        varchar data_source
+        bigint policy_id FK
+        bigint detector_version_id FK
+        numeric anomaly_score
+        varchar baseline_source
+        timestamptz baseline_from
+        timestamptz baseline_to
+        integer baseline_sample_count
+        numeric trend_slope
+        numeric trend_confidence
+        integer prediction_horizon_minutes
+        timestamptz projected_threshold_crossing_at
+        jsonb suspected_causes_json
+        varchar confirmed_cause
+        text resolution_note
+        integer recurrence_count
+        timestamptz first_detected_at
+        timestamptz last_detected_at
+        timestamptz recovered_at
+        timestamptz resolved_at
+        timestamptz acknowledged_at
+        bigint acknowledged_by FK
+        bigint resolved_by FK
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    ANOMALY_EVENT_EVIDENCE {
+        bigint id PK
+        bigint anomaly_event_id FK
+        varchar metric_name
+        numeric observed_value
+        numeric baseline_value
+        numeric threshold_value
+        numeric metric_score
+        varchar unit
+        timestamptz sampled_at
+        jsonb context_json
+        timestamptz created_at
+    }
+
+    MAINTENANCE_TICKETS {
+        bigint id PK
+        bigint anomaly_event_id FK_UK
+        varchar ticket_number UK
+        varchar priority
+        varchar status
+        bigint assignee_id FK
+        timestamptz due_ack_at
+        timestamptz due_start_at
+        timestamptz acknowledged_at
+        timestamptz started_at
+        timestamptz resolved_at
+        timestamptz closed_at
+        text action_note
+        bigint created_by FK
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    MAINTENANCE_TICKET_HISTORIES {
+        bigint id PK
+        bigint maintenance_ticket_id FK
+        varchar from_status
+        varchar to_status
+        bigint changed_by FK
+        text note
+        timestamptz changed_at
+    }
+```
+
+## 3. 신규 테이블 계약
+
+### 3-1. `camera_health_samples`
+
+카메라와 AI 처리 프로세스의 1분 상태를 저장한다.
+
+```text
+UNIQUE(camera_id, sampled_at)
+UNIQUE(idempotency_key)
+fps_avg >= 0
+0 <= frame_drop_rate <= 1
+0 <= blur_score_avg <= 1
+0 <= brightness_score_avg <= 1
+0 <= ocr_fail_rate <= 1
+0 <= cpu_usage_pct <= 100
+0 <= memory_usage_pct <= 100
+0 <= disk_usage_pct <= 100
+```
+
+인덱스:
+
+```text
+(camera_id, sampled_at DESC)
+(quality_status, sampled_at DESC)
+(data_source, sampled_at DESC)
+```
+
+### 3-2. `traffic_context_samples`
+
+기존 차량, OCR, 과속 데이터를 5분 단위로 집계한다. 혼잡 정비 이벤트가 아니라 CCTV 이상 원인 교차검증에 사용한다.
+
+```text
+UNIQUE(camera_id, zone_id, sampled_at)
+UNIQUE(idempotency_key)
+window_minutes = 5
+vehicle_count >= 0
+speed_violation_count >= 0
+ocr_success_count + ocr_failure_count <= ocr_attempt_count
+```
+
+인덱스:
+
+```text
+(camera_id, sampled_at DESC)
+(zone_id, sampled_at DESC)
+(data_source, sampled_at DESC)
+```
+
+### 3-3. `camera_links`
+
+인접 카메라의 방향, 예상 이동 시간, 정상 흐름 비율을 정의한다.
+
+```text
+UNIQUE(upstream_camera_id, downstream_camera_id, direction)
+upstream_camera_id <> downstream_camera_id
+expected_travel_time_seconds > 0
+0 <= expected_flow_ratio <= 2
+0 <= tolerance_ratio <= 1
+```
+
+### 3-4. `anomaly_policies`
+
+초기 정책 코드:
+
+```text
+CAMERA_OFFLINE_RULE_V1
+FPS_DEGRADATION_RULE_V1
+FRAME_DROP_DEGRADATION_RULE_V1
+LATENCY_DEGRADATION_RULE_V1
+BLUR_DEGRADATION_RULE_V1
+OCR_QUALITY_DEGRADATION_RULE_V1
+RESOURCE_SATURATION_RULE_V1
+NETWORK_INSTABILITY_RULE_V1
+CAMERA_ROBUST_ZSCORE_V1
+CAMERA_TREND_PROJECTION_V1
+TRAFFIC_CONTEXT_VALIDATION_V1
+```
+
+추세 정책의 `config_json` 예:
+
+```json
+{
+  "windowMinutes": 15,
+  "minimumValidSamples": 12,
+  "ewmaAlpha": 0.3,
+  "minimumTrendConfidence": 0.6,
+  "predictionHorizonMinutes": 10
+}
+```
+
+### 3-5. `detector_versions`
+
+```text
+UNIQUE(detector_name, version)
+```
+
+초기 레코드:
+
+```text
+camera-rule / 1.1.0 / RULE
+camera-robust-zscore / 1.0.0 / ROBUST_Z_SCORE
+camera-trend-projection / 1.0.0 / TREND_PROJECTION
+camera-context-cross-validator / 1.0.0 / CROSS_VALIDATION
+```
+
+### 3-6. `anomaly_events`
+
+- MVP의 `target_type` 값은 `CAMERA`만 허용한다.
+- `target_camera_id`는 필수다.
+- 교통 맥락만으로 이벤트를 생성하지 않는다.
+- 추세 탐지가 아니면 추세·예측 컬럼은 `null`이다.
+
+```sql
+CREATE UNIQUE INDEX ux_anomaly_events_active
+ON anomaly_events (target_camera_id, anomaly_type)
+WHERE status IN ('OPEN', 'ACKNOWLEDGED', 'RECOVERED');
+```
+
+### 3-7. `anomaly_event_evidence`
+
+판단 근거를 행 단위로 저장한다. 교통 맥락은 `context_json`에 출처 카메라와 시간 구간을 포함한다.
+
+```json
+{
+  "metricName": "fpsAvg",
+  "observedValue": 8.4,
+  "baselineValue": 24.1,
+  "thresholdValue": 10.0,
+  "metricScore": -4.2,
+  "unit": "fps",
+  "context": {
+    "adjacentTrafficNormal": true,
+    "sourceCameraIds": [1, 2]
+  }
+}
+```
+
+### 3-8. `maintenance_tickets`
+
+```text
+UNIQUE(anomaly_event_id)
+UNIQUE(ticket_number)
+ticket_number = MNT-YYYYMMDD-0001
+```
+
+### 3-9. `maintenance_ticket_histories`
+
+상태, 담당자, 조치 메모 변경을 append-only로 기록한다. 수정·삭제 API는 제공하지 않는다.
+
+## 4. Enum 계약
+
+| 구분 | 값 |
+|---|---|
+| `DataSource` | `REAL`, `OPEN_DATA`, `SIMULATED`, `FAULT_INJECTED`, `MOCK` |
+| `QualityStatus` | `COMPLETE`, `PARTIAL`, `INSUFFICIENT` |
+| `TargetType` | `CAMERA` |
+| `DetectionMethod` | `RULE`, `ROBUST_Z_SCORE`, `TREND_PROJECTION`, `CROSS_VALIDATION` |
+| `AnomalyType` | `CAMERA_OFFLINE`, `FPS_DEGRADATION`, `FRAME_DROP_DEGRADATION`, `LATENCY_DEGRADATION`, `BLUR_DEGRADATION`, `OCR_QUALITY_DEGRADATION`, `RESOURCE_SATURATION`, `NETWORK_INSTABILITY` |
+| `Severity` | `WARNING`, `CRITICAL` |
+| `AnomalyStatus` | `OPEN`, `ACKNOWLEDGED`, `RECOVERED`, `RESOLVED`, `DISMISSED` |
+| `TicketPriority` | `P1`, `P2`, `P3` |
+| `TicketStatus` | `OPEN`, `ASSIGNED`, `IN_PROGRESS`, `RESOLVED`, `CLOSED` |
+| `UserRole` | `USER`, `OPERATOR`, `MAINTAINER`, `ADMIN` |
+| `HealthStatus` | `NORMAL`, `DEGRADED`, `CRITICAL`, `OFFLINE`, `BASELINE_LEARNING`, `INSUFFICIENT_DATA` |
+| `SuspectedCause` | `CAMERA_POWER_OR_NETWORK`, `CAMERA_LENS_OR_FOCUS`, `LOW_ILLUMINATION`, `AI_PROCESSING_OVERLOAD`, `OCR_PIPELINE_DEGRADATION`, `NETWORK_CONGESTION`, `EXTERNAL_TRAFFIC_CHANGE`, `INSUFFICIENT_DATA`, `UNKNOWN` |
+
+## 5. 기존 데이터 연결
+
+`traffic_context_samples` 집계 원천:
+
+- `vehicle_flow_events`: 차량 수, 방향, 평균 속도
+- `detection_analysis_results`: OCR 시도·성공·실패
+- `speed_violations`: 과속 이벤트 수
+
+추적 컬럼:
+
+- `source_from_flow_event_id`
+- `source_to_flow_event_id`
+- 집계 로그의 시간 범위와 처리 건수
+
+## 6. 마이그레이션
+
+1. 현재 스키마를 `V001__baseline_schema.sql`로 고정한다.
+2. 신규 테이블은 `V002__predictive_maintenance_schema.sql`로 생성한다.
+3. 정책과 detector version은 `V003__predictive_seed_policies.sql`로 삽입한다.
+4. 운영 설정은 `ddl-auto=validate`, `spring.sql.init.mode=never`를 사용한다.
+5. 데모 데이터는 migration이 아니라 별도 seed profile로 주입한다.
+
+## 7. 보관 정책
+
+| 데이터 | 보관 |
+|---|---:|
+| 카메라 상태 샘플 | 90일 |
+| 교통 맥락 샘플 | 90일 |
+| 이상 이벤트·근거 | 1년 |
+| 정비 티켓·이력 | 1년 |
+| detector version·정책 | 영구 |
+
+이벤트와 티켓이 참조하는 근거는 일반 샘플 정리 작업과 별도로 보존한다.
