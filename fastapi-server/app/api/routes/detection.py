@@ -22,6 +22,7 @@ from app.schemas.detection import (
 from app.schemas.speed import SpeedViolationCreateRequest
 from app.core.config import PLATE_MODEL_PATH, VEHICLE_MODEL_SOURCE
 from app.services.backend_client import BackendClient
+from app.services.camera_health_collector import camera_health_collector
 from app.services.duplicate_detection_guard import DuplicateDetectionGuard
 from app.services.inference_service import InferenceService
 from app.services.speed_config import SpeedCameraConfig, load_speed_camera_configs
@@ -39,10 +40,13 @@ logger = logging.getLogger(__name__)
 SPRING_ERROR_BODY_LIMIT = 500
 STREAM_OCR_STATUS_TTL_SECONDS = 600.0
 
-inference_service = InferenceService()
+inference_service = InferenceService(health_collector=camera_health_collector)
 backend_client = BackendClient()
 duplicate_detection_guard = DuplicateDetectionGuard()
-stream_detection_service = StreamEventService(inference_service=inference_service)
+stream_detection_service = StreamEventService(
+    inference_service=inference_service,
+    health_collector=camera_health_collector,
+)
 stream_ocr_statuses: dict[str, dict] = {}
 stream_ocr_status_seen_at: dict[str, float] = {}
 stream_finalized_results: dict[str, StreamProcessingResult] = {}

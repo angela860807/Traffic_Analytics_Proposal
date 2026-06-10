@@ -24,6 +24,7 @@ from app.core.config import (
 from app.schemas.detection import DetectionResult
 from app.schemas.speed import SpeedMeasurementResult
 from app.services.bbox_tracker import BboxTracker
+from app.services.camera_health_collector import CameraHealthCollector
 from app.services.frame_buffer import BufferedFrame, FrameBuffer, frame_buffer
 from app.services.image_decoder import ImageDecoder
 from app.services.inference_service import InferenceService
@@ -85,12 +86,14 @@ class StreamEventService:
         inference_service: InferenceService | None = None,
         speed_tracker: SpeedTracker | None = None,
         bbox_tracker: BboxTracker | None = None,
+        health_collector: CameraHealthCollector | None = None,
     ) -> None:
         self.buffer = buffer
         self.image_decoder = image_decoder or ImageDecoder()
         self.inference_service = inference_service or InferenceService()
         self.speed_tracker = speed_tracker or SpeedTracker()
         self.bbox_tracker = bbox_tracker or BboxTracker()
+        self.health_collector = health_collector
         self._events_by_camera: dict[str, StreamEvent] = {}
         self._stream_bbox_roi = self._parse_normalized_roi(STREAM_BBOX_ROI_NORMALIZED)
 
@@ -167,6 +170,17 @@ class StreamEventService:
                 else detection.confidence_score
             ),
         )
+        if self.health_collector is not None:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            self.health_collector.record_frame(
+                camera_code=camera_code,
+                captured_at=captured_at,
+                processing_latency_ms=(time.monotonic() - received_monotonic) * 1000,
+                blur_variance=frame.blur_score,
+                brightness_score=float(np.mean(gray) / 255.0),
+                detection_count=len(bboxes),
+                frame_number=frame_number,
+            )
         self.buffer.add_frame(frame)
 
         has_detection_trigger = (
