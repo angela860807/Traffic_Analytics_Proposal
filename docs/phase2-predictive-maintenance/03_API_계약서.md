@@ -79,7 +79,9 @@ INTERNAL_DETECTOR_UNAVAILABLE
 DataSource: REAL, OPEN_DATA, SIMULATED, FAULT_INJECTED, MOCK
 QualityStatus: COMPLETE, PARTIAL, INSUFFICIENT
 TargetType: CAMERA
-DetectionMethod: RULE, ROBUST_Z_SCORE, TREND_PROJECTION, CROSS_VALIDATION
+DetectionMethod: RULE, ROBUST_Z_SCORE, TREND_PROJECTION, CROSS_VALIDATION,
+                 LSTM_AUTOENCODER
+DetectorOperatingMode: ACTIVE, SHADOW, EXPERIMENTAL
 AnomalyType: CAMERA_OFFLINE, FPS_DEGRADATION, FRAME_DROP_DEGRADATION,
              LATENCY_DEGRADATION, BLUR_DEGRADATION,
              OCR_QUALITY_DEGRADATION, RESOURCE_SATURATION,
@@ -277,6 +279,17 @@ GET /api/v1/predictive/anomaly-events/101
     "ticketNumber": "MNT-20260609-0001",
     "priority": "P2",
     "status": "OPEN"
+  },
+  "shadowModel": {
+    "detectorName": "camera-lstm-autoencoder",
+    "version": "1.0.0",
+    "operatingMode": "SHADOW",
+    "anomalyScore": 0.91,
+    "warningThreshold": 0.72,
+    "criticalThreshold": 0.82,
+    "predictedAnomaly": true,
+    "predictedSeverity": "CRITICAL",
+    "evaluatedAt": "2026-06-09T14:05:00+09:00"
   }
 }
 ```
@@ -600,9 +613,38 @@ POST /internal/v1/anomaly-detection/camera-degradation/evaluate
         }
       ]
     }
+  ],
+  "shadowCandidates": [
+    {
+      "targetType": "CAMERA",
+      "cameraId": 1,
+      "detectionMethod": "LSTM_AUTOENCODER",
+      "operatingMode": "SHADOW",
+      "anomalyScore": 0.91,
+      "warningThreshold": 0.72,
+      "criticalThreshold": 0.82,
+      "predictedAnomaly": true,
+      "predictedSeverity": "CRITICAL",
+      "inputWindowFrom": "2026-06-09T13:05:00+09:00",
+      "inputWindowTo": "2026-06-09T14:05:00+09:00",
+      "featureSchemaVersion": "camera-health-sequence-v1",
+      "topFeatures": [
+        {
+          "featureName": "fpsAvg",
+          "featureValue": 0.38
+        },
+        {
+          "featureName": "cpuUsagePct",
+          "featureValue": 0.24
+        }
+      ]
+    }
   ]
 }
 ```
+
+`shadowCandidates`는 비교·평가용으로만 저장하며 `AnomalyEvent`나 `MaintenanceTicket` 생성에 사용하지 않는다.
+`topFeatures`는 모델 기여도나 원인 확정값이 아니라 feature별 평균 재구성 오차가 큰 상위 목록이다.
 
 기준선 부족 응답:
 
@@ -649,6 +691,15 @@ GET /internal/v1/anomaly-detection/health
     {
       "name": "camera-context-cross-validator",
       "version": "1.0.0",
+      "active": true
+    },
+    {
+      "name": "camera-lstm-autoencoder",
+      "version": "1.0.0",
+      "method": "LSTM_AUTOENCODER",
+      "operatingMode": "SHADOW",
+      "modelFormat": "pytorch-state-dict",
+      "featureSchemaVersion": "camera-health-sequence-v1",
       "active": true
     }
   ]
