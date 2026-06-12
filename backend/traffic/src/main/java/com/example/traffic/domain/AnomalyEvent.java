@@ -101,8 +101,9 @@ public class AnomalyEvent {
     @Column(name = "suspected_causes_json", nullable = false, columnDefinition = "jsonb")
     private List<Object> suspectedCausesJson = new ArrayList<>();
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "confirmed_cause", length = 100)
-    private String confirmedCause;
+    private SuspectedCause confirmedCause;
 
     @Column(name = "resolution_note", columnDefinition = "TEXT")
     private String resolutionNote;
@@ -147,7 +148,7 @@ public class AnomalyEvent {
                         LocalDateTime baselineTo, Integer baselineSampleCount, BigDecimal trendSlope,
                         BigDecimal trendConfidence, Integer predictionHorizonMinutes,
                         LocalDateTime projectedThresholdCrossingAt, List<Object> suspectedCausesJson,
-                        String confirmedCause, String resolutionNote, Integer recurrenceCount,
+                        SuspectedCause confirmedCause, String resolutionNote, Integer recurrenceCount,
                         LocalDateTime firstDetectedAt, LocalDateTime lastDetectedAt) {
         this.targetType = targetType != null ? targetType : AnomalyTargetType.CAMERA;
         this.targetCamera = targetCamera;

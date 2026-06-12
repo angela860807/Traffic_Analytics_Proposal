@@ -40,8 +40,20 @@ public class DetectorVersion {
     @Column(name = "detection_method", nullable = false, length = 50)
     private DetectionMethod detectionMethod;
 
+    @Column(name = "model_format", length = 20)
+    private String modelFormat;
+
     @Column(name = "artifact_path", length = 500)
     private String artifactPath;
+
+    @Column(name = "artifact_sha256", length = 64)
+    private String artifactSha256;
+
+    @Column(name = "feature_schema_version", length = 20)
+    private String featureSchemaVersion;
+
+    @Column(name = "dataset_version", length = 50)
+    private String datasetVersion;
 
     @Column(name = "config_hash", length = 64)
     private String configHash;
@@ -65,13 +77,19 @@ public class DetectorVersion {
 
     @Builder
     public DetectorVersion(String detectorName, String version, DetectionMethod detectionMethod,
-                           String artifactPath, String configHash, Map<String, Object> metricsJson,
+                           String modelFormat, String artifactPath, String artifactSha256,
+                           String featureSchemaVersion, String datasetVersion,
+                           String configHash, Map<String, Object> metricsJson,
                            DetectorOperatingMode operatingMode, boolean active,
                            LocalDateTime trainedAt) {
         this.detectorName = detectorName;
         this.version = version;
         this.detectionMethod = detectionMethod;
+        this.modelFormat = modelFormat;
         this.artifactPath = artifactPath;
+        this.artifactSha256 = artifactSha256;
+        this.featureSchemaVersion = featureSchemaVersion;
+        this.datasetVersion = datasetVersion;
         this.configHash = configHash;
         this.metricsJson = metricsJson != null ? new HashMap<>(metricsJson) : new HashMap<>();
         this.operatingMode = operatingMode != null

@@ -53,8 +53,11 @@ public class AnomalyPolicy {
     @Column(name = "threshold_direction", nullable = false, length = 20)
     private ThresholdDirection thresholdDirection;
 
-    @Column(name = "consecutive_windows")
-    private Integer consecutiveWindows;
+    @Column(name = "warning_consecutive_windows")
+    private Integer warningConsecutiveWindows;
+
+    @Column(name = "critical_consecutive_windows")
+    private Integer criticalConsecutiveWindows;
 
     @Column(name = "minimum_sample_count")
     private Integer minimumSampleCount;
@@ -86,7 +89,8 @@ public class AnomalyPolicy {
     public AnomalyPolicy(String policyCode, AnomalyType anomalyType, DetectionMethod detectionMethod,
                          BigDecimal warningThreshold, BigDecimal criticalThreshold,
                          ThresholdDirection thresholdDirection,
-                         Integer consecutiveWindows, Integer minimumSampleCount,
+                         Integer warningConsecutiveWindows, Integer criticalConsecutiveWindows,
+                         Integer minimumSampleCount,
                          Integer predictionHorizonMinutes, Integer cooldownMinutes,
                          Map<String, Object> configJson, Boolean enabled, Member updatedBy) {
         this.policyCode = policyCode;
@@ -96,7 +100,8 @@ public class AnomalyPolicy {
         this.criticalThreshold = criticalThreshold;
         this.thresholdDirection = thresholdDirection != null
                 ? thresholdDirection : ThresholdDirection.HIGHER_IS_WORSE;
-        this.consecutiveWindows = consecutiveWindows;
+        this.warningConsecutiveWindows = warningConsecutiveWindows;
+        this.criticalConsecutiveWindows = criticalConsecutiveWindows;
         this.minimumSampleCount = minimumSampleCount;
         this.predictionHorizonMinutes = predictionHorizonMinutes;
         this.cooldownMinutes = cooldownMinutes;

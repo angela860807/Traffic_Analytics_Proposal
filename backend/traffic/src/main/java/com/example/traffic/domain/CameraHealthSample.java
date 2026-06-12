@@ -103,6 +103,9 @@ public class CameraHealthSample {
     @Column(name = "is_imputed", nullable = false)
     private boolean isImputed;
 
+    @Column(name = "is_late_sample", nullable = false)
+    private boolean isLateSample;
+
     @Column(name = "idempotency_key", nullable = false, unique = true, length = 100)
     private String idempotencyKey;
 
@@ -117,7 +120,7 @@ public class CameraHealthSample {
                               BigDecimal ocrFailRate, BigDecimal cpuUsagePct, BigDecimal memoryUsagePct,
                               BigDecimal diskUsagePct, Integer networkRttMs, LocalDateTime lastFrameAt,
                               DataSourceType dataSource, QualityStatus qualityStatus, boolean isImputed,
-                              String idempotencyKey) {
+                              boolean isLateSample, String idempotencyKey) {
         this.camera = camera;
         this.processorCode = processorCode;
         this.sampledAt = sampledAt;
@@ -139,6 +142,7 @@ public class CameraHealthSample {
         this.dataSource = dataSource != null ? dataSource : DataSourceType.REAL;
         this.qualityStatus = qualityStatus != null ? qualityStatus : QualityStatus.COMPLETE;
         this.isImputed = isImputed;
+        this.isLateSample = isLateSample;
         this.idempotencyKey = idempotencyKey;
         this.createdAt = LocalDateTime.now();
     }
