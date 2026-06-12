@@ -154,8 +154,8 @@ SELECT
     h.to_status,
     h.changed_at
 FROM maintenance_ticket_histories h
-WHERE (h.from_status = 'OPEN'        AND h.to_status NOT IN ('ASSIGNED','CLOSED'))
-   OR (h.from_status = 'ASSIGNED'    AND h.to_status NOT IN ('IN_PROGRESS','OPEN'))
+WHERE (h.from_status = 'OPEN'        AND h.to_status NOT IN ('ASSIGNED'))
+   OR (h.from_status = 'ASSIGNED'    AND h.to_status NOT IN ('IN_PROGRESS'))
    OR (h.from_status = 'IN_PROGRESS' AND h.to_status NOT IN ('RESOLVED'))
    OR (h.from_status = 'RESOLVED'    AND h.to_status NOT IN ('CLOSED'))
 ORDER BY h.changed_at DESC;
@@ -185,3 +185,39 @@ WHERE ocr_attempt_count IS NOT NULL
   AND ocr_failure_count IS NOT NULL
   AND ocr_success_count + ocr_failure_count > ocr_attempt_count
 ORDER BY id;
+
+-- ------------------------------------------------------------
+-- 13. 지연 샘플이 탐지에 사용됐는지 확인 (요구사항 5-2)
+--     is_late_sample=TRUE 샘플의 sampled_at이
+--     anomaly_event_evidence의 sampled_at과 일치하는 경우
+-- ------------------------------------------------------------
+SELECT
+    '지연샘플_탐지사용_확인'              AS check_name,
+    chs.id                               AS sample_id,
+    chs.camera_id,
+    chs.sampled_at,
+    ae.id                                AS event_id
+FROM camera_health_samples chs
+JOIN anomaly_event_evidence aee
+    ON aee.sampled_at      = chs.sampled_at
+JOIN anomaly_events ae
+    ON aee.anomaly_event_id = ae.id
+   AND ae.target_camera_id  = chs.camera_id
+WHERE chs.is_late_sample = TRUE
+ORDER BY chs.sampled_at DESC;
+
+-- ------------------------------------------------------------
+-- 14. predicted_severity 일관성 확인
+--     predicted_anomaly=FALSE인데 predicted_severity가 있는 경우
+-- ------------------------------------------------------------
+SELECT
+    'predicted_severity_불일치'           AS check_name,
+    id,
+    camera_id,
+    evaluated_at,
+    predicted_anomaly,
+    predicted_severity
+FROM model_prediction_logs
+WHERE predicted_anomaly = FALSE
+  AND predicted_severity IS NOT NULL
+ORDER BY evaluated_at DESC;

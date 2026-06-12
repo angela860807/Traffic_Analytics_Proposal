@@ -51,22 +51,23 @@ SELECT
 
 FROM cameras c
 LEFT JOIN (
-    -- 카메라별 최신 Health 상태 (별도 뷰 또는 서브쿼리)
+    -- 카메라별 최신 Health 상태
     SELECT DISTINCT ON (camera_id)
         camera_id,
-        -- Health Score 기반 상태 분류
+        -- Health Score 기반 상태 분류 (요구사항 8절)
         CASE
-            WHEN fps_avg IS NULL OR fps_avg = 0 THEN 'OFFLINE'
+            WHEN fps_avg IS NULL OR fps_avg = 0               THEN 'OFFLINE'
             WHEN fps_avg < 5
               OR latency_p95_ms > 5000
-              OR cpu_usage_pct > 95   THEN 'CRITICAL'
+              OR cpu_usage_pct > 95                           THEN 'CRITICAL'
             WHEN fps_avg < 10
               OR latency_p95_ms > 2000
-              OR cpu_usage_pct > 85   THEN 'DEGRADED'
+              OR cpu_usage_pct > 85                           THEN 'DEGRADED'
             ELSE 'NORMAL'
         END AS health_status
     FROM camera_health_samples
-    WHERE data_source = :dataSource
+    WHERE data_source    = :dataSource
+      AND is_late_sample = false                              -- 지연 샘플 제외 (요구사항 5-2)
     ORDER BY camera_id, sampled_at DESC
 ) hs ON hs.camera_id = c.camera_id
 LEFT JOIN anomaly_events ae
@@ -86,17 +87,74 @@ SELECT
     c.camera_name,
     c.zone_id,
 
-    -- Health Score (0~100, 낮을수록 위험)
-    ROUND(
-        GREATEST(0, LEAST(100,
-            100
-            - GREATEST(0, (10 - COALESCE(s.fps_avg, 0)) * 3)
-            - GREATEST(0, (COALESCE(s.latency_p95_ms, 0) - 500) * 0.01)
-            - GREATEST(0, (COALESCE(s.cpu_usage_pct, 0) - 70) * 1.5)
-            - GREATEST(0, (COALESCE(s.ocr_fail_rate, 0) - 0.3) * 100)
-        ))
-    , 1)                                            AS health_score,
+    -- Health Score (0~100, 요구사항 8절 가중치 기준)
+    -- 각 지표를 WARNING/CRITICAL 구간으로 정규화 후 가중 평균
+    -- 유효 지표 4개 미만이면 NULL
+    CASE
+        WHEN (
+            CASE WHEN s.fps_avg            IS NOT NULL THEN 1 ELSE 0 END +
+            CASE WHEN s.latency_p95_ms     IS NOT NULL THEN 1 ELSE 0 END +
+            CASE WHEN s.frame_drop_rate    IS NOT NULL THEN 1 ELSE 0 END +
+            CASE WHEN s.ocr_fail_rate      IS NOT NULL THEN 1 ELSE 0 END +
+            CASE WHEN s.blur_score_avg     IS NOT NULL THEN 1 ELSE 0 END +
+            CASE WHEN s.cpu_usage_pct      IS NOT NULL THEN 1 ELSE 0 END +
+            CASE WHEN s.network_rtt_ms     IS NOT NULL THEN 1 ELSE 0 END
+        ) < 4 THEN NULL
+        ELSE ROUND(
+            GREATEST(0, LEAST(100,
+                -- FPS (가중치 20): 정상=30fps, WARNING=10, CRITICAL=5
+                COALESCE(CASE
+                    WHEN s.fps_avg >= 30  THEN 20.0
+                    WHEN s.fps_avg >= 10  THEN 20.0 * (s.fps_avg - 10) / 20.0
+                    WHEN s.fps_avg >= 5   THEN 10.0 * (s.fps_avg - 5) / 5.0
+                    ELSE 0.0
+                END, 20.0)
+                -- latency p95 (가중치 15): 정상=500ms, WARNING=2000, CRITICAL=5000
+                + COALESCE(CASE
+                    WHEN s.latency_p95_ms <= 500   THEN 15.0
+                    WHEN s.latency_p95_ms <= 2000  THEN 15.0 * (2000 - s.latency_p95_ms) / 1500.0
+                    WHEN s.latency_p95_ms <= 5000  THEN 7.5 * (5000 - s.latency_p95_ms) / 3000.0
+                    ELSE 0.0
+                END, 15.0)
+                -- frame drop (가중치 15): 정상=0, WARNING=0.30, CRITICAL=0.60
+                + COALESCE(CASE
+                    WHEN s.frame_drop_rate <= 0.0   THEN 15.0
+                    WHEN s.frame_drop_rate <= 0.30  THEN 15.0 * (0.30 - s.frame_drop_rate) / 0.30
+                    WHEN s.frame_drop_rate <= 0.60  THEN 7.5 * (0.60 - s.frame_drop_rate) / 0.30
+                    ELSE 0.0
+                END, 15.0)
+                -- OCR 실패율 (가중치 15): 정상=0, WARNING=0.70, CRITICAL=0.90
+                + COALESCE(CASE
+                    WHEN s.ocr_fail_rate <= 0.0   THEN 15.0
+                    WHEN s.ocr_fail_rate <= 0.70  THEN 15.0 * (0.70 - s.ocr_fail_rate) / 0.70
+                    WHEN s.ocr_fail_rate <= 0.90  THEN 7.5 * (0.90 - s.ocr_fail_rate) / 0.20
+                    ELSE 0.0
+                END, 15.0)
+                -- blur score (가중치 15): 정상=0, WARNING=0.75, CRITICAL=0.90
+                + COALESCE(CASE
+                    WHEN s.blur_score_avg <= 0.0   THEN 15.0
+                    WHEN s.blur_score_avg <= 0.75  THEN 15.0 * (0.75 - s.blur_score_avg) / 0.75
+                    WHEN s.blur_score_avg <= 0.90  THEN 7.5 * (0.90 - s.blur_score_avg) / 0.15
+                    ELSE 0.0
+                END, 15.0)
+                -- CPU·메모리 (가중치 10): 정상=70%, WARNING=85%, CRITICAL=95%
+                + COALESCE(CASE
+                    WHEN GREATEST(s.cpu_usage_pct, s.memory_usage_pct) <= 70  THEN 10.0
+                    WHEN GREATEST(s.cpu_usage_pct, s.memory_usage_pct) <= 85  THEN 10.0 * (85 - GREATEST(s.cpu_usage_pct, s.memory_usage_pct)) / 15.0
+                    WHEN GREATEST(s.cpu_usage_pct, s.memory_usage_pct) <= 95  THEN 5.0 * (95 - GREATEST(s.cpu_usage_pct, s.memory_usage_pct)) / 10.0
+                    ELSE 0.0
+                END, 10.0)
+                -- network RTT (가중치 10): 정상=500ms, WARNING=500, CRITICAL=1000
+                + COALESCE(CASE
+                    WHEN s.network_rtt_ms <= 500   THEN 10.0
+                    WHEN s.network_rtt_ms <= 1000  THEN 10.0 * (1000 - s.network_rtt_ms) / 500.0
+                    ELSE 0.0
+                END, 10.0)
+            ))
+        , 1)
+    END                                             AS health_score,
 
+    -- health_status (요구사항 8절)
     CASE
         WHEN s.fps_avg IS NULL OR s.fps_avg = 0     THEN 'OFFLINE'
         WHEN s.fps_avg < 5
@@ -124,8 +182,9 @@ FROM cameras c
 LEFT JOIN LATERAL (
     SELECT *
     FROM camera_health_samples
-    WHERE camera_id   = c.camera_id
-      AND data_source = :dataSource
+    WHERE camera_id    = c.camera_id
+      AND data_source  = :dataSource
+      AND is_late_sample = false                    -- 지연 샘플 제외 (요구사항 5-2)
     ORDER BY sampled_at DESC
     LIMIT 1
 ) s ON true
@@ -135,9 +194,11 @@ LEFT JOIN anomaly_events ae
 
 WHERE c.is_active = true
 GROUP BY c.camera_id, c.camera_name, c.zone_id,
-         s.fps_avg, s.latency_p95_ms, s.cpu_usage_pct,
-         s.ocr_fail_rate, s.sampled_at
-ORDER BY health_score ASC;
+         s.fps_avg, s.frame_drop_rate, s.latency_p95_ms,
+         s.blur_score_avg, s.ocr_fail_rate,
+         s.cpu_usage_pct, s.memory_usage_pct,
+         s.network_rtt_ms, s.sampled_at
+ORDER BY health_score ASC NULLS LAST;
 
 
 -- ------------------------------------------------------------
