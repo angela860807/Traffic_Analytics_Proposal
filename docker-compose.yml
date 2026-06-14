@@ -38,7 +38,22 @@ services:
       SPRING_SPEED_VIOLATION_PATH: /api/speed-violations
       SPRING_SPEED_VIOLATION_RETRY_ATTEMPTS: 2
       SPRING_SPEED_VIOLATION_RETRY_DELAY_SECONDS: 0.2
+      SPRING_CAMERA_HEALTH_PATH: /internal/v1/camera-health-samples
+      SPRING_CAMERA_HEALTH_TIMEOUT_SECONDS: 3
+      SPRING_CAMERA_HEALTH_RETRY_ATTEMPTS: 3
+      SPRING_CAMERA_HEALTH_RETRY_BASE_DELAY_SECONDS: 0.5
       BACKEND_INTERNAL_API_KEY: traffic-ai-internal-key-2026
+      CAMERA_HEALTH_WINDOW_SECONDS: 60
+      CAMERA_HEALTH_DELIVERY_QUEUE_MAX_SIZE: 1000
+      CAMERA_HEALTH_DELIVERY_ENABLED: "true"
+      CAMERA_HEALTH_DELIVERY_POLL_SECONDS: 1
+      CAMERA_HEALTH_SHUTDOWN_TIMEOUT_SECONDS: 5
+      CAMERA_PROCESSOR_CODE: edge-01
+      CAMERA_ID_MAP_JSON: '{"CAM_001":1}'
+      PREDICTIVE_MODEL_DIR: /app/models/predictive
+      PREDICTIVE_ARTIFACT_REQUIRED: "false"
+      PREDICTIVE_ARTIFACT_SHA256_JSON: '{}'
+      INTERNAL_API_MAX_BODY_BYTES: 1048576
       IMAGE_STORAGE_DIR: storage/detections
       MODEL_PATH: /app/models/best.pt
       PLATE_MODEL_PATH: /app/models/best.pt
@@ -72,6 +87,19 @@ services:
       SPEED_TRACK_DELTA_MIN_ELAPSED_SECONDS: 0.3
     ports:
       - "8000:8000"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "import os,urllib.request;
+          request=urllib.request.Request(
+          'http://127.0.0.1:8000/internal/v1/anomaly-detection/health',
+          headers={'X-Internal-Api-Key':os.environ['BACKEND_INTERNAL_API_KEY']});
+          urllib.request.urlopen(request,timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     volumes:
       - ./fastapi-server/storage:/app/storage
       - ./fastapi-server/models:/app/models:ro

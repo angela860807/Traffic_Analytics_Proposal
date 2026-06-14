@@ -32,6 +32,9 @@ htmlcov/
 # FastAPI runtime artifacts
 fastapi-server/storage/
 fastapi-server/models/*.pt
+fastapi-server/models/predictive/
+fastapi-server/vendor/*.whl
+!fastapi-server/vendor/.gitkeep
 fastapi-server/sample.jpg
 fastapi-server/capture.jpg
 fastapi-server/capture*.jpg

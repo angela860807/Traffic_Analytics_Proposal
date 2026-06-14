@@ -228,4 +228,19 @@ class DetectorHealth(CameraHealthSchema):
 
 class DetectorHealthResponse(CameraHealthSchema):
     status: Literal["UP", "DEGRADED", "DOWN"]
+    package_version: str | None = Field(
+        default=None,
+        alias="packageVersion",
+        max_length=100,
+    )
     detectors: list[DetectorHealth] = Field(default_factory=list)
+    artifact_status: Literal[
+        "READY",
+        "NOT_CONFIGURED",
+        "MISSING",
+        "INVALID",
+    ] = Field(default="NOT_CONFIGURED", alias="artifactStatus")
+    artifact_errors: list[str] = Field(
+        default_factory=list,
+        alias="artifactErrors",
+    )
