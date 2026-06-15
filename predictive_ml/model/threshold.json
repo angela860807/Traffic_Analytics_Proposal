@@ -1,0 +1,16 @@
+{
+  "warning_threshold": 0.743674,
+  "critical_threshold": 0.783241,
+  "basis": "정상 재구성 오차 97th / 99th percentile",
+  "sequence_len": 30,
+  "features": [
+    "fps_avg",
+    "frame_drop_rate",
+    "latency_p95_ms",
+    "blur_score_avg",
+    "ocr_fail_rate",
+    "cpu_usage_pct",
+    "memory_usage_pct",
+    "network_rtt_ms"
+  ]
+}

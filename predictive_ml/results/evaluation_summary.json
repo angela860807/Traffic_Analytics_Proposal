@@ -1,0 +1,12 @@
+{
+  "warning_threshold": 0.715773,
+  "critical_threshold": 0.783241,
+  "scenario_count": 8,
+  "detected_count": 8,
+  "early_detection_count": 6,
+  "avg_lead_time_minutes": 42.0,
+  "max_lead_time_minutes": 90,
+  "best_scenario": "CAMERA_OFFLINE",
+  "worst_scenario": "EXTERNAL_TRAFFIC_NORMAL_DEVICE",
+  "avg_f1": 0.4701
+}
