@@ -12,6 +12,7 @@ from .test_predictive_adapter import (
     build_fake_module,
     make_degradation_request,
     make_rule_request,
+    write_valid_artifacts,
 )
 
 
@@ -76,9 +77,15 @@ def test_predictive_metrics_requires_internal_api_key(monkeypatch) -> None:
 
 def test_two_predictive_endpoints_accept_handoff_fixtures(
     monkeypatch,
+    tmp_path,
 ) -> None:
     monkeypatch.setattr(security, "BACKEND_INTERNAL_API_KEY", "secret")
-    adapter = PredictiveDetectorAdapter(module=build_fake_module())
+    write_valid_artifacts(tmp_path)
+    adapter = PredictiveDetectorAdapter(
+        module=build_fake_module(),
+        model_dir=str(tmp_path),
+        artifact_required=True,
+    )
     app.dependency_overrides[get_predictive_detector_adapter] = lambda: adapter
 
     try:

@@ -92,6 +92,16 @@ class PredictiveDetectorAdapter:
                     )
                     logger.exception("predictive artifact loading failed")
         self._initialized = True
+        logger.info(
+            "predictive detector initialized: "
+            "packageAvailable=%s packageVersion=%s artifactStatus=%s "
+            "featureSchemaVersion=%s verifiedFiles=%s",
+            self.available,
+            self._package_version(),
+            self._artifact_status.status,
+            self._artifact_status.feature_schema_version,
+            list(self._artifact_status.verified_files),
+        )
 
     def evaluate_rules(
         self,
@@ -147,6 +157,7 @@ class PredictiveDetectorAdapter:
 
         if (
             response.baseline_status != "LEARNING"
+            and self._is_shadow_artifact_available()
             and self._has_detector("predict_anomaly")
         ):
             shadow_result = self._call_optional_detector(
@@ -169,6 +180,20 @@ class PredictiveDetectorAdapter:
                     camera_id=request.camera_id,
                     evaluated_at=request.evaluated_at,
                 )
+
+        elif (
+            response.baseline_status != "LEARNING"
+            and self._artifact_status.status
+            in {"NOT_CONFIGURED", "MISSING", "INVALID"}
+        ):
+            logger.warning(
+                "predictive shadow inference skipped due to artifact status: "
+                "requestId=%s cameraId=%s artifactStatus=%s errors=%s",
+                get_request_id(),
+                request.camera_id,
+                self._artifact_status.status,
+                list(self._artifact_status.errors),
+            )
 
         logger.info(
             "predictive degradation evaluation completed: "
@@ -208,10 +233,13 @@ class PredictiveDetectorAdapter:
             )
 
         detector_up = all(item.active for item in detectors)
-        artifact_up = self._artifact_status.status in {
-            "READY",
-            "NOT_CONFIGURED",
-        }
+        artifact_up = (
+            self._artifact_status.status == "READY"
+            or (
+                self._artifact_status.status == "NOT_CONFIGURED"
+                and not self._has_detector("predict_anomaly")
+            )
+        )
         status = "UP" if detector_up and artifact_up else "DEGRADED"
         return DetectorHealthResponse(
             status=status,
@@ -264,6 +292,10 @@ class PredictiveDetectorAdapter:
             and self._module is not None
             and callable(getattr(self._module, function_name, None))
         )
+
+    def _is_shadow_artifact_available(self) -> bool:
+        self.initialize()
+        return self._artifact_status.status == "READY"
 
     def _call_detector(self, function_name: str, request: Any = None) -> Any:
         if not self.available or self._module is None:

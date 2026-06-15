@@ -1,8 +1,10 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
+import logging
 from uuid import UUID
 
 import httpx
+import numpy as np
 
 from app.schemas.camera_health import CameraHealthSampleRequest
 from app.services.backend_health_client import BackendHealthClient
@@ -11,6 +13,13 @@ from app.services.camera_health_collector import (
     SystemResourceSnapshot,
 )
 from app.services.delivery_queue import CameraHealthDeliveryQueue
+from app.services.frame_buffer import FrameBuffer
+from app.services.inference_service import InferenceService
+from app.services.stream_event_service import (
+    STREAM_STATUS_IDLE,
+    StreamEventService,
+)
+from app.services.vehicle_detector import VehicleDetection
 
 
 KST = timezone(timedelta(hours=9))
@@ -23,6 +32,14 @@ class FixedResourceSampler:
             memory_usage_pct=40.0,
             disk_usage_pct=50.0,
         )
+
+
+class FailingHealthCollector:
+    def record_frame(self, **kwargs) -> None:
+        raise RuntimeError("frame health collection failed")
+
+    def record_ocr_result(self, **kwargs) -> None:
+        raise RuntimeError("OCR health collection failed")
 
 
 def make_sample() -> CameraHealthSampleRequest:
@@ -166,3 +183,57 @@ def test_delivery_queue_counts_dropped_sample_when_full() -> None:
     assert queue.enqueue(make_sample()) is False
     assert queue.metrics.enqueued_count == 1
     assert queue.metrics.dropped_count == 1
+
+
+def test_frame_health_collection_failure_does_not_stop_video_analysis(
+    caplog,
+) -> None:
+    class FakeImageDecoder:
+        def decode_image_bytes(self, image_bytes):
+            return np.zeros((80, 160, 3), dtype=np.uint8)
+
+    class FakeInferenceService:
+        def detect_vehicle_bbox_from_image(self, image):
+            return VehicleDetection("UNKNOWN", 0.0, None)
+
+    caplog.set_level(
+        logging.ERROR,
+        logger="app.services.stream_event_service",
+    )
+    service = StreamEventService(
+        buffer=FrameBuffer(max_frames_per_camera=3),
+        image_decoder=FakeImageDecoder(),
+        inference_service=FakeInferenceService(),
+        health_collector=FailingHealthCollector(),
+    )
+
+    result = asyncio.run(
+        service.process_frame(
+            camera_code="CAM_001",
+            captured_at=datetime(2026, 6, 15, 12, 0, tzinfo=KST),
+            content_type="image/jpeg",
+            image_bytes=b"frame",
+            frame_number=1,
+        )
+    )
+
+    assert result.stream_status == STREAM_STATUS_IDLE
+    assert "video analysis continues" in caplog.text
+
+
+def test_ocr_health_collection_failure_is_isolated(caplog) -> None:
+    caplog.set_level(
+        logging.ERROR,
+        logger="app.services.inference_service",
+    )
+    service = InferenceService(
+        health_collector=FailingHealthCollector(),
+    )
+
+    service._record_ocr_result(
+        camera_code="CAM_001",
+        captured_at=datetime(2026, 6, 15, 12, 0, tzinfo=KST),
+        failed=True,
+    )
+
+    assert "video analysis continues" in caplog.text
