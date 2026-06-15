@@ -107,14 +107,3 @@ FastAPIdocuments/
 
 # Claude Code local settings
 **/.claude/
-
-
-# predictive_ml - AI model training
-predictive_ml/tas-pm-env/
-predictive_ml/data/normal_samples.csv
-predictive_ml/data/fault_samples.csv
-predictive_ml/data/all_samples.csv
-predictive_ml/model/lstm_ae_thr95.pt
-predictive_ml/model/scaler_thr95.pkl
-predictive_ml/model/threshold_thr95.json
-predictive_ml/model/metrics_thr95.json
