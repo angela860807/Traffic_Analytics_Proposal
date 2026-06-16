@@ -390,7 +390,11 @@
                       <span class="stat" :class="c.stTone">{{ c.st }}</span>
                     </td>
                     <td class="num mono">
-                      <span class="pm-hs" :class="pmScoreTone(c.healthScore)">{{ c.healthScore.toFixed(1) }}</span>
+                      <span v-if="c.healthStatus === 'BASELINE_LEARNING'" class="pm-baseline" title="기준선 학습 중">
+                        <i class="bi bi-cpu"></i> {{ c.baselineSamples }}/{{ c.baselineRequired }}
+                      </span>
+                      <span v-else-if="c.healthScore != null" class="pm-hs" :class="pmScoreTone(c.healthScore)">{{ c.healthScore.toFixed(1) }}</span>
+                      <span v-else class="pm-hs gy">—</span>
                     </td>
                     <td class="mono">{{ c.lat }}</td>
                     <td class="mono">{{ c.ts }}</td>
@@ -563,7 +567,11 @@
                   <span class="stat" :class="c.stTone">{{ c.st }}</span>
                 </td>
                 <td class="num mono">
-                  <span class="pm-hs" :class="pmScoreTone(c.healthScore)">{{ c.healthScore.toFixed(1) }}</span>
+                  <span v-if="c.healthStatus === 'BASELINE_LEARNING'" class="pm-baseline" title="기준선 학습 중">
+                    <i class="bi bi-cpu"></i> {{ c.baselineSamples }}/{{ c.baselineRequired }}
+                  </span>
+                  <span v-else-if="c.healthScore != null" class="pm-hs" :class="pmScoreTone(c.healthScore)">{{ c.healthScore.toFixed(1) }}</span>
+                  <span v-else class="pm-hs gy">—</span>
                 </td>
                 <td class="mono">{{ c.lat }}<span v-if="c.lat !== '—'">ms</span></td>
                 <td
@@ -1420,6 +1428,35 @@
               </tbody>
             </table>
 
+            <!-- 교통 맥락 교차검증 -->
+            <div class="pm-traffic" v-if="activeAnomaly.trafficContext">
+              <div class="pm-traffic-h">
+                <i class="bi bi-car-front-fill"></i>
+                <strong>교통 맥락 교차검증</strong>
+                <span class="pm-traffic-jd" :class="trafficJdTone(activeAnomaly.trafficContext.crossValidation)">
+                  {{ trafficJdLabel(activeAnomaly.trafficContext.crossValidation) }}
+                </span>
+              </div>
+              <div class="pm-traffic-body">
+                <div class="pm-traffic-self">
+                  <div class="pm-traffic-l">본 카메라</div>
+                  <div class="pm-traffic-v">
+                    <strong>{{ activeAnomaly.trafficContext.currentVehicleCount }}</strong>대
+                    <span class="pm-traffic-sub">· {{ activeAnomaly.trafficContext.currentAvgSpeed }}km/h</span>
+                  </div>
+                </div>
+                <i class="bi bi-arrow-left-right pm-traffic-arr"></i>
+                <div class="pm-traffic-adj">
+                  <div class="pm-traffic-l">인접 카메라 평균</div>
+                  <div class="pm-traffic-v">
+                    <strong>{{ adjacentAvg(activeAnomaly.trafficContext) }}</strong>대
+                    <span class="pm-traffic-sub">· {{ adjacentSpeedAvg(activeAnomaly.trafficContext) }}km/h</span>
+                  </div>
+                </div>
+              </div>
+              <div class="pm-traffic-note">{{ activeAnomaly.trafficContext.crossValidationLabel }}</div>
+            </div>
+
             <!-- 원인 후보 / 운영자 확정 원인 -->
             <div class="pm-causes">
               <div class="pm-cause-blk">
@@ -1490,29 +1527,32 @@
             </div>
 
             <!-- 액션: 권한 매트릭스 기반 노출 -->
-            <div class="pm-anom-acts">
+            <div class="pm-anom-acts" role="group" aria-label="이상 이벤트 처리">
               <button
                 class="pnl-act"
                 :disabled="!canResolveAnomaly"
+                :aria-disabled="!canResolveAnomaly"
                 :title="canResolveAnomaly ? '' : 'OPERATOR/ADMIN만 해결 처리 가능'"
                 @click="openAnomalyResolve(activeAnomaly)"
               >
-                <i class="bi bi-check2-circle"></i> 해결(resolve)
+                <i class="bi bi-check2-circle" aria-hidden="true"></i> 해결(resolve)
               </button>
               <button
                 class="pnl-act"
                 :disabled="!canResolveAnomaly"
+                :aria-disabled="!canResolveAnomaly"
                 :title="canResolveAnomaly ? '' : 'OPERATOR/ADMIN만 오탐 종료 가능'"
                 @click="openAnomalyDismiss(activeAnomaly)"
               >
-                <i class="bi bi-x-circle"></i> 오탐 종료(dismiss)
+                <i class="bi bi-x-circle" aria-hidden="true"></i> 오탐 종료(dismiss)
               </button>
               <button
                 class="pnl-act"
                 :disabled="!canAssignTicket"
+                :aria-disabled="!canAssignTicket"
                 :title="canAssignTicket ? '' : 'OPERATOR/ADMIN만 담당자 배정 가능'"
               >
-                <i class="bi bi-person-plus"></i> 담당자 배정
+                <i class="bi bi-person-plus" aria-hidden="true"></i> 담당자 배정
               </button>
             </div>
           </div>
@@ -1673,14 +1713,21 @@
       </section>
 
       <!-- ============ 이상 이벤트 resolve / dismiss 모달 ============ -->
-      <div v-if="anomalyModal" class="cam-modal-bg" @click="closeAnomalyModal">
+      <div
+        v-if="anomalyModal"
+        class="cam-modal-bg"
+        @click="closeAnomalyModal"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="anomalyModal.mode === 'resolve' ? '이상 이벤트 해결' : '이상 이벤트 오탐 종료'"
+      >
         <div class="cam-modal pm-ticket-modal" @click.stop>
           <div class="cm-h">
             <div class="cm-title">
-              <i :class="anomalyModal.mode === 'resolve' ? 'bi bi-check2-circle' : 'bi bi-x-circle'"></i>
+              <i :class="anomalyModal.mode === 'resolve' ? 'bi bi-check2-circle' : 'bi bi-x-circle'" aria-hidden="true"></i>
               <span>{{ anomalyModal.mode === 'resolve' ? '이상 이벤트 해결' : '이상 이벤트 오탐 종료' }}</span>
             </div>
-            <button class="cm-x" @click="closeAnomalyModal"><i class="bi bi-x-lg"></i></button>
+            <button class="cm-x" @click="closeAnomalyModal" aria-label="닫기"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
           </div>
           <div class="pm-ticket-body">
             <div class="cm-row">
@@ -1744,15 +1791,22 @@
       </div>
 
       <!-- ============ 티켓 상태 전이 모달 (RESOLVED 시 메모 필수) ============ -->
-      <div v-if="ticketModal" class="cam-modal-bg" @click="closeTicketModal">
-        <div class="cam-modal pm-ticket-modal" @click.stop>
+      <div
+        v-if="ticketModal"
+        class="cam-modal-bg"
+        @click="closeTicketModal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="티켓 상태 변경"
+      >
+        <div class="cam-modal pm-ticket-modal pm-ticket-modal-wide" @click.stop>
           <div class="cm-h">
             <div class="cm-title">
-              <i class="bi bi-clipboard-check"></i>
+              <i class="bi bi-clipboard-check" aria-hidden="true"></i>
               <span>티켓 상태 변경</span>
               <span class="stat" :class="ticketModal.fault.tone">{{ ticketModal.fault.sev }}</span>
             </div>
-            <button class="cm-x" @click="closeTicketModal"><i class="bi bi-x-lg"></i></button>
+            <button class="cm-x" @click="closeTicketModal" aria-label="닫기"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
           </div>
           <div class="pm-ticket-body">
             <div class="cm-row">
@@ -1764,6 +1818,32 @@
             <div class="cm-row">
               <span>전환 상태</span>
               <strong class="rd-txt">→ {{ ticketStatusLabel(ticketModal.toStatus) }}</strong>
+            </div>
+
+            <!-- 변경 이력 timeline -->
+            <div class="pm-ticket-timeline">
+              <div class="pm-tl-h">
+                <i class="bi bi-clock-history"></i> 변경 이력
+                <span class="pm-tl-cnt">{{ ticketHistory(ticketModal.fault).length }}건</span>
+              </div>
+              <div class="pm-tl-list">
+                <div v-for="(h, i) in ticketHistory(ticketModal.fault)" :key="i" class="pm-tl-row">
+                  <div class="pm-tl-dot" :class="h.kind"></div>
+                  <div class="pm-tl-body">
+                    <div class="pm-tl-line">
+                      <strong>{{ h.action }}</strong>
+                      <span class="pm-tl-from-to" v-if="h.from && h.to">
+                        {{ ticketStatusLabel(h.from) }} → {{ ticketStatusLabel(h.to) }}
+                      </span>
+                    </div>
+                    <div class="pm-tl-meta">
+                      <span class="mono">{{ h.at }}</span>
+                      <span v-if="h.by"> · {{ h.by }}</span>
+                    </div>
+                    <div v-if="h.note" class="pm-tl-note">{{ h.note }}</div>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="pm-ticket-note">
               <label>
@@ -1936,14 +2016,21 @@
       </section>
 
       <!-- ============ 정책 수정 확인 modal ============ -->
-      <div v-if="policyConfirm" class="cam-modal-bg" @click="policyConfirm = null">
+      <div
+        v-if="policyConfirm"
+        class="cam-modal-bg"
+        @click="policyConfirm = null"
+        role="dialog"
+        aria-modal="true"
+        aria-label="정책 변경 확인"
+      >
         <div class="cam-modal pm-policy-modal" @click.stop>
           <div class="cm-h">
             <div class="cm-title">
-              <i class="bi bi-shield-exclamation"></i>
+              <i class="bi bi-shield-exclamation" aria-hidden="true"></i>
               <span>정책 변경 확인</span>
             </div>
-            <button class="cm-x" @click="policyConfirm = null"><i class="bi bi-x-lg"></i></button>
+            <button class="cm-x" @click="policyConfirm = null" aria-label="닫기"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
           </div>
           <div class="pm-policy-confirm-body">
             <div class="cm-row">
@@ -2041,15 +2128,35 @@
           <div class="cm-pm-head">
             <h4>
               <i class="bi bi-heart-pulse"></i> 헬스 분석
-              <span class="cm-pm-score" :class="pmScoreTone(camModal.healthScore)">
+              <span v-if="camModal.healthStatus === 'BASELINE_LEARNING'" class="cm-pm-baseline-bdg">
+                <i class="bi bi-cpu"></i> 기준선 학습 중
+              </span>
+              <span v-else-if="camModal.healthScore != null" class="cm-pm-score" :class="pmScoreTone(camModal.healthScore)">
                 Health {{ camModal.healthScore.toFixed(1) }}
               </span>
+              <span v-else class="cm-pm-score gy">Health —</span>
             </h4>
             <div v-if="camModal.predictedRisk > 0" class="cm-pm-pred">
               <i class="bi bi-graph-up-arrow"></i>
               <span><strong>{{ camModal.predictedType }}</strong> 추세 — {{ camModal.predictedAt }} 임계 도달 예상</span>
             </div>
           </div>
+
+          <!-- BASELINE_LEARNING — 차트/지표 대신 진행률 표시 -->
+          <div v-if="camModal.healthStatus === 'BASELINE_LEARNING'" class="cm-pm-baseline-card">
+            <div class="cm-pm-baseline-l">신규 카메라의 기준선(baseline) 학습이 진행 중입니다.</div>
+            <div class="cm-pm-baseline-bar">
+              <div class="cm-pm-baseline-fill"
+                :style="{ width: ((camModal.baselineSamples || 0) / (camModal.baselineRequired || 30) * 100) + '%' }"
+              ></div>
+            </div>
+            <div class="cm-pm-baseline-stat">
+              표본 수집: <strong>{{ camModal.baselineSamples || 0 }}</strong> / {{ camModal.baselineRequired || 30 }}
+              <span class="cm-pm-baseline-sub">(완료 시 정상 모니터링으로 자동 전환)</span>
+            </div>
+          </div>
+
+          <template v-else>
 
           <!-- Health Score 30분 추세 sparkline -->
           <div class="cm-pm-chart">
@@ -2061,7 +2168,13 @@
                 <i class="ln-pred"></i> 예측
               </span>
             </div>
-            <svg viewBox="0 0 400 100" class="cm-pm-svg" preserveAspectRatio="none">
+            <svg
+              viewBox="0 0 400 100"
+              class="cm-pm-svg"
+              preserveAspectRatio="none"
+              role="img"
+              :aria-label="`Health Score 30분 추세 차트. 현재 ${camModal && camModal.healthScore != null ? camModal.healthScore.toFixed(1) : '값 없음'}, 기준선 75, 위험 임계 50`"
+            >
               <!-- 임계선 (50) -->
               <line x1="0" y1="50" x2="400" y2="50" stroke="#dc2626" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>
               <!-- 기준선 (75) -->
@@ -2100,6 +2213,7 @@
               </div>
             </div>
           </div>
+          </template>
         </div>
       </div>
     </div>
@@ -2302,7 +2416,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
 import echarts from "@/composables/echartsSetup";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import DeptSwitcher from "@/components/dashboard/DeptSwitcher.vue";
 import SideWeather from "@/components/dashboard/SideWeather.vue";
 import { INITIAL_DISTRICTS_WEATHER, DISTRICT_LIST } from "@/data/weather";
@@ -2324,7 +2438,54 @@ const {
 
 const guideOpen = ref(false);
 
-const tab = ref("status");
+// ─── URL query 동기화 (tab + 필터 상태) ───
+// /admin/ops?tab=fault&kind=anomaly&priority=P1&overdue=1 식으로 보존
+const route = useRoute();
+const router = useRouter();
+
+const ALLOWED_TABS = ["status", "cams", "srv", "net", "fault", "settings"];
+const initialTab = ALLOWED_TABS.includes(route.query.tab) ? route.query.tab : "status";
+const tab = ref(initialTab);
+
+// 라우터 query를 안전하게 갱신 (history 누적 X)
+let suppressSync = false;
+function syncToQuery(partial) {
+  if (suppressSync) return;
+  const next = { ...route.query, ...partial };
+  // 빈 값은 query에서 제거
+  Object.keys(next).forEach((k) => {
+    if (next[k] === "" || next[k] === null || next[k] === undefined || next[k] === false) {
+      delete next[k];
+    }
+  });
+  router.replace({ path: route.path, query: next });
+}
+
+// tab 변경 → URL (flush:sync로 suppressSync flag와 동기화)
+watch(tab, (v) => syncToQuery({ tab: v === "status" ? "" : v }), { flush: "sync" });
+
+// URL → state (back/forward 버튼 대응)
+watch(() => route.query, (q) => {
+  suppressSync = true
+  try {
+    const nextTab = ALLOWED_TABS.includes(q.tab) ? q.tab : "status"
+    if (tab.value !== nextTab) tab.value = nextTab
+    // fault 필터
+    if (faultFilter.value.kind !== (q.kind || "")) faultFilter.value.kind = pick(ALLOWED_KIND, q.kind)
+    if (faultFilter.value.priority !== (q.priority || "")) faultFilter.value.priority = pick(ALLOWED_PRI, q.priority)
+    if (faultFilter.value.detectionMethod !== (q.dm || "")) faultFilter.value.detectionMethod = pick(ALLOWED_DM, q.dm)
+    if (faultFilter.value.status !== (q.ts || "")) faultFilter.value.status = pick(ALLOWED_TS, q.ts)
+    const overdueFlag = q.overdue === "1"
+    if (faultFilter.value.slaOverdueOnly !== overdueFlag) faultFilter.value.slaOverdueOnly = overdueFlag
+    // cams 필터
+    const qStr = typeof q.q === "string" ? q.q : ""
+    if (camQuery.value !== qStr) camQuery.value = qStr
+    const stStr = ALLOWED_CAM_ST.includes(q.st) ? q.st : "all"
+    if (camSt.value !== stStr) camSt.value = stStr
+  } finally {
+    suppressSync = false
+  }
+})
 async function onGuideStep(step) {
   if (step?.tab && step.tab !== tab.value) {
     tab.value = step.tab;
@@ -2357,8 +2518,16 @@ const alarmModal = ref(null);
 function openAlarm(a) {
   alarmModal.value = a;
 }
-const camQuery = ref("");
-const camSt = ref("all");
+// cams 탭 필터 — URL 동기화
+const ALLOWED_CAM_ST = ["all", "정상", "지연", "장애"]
+const camQuery = ref(typeof route.query.q === "string" ? route.query.q : "");
+const camSt = ref(ALLOWED_CAM_ST.includes(route.query.st) ? route.query.st : "all");
+watch([camQuery, camSt], ([q, st]) => {
+  syncToQuery({
+    q: q || "",
+    st: st === "all" ? "" : st,
+  })
+}, { flush: "sync" })
 const filteredCams = computed(() => {
   const q = camQuery.value.trim().toLowerCase();
   return cams.filter((c) => {
@@ -2870,6 +3039,17 @@ const faults = Object.freeze([
     ],
     suspectedCauses: ["분석 프로세스 과부하 (CPU 91.3%)", "RTSP 입력 일시 jitter"],
     confirmedCause: null,
+    // 교통 맥락 교차검증 — 인접 카메라는 정상이면 이 카메라 자체 문제일 가능성 ↑
+    trafficContext: {
+      currentVehicleCount: 8,
+      currentAvgSpeed: 42.3,
+      adjacentCameras: [
+        { id: "OLP-W-0040", name: "잠실대교 남단", vehicleCount: 43, avgSpeed: 41.8, qualityStatus: "COMPLETE" },
+        { id: "OLP-W-0042", name: "올림픽대로 잠실", vehicleCount: 39, avgSpeed: 39.5, qualityStatus: "COMPLETE" },
+      ],
+      crossValidation: "ABNORMAL_LOCAL",  // 인접 정상 / 본 카메라만 비정상
+      crossValidationLabel: "본 카메라 단독 이상 — 인접 카메라는 정상 트래픽 유지",
+    },
     shadowModel: {
       name: "camera-lstm-autoencoder",
       version: "1.0.0",
@@ -2956,17 +3136,35 @@ const pmSlaOverdueCount = computed(() => faults.filter((f) => f.slaOverdue).leng
 const pmMtta = ref(7.4)
 const pmMttr = ref(18)
 
-// ─── fault 필터 ───
+// ─── fault 필터 (URL query 동기화) ───
+const ALLOWED_KIND = ["", "fault", "anomaly"]
+const ALLOWED_PRI = ["", "P1", "P2", "P3"]
+const ALLOWED_DM = ["", "RULE", "TREND_PROJECTION", "ROBUST_Z_SCORE", "CROSS_VALIDATION", "LSTM_AUTOENCODER"]
+const ALLOWED_TS = ["", "OPEN", "ASSIGNED", "IN_PROGRESS", "RESOLVED", "CLOSED"]
+function pick(arr, v, def = "") { return arr.includes(v) ? v : def }
+
 const faultFilter = ref({
-  kind: "",
-  priority: "",
-  detectionMethod: "",
-  status: "",
-  slaOverdueOnly: false,
+  kind:           pick(ALLOWED_KIND, route.query.kind),
+  priority:       pick(ALLOWED_PRI,  route.query.priority),
+  detectionMethod: pick(ALLOWED_DM,  route.query.dm),
+  status:         pick(ALLOWED_TS,   route.query.ts),
+  slaOverdueOnly: route.query.overdue === "1",
 })
+
 function resetFaultFilter() {
   faultFilter.value = { kind: "", priority: "", detectionMethod: "", status: "", slaOverdueOnly: false }
 }
+
+// fault 필터 변경 → URL
+watch(faultFilter, (v) => {
+  syncToQuery({
+    kind:     v.kind,
+    priority: v.priority,
+    dm:       v.detectionMethod,
+    ts:       v.status,
+    overdue:  v.slaOverdueOnly ? "1" : "",
+  })
+}, { deep: true, flush: "sync" })
 const filteredFaults = computed(() => {
   const f = faultFilter.value
   return faults.filter((it) => {
@@ -2993,6 +3191,107 @@ const activeAnomaly = computed(() => {
 function linkedTicket(anom) {
   if (!anom) return null
   return faults.find((f) => f.kind === "fault" && f.dev === anom.dev) || null
+}
+
+// 교통 맥락 헬퍼
+function trafficJdLabel(code) {
+  const m = {
+    ABNORMAL_LOCAL:  "본 카메라 단독 이상",
+    ABNORMAL_GLOBAL: "광역 교통 영향",
+    NORMAL_TRAFFIC:  "정상 교통",
+    INSUFFICIENT:    "데이터 부족",
+  }
+  return m[code] || code || "—"
+}
+function trafficJdTone(code) {
+  if (code === "ABNORMAL_LOCAL")  return "rd"
+  if (code === "ABNORMAL_GLOBAL") return "yl"
+  if (code === "NORMAL_TRAFFIC")  return "gr"
+  return "gy"
+}
+function adjacentAvg(ctx) {
+  const arr = ctx?.adjacentCameras || []
+  if (!arr.length) return "—"
+  return Math.round(arr.reduce((s, c) => s + (c.vehicleCount || 0), 0) / arr.length)
+}
+function adjacentSpeedAvg(ctx) {
+  const arr = ctx?.adjacentCameras || []
+  if (!arr.length) return "—"
+  return (arr.reduce((s, c) => s + (c.avgSpeed || 0), 0) / arr.length).toFixed(1)
+}
+
+// 티켓 변경 이력 (현재 상태에 맞춰 발생한 단계까지의 history 생성)
+// 실제 백엔드 연동 시 GET /tickets/{id}/history 로 교체
+function ticketHistory(fault) {
+  if (!fault) return []
+  const events = []
+  const STAGES = ["OPEN", "ASSIGNED", "IN_PROGRESS", "RESOLVED", "CLOSED"]
+  const currentIdx = STAGES.indexOf(fault.ticketStatus)
+  const baseTime = fault.time || "10:00:00"
+
+  // 발생 (항상)
+  events.push({
+    action: "티켓 생성",
+    kind: "create",
+    at: `${baseTime}`,
+    by: fault.detectionMethod === "TREND_PROJECTION" ? "예지 시스템" : "장애 자동 감지",
+    from: null, to: "OPEN",
+    note: fault.symp,
+  })
+  // 배정
+  if (currentIdx >= 1) {
+    events.push({
+      action: "담당자 배정",
+      kind: "assign",
+      at: addMin(baseTime, 4),
+      by: "운영자",
+      from: "OPEN", to: "ASSIGNED",
+      note: `${fault.who || "담당자"}에게 배정`,
+    })
+  }
+  // 진행 중
+  if (currentIdx >= 2) {
+    events.push({
+      action: "작업 시작",
+      kind: "progress",
+      at: addMin(baseTime, 12),
+      by: fault.who || "담당자",
+      from: "ASSIGNED", to: "IN_PROGRESS",
+      note: "현장 점검 시작",
+    })
+  }
+  // 해결
+  if (currentIdx >= 3) {
+    events.push({
+      action: "작업 완료",
+      kind: "resolve",
+      at: addMin(baseTime, 38),
+      by: fault.who || "담당자",
+      from: "IN_PROGRESS", to: "RESOLVED",
+      note: "장비 재기동 후 정상 동작 확인",
+    })
+  }
+  // 종결
+  if (currentIdx >= 4) {
+    events.push({
+      action: "최종 종결",
+      kind: "close",
+      at: addMin(baseTime, 52),
+      by: "운영자",
+      from: "RESOLVED", to: "CLOSED",
+      note: "복구 확인 후 종결",
+    })
+  }
+  return events
+}
+
+function addMin(hms, mins) {
+  const [h, m, s] = (hms || "00:00:00").split(":").map((n) => parseInt(n, 10))
+  const total = h * 60 + m + mins
+  const nh = Math.floor(total / 60)
+  const nm = total % 60
+  const pad = (n) => String(n).padStart(2, "0")
+  return `${pad(nh)}:${pad(nm)}:${pad(s || 0)}`
 }
 
 // 라벨 헬퍼 (Enum → 한글)
@@ -3276,13 +3575,26 @@ const alarmsTimeline = Object.freeze([
 // 시연용 현재 시각 (헤더 14:32:18 기준) — 1초마다 tick
 const nowSec = ref(14 * 3600 + 32 * 60 + 18);
 let nowTimer = null;
+// ESC 키로 열려있는 모달 닫기 (접근성)
+function onGlobalKeydown(e) {
+  if (e.key !== "Escape") return
+  // 우선순위: 가장 최근에 연 모달부터
+  if (anomalyModal.value) { closeAnomalyModal(); return }
+  if (ticketModal.value) { closeTicketModal(); return }
+  if (policyConfirm.value) { policyConfirm.value = null; return }
+  if (camModal.value) { camModal.value = null; return }
+  if (alarmModal.value) { alarmModal.value = null; return }
+}
+
 onMounted(() => {
   nowTimer = setInterval(() => {
     nowSec.value += 1;
   }, 1000);
+  document.addEventListener("keydown", onGlobalKeydown)
 });
 onBeforeUnmount(() => {
   if (nowTimer) clearInterval(nowTimer);
+  document.removeEventListener("keydown", onGlobalKeydown)
 });
 
 function alarmSec(t) {
@@ -3409,6 +3721,18 @@ const cams = Object.freeze([
     predictedRisk: 1,
     predictedType: "OCR 품질 저하",
     predictedAt: "10:51",
+  },
+  {
+    // 신규 설치 카메라 — 기준선 학습 중 (14일 표본 수집)
+    name: "마곡대로_C7",
+    loc: "마곡대로 04K+700",
+    st: "수집 중", stTone: "wn",
+    lat: 102, ts: "10:32:11",
+    id: "MGK-W-0102",
+    healthScore: null, healthStatus: "BASELINE_LEARNING",
+    baselineSamples: 14,
+    baselineRequired: 30,
+    predictedRisk: 0,
   },
 ]);
 
@@ -3626,9 +3950,14 @@ const servers = Object.freeze([
 
 @media (max-width: 1400px) {
   .ops-shell .pm-strip { grid-template-columns: repeat(3, 1fr); }
+  .ops-shell .pm-kpi > i { font-size: 18px; }
+  .ops-shell .pm-kpi-v { font-size: 20px; }
 }
-@media (max-width: 1000px) {
-  .ops-shell .pm-strip { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 1100px) {
+  .ops-shell .pm-strip { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .ops-shell .pm-kpi { padding: 8px 10px; gap: 8px; }
+  .ops-shell .pm-kpi-l { font-size: 10.5px; }
+  .ops-shell .pm-sub { display: none; }
 }
 
 /* ── cams 탭 KPI 9박스 ── */
@@ -4020,6 +4349,22 @@ const servers = Object.freeze([
 @media (max-width: 1200px) {
   .ops-shell .pm-shadow-body { grid-template-columns: 1fr; }
   .ops-shell .pm-causes { grid-template-columns: 1fr; }
+  .ops-shell .pm-traffic-body { grid-template-columns: 1fr; gap: 8px; }
+  .ops-shell .pm-traffic-arr { display: none; }
+}
+@media (max-width: 1100px) {
+  /* fault 필터: 줄바꿈 + select 폭 적당히 */
+  .ops-shell .pm-fault-filter { gap: 6px; }
+  .ops-shell .pm-fault-filter select { font-size: 11.5px; padding: 4px 8px; }
+  /* fault 표: 가로 스크롤 허용 — 컬럼 13개 초과 폭 시 */
+  .ops-shell .pm-fault-tbl { font-size: 11.5px; }
+  .ops-shell .pm-fault-tbl .pm-fault-acts .pnl-act.sm {
+    font-size: 10.5px; padding: 3px 6px;
+  }
+}
+@media (max-width: 900px) {
+  .ops-shell .pm-policy-fields { grid-template-columns: 1fr; }
+  .ops-shell .pm-field { grid-template-columns: 90px 1fr 28px; gap: 4px; }
 }
 
 /* fault 탭 — 활성 이상 카드 추가로 콘텐츠가 길어져 내부 스크롤 허용 */
@@ -4224,6 +4569,191 @@ const servers = Object.freeze([
   color: #6b7280; font-size: 12px;
 }
 .ops-shell .pm-linked-ticket.none > i { color: #9aa6b8; }
+
+/* BASELINE_LEARNING 표시 (Health 컬럼) */
+.ops-shell .pm-baseline {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(124,58,237,0.12);
+  color: #7c3aed;
+  padding: 2px 8px; border-radius: 100px;
+  font-size: 11px; font-weight: 700;
+}
+.ops-shell .pm-baseline > i { font-size: 10px; }
+.ops-shell .cm-pm-baseline-bdg {
+  margin-left: 6px;
+  padding: 2px 10px; border-radius: 100px;
+  background: rgba(124,58,237,0.12);
+  color: #7c3aed;
+  font-size: 11px; font-weight: 800;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.ops-shell .cm-pm-baseline-bdg > i { font-size: 10px; }
+.ops-shell .cm-pm-baseline-card {
+  background: #ffffff;
+  border: 1px solid rgba(124,58,237,0.25);
+  border-left: 3px solid #7c3aed;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.ops-shell .cm-pm-baseline-l {
+  font-size: 13px; color: #4a5b78; margin-bottom: 10px;
+}
+.ops-shell .cm-pm-baseline-bar {
+  height: 10px;
+  background: rgba(124,58,237,0.1);
+  border-radius: 100px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.ops-shell .cm-pm-baseline-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7c3aed, #2563eb);
+  border-radius: 100px;
+  transition: width .3s;
+}
+.ops-shell .cm-pm-baseline-stat {
+  font-size: 13px; color: #0c1f40;
+  font-family: 'JetBrains Mono', monospace;
+}
+.ops-shell .cm-pm-baseline-stat > strong { color: #7c3aed; font-size: 16px; }
+.ops-shell .cm-pm-baseline-sub {
+  margin-left: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11.5px; color: #6b7280; font-weight: 500;
+}
+
+/* 교통 맥락 교차검증 */
+.ops-shell .pm-traffic {
+  background: #f4f7fb;
+  border: 1px solid #e3e9f1;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.ops-shell .pm-traffic-h {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: #4a5b78;
+  margin-bottom: 10px;
+}
+.ops-shell .pm-traffic-h > i { color: #2563eb; font-size: 14px; }
+.ops-shell .pm-traffic-h > strong { color: #0c1f40; font-size: 13.5px; }
+.ops-shell .pm-traffic-jd {
+  margin-left: auto;
+  padding: 2px 10px; border-radius: 100px;
+  font-size: 10.5px; font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.ops-shell .pm-traffic-jd.rd { background: rgba(220,38,38,0.12); color: #dc2626; }
+.ops-shell .pm-traffic-jd.yl { background: rgba(217,119,6,0.12); color: #d97706; }
+.ops-shell .pm-traffic-jd.gr { background: rgba(5,150,105,0.12); color: #059669; }
+.ops-shell .pm-traffic-jd.gy { background: rgba(107,114,128,0.15); color: #6b7280; }
+
+.ops-shell .pm-traffic-body {
+  display: grid; grid-template-columns: 1fr 24px 1fr; gap: 12px;
+  align-items: center; margin-bottom: 8px;
+}
+.ops-shell .pm-traffic-self,
+.ops-shell .pm-traffic-adj {
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+.ops-shell .pm-traffic-l {
+  font-size: 10.5px; color: #4a5b78; font-weight: 700;
+  letter-spacing: 0.04em; margin-bottom: 2px;
+}
+.ops-shell .pm-traffic-v {
+  font-family: 'JetBrains Mono', monospace;
+  display: flex; align-items: baseline; gap: 4px;
+}
+.ops-shell .pm-traffic-v > strong { font-size: 20px; color: #0c1f40; font-weight: 800; }
+.ops-shell .pm-traffic-sub { font-size: 11.5px; color: #4a5b78; }
+.ops-shell .pm-traffic-arr {
+  color: #9aa6b8; font-size: 16px; text-align: center;
+}
+.ops-shell .pm-traffic-note {
+  font-size: 11.5px; color: #4a5b78;
+  background: rgba(37,99,235,0.06);
+  padding: 6px 10px; border-radius: 5px;
+  border-left: 2px solid #2563eb;
+}
+
+/* 티켓 변경 이력 timeline (모달 내부) */
+.ops-shell .pm-ticket-modal-wide { max-width: 580px; }
+.ops-shell .pm-ticket-timeline {
+  margin-top: 14px;
+  background: #f4f7fb;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.ops-shell .pm-tl-h {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 700; color: #4a5b78;
+  margin-bottom: 10px;
+}
+.ops-shell .pm-tl-h > i { color: #2563eb; }
+.ops-shell .pm-tl-cnt {
+  margin-left: auto;
+  font-size: 10.5px; color: #6b7280;
+  background: #ffffff;
+  padding: 1px 8px; border-radius: 100px;
+  font-weight: 600;
+}
+.ops-shell .pm-tl-list {
+  position: relative;
+  padding-left: 4px;
+}
+.ops-shell .pm-tl-list::before {
+  content: "";
+  position: absolute;
+  left: 9px; top: 6px; bottom: 6px;
+  width: 1px;
+  background: #c9d4e3;
+}
+.ops-shell .pm-tl-row {
+  position: relative;
+  display: flex; gap: 12px;
+  padding: 6px 0;
+}
+.ops-shell .pm-tl-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #c9d4e3;
+  border: 2px solid #ffffff;
+  z-index: 1;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.ops-shell .pm-tl-dot.create   { background: #6b7280; }
+.ops-shell .pm-tl-dot.assign   { background: #2563eb; }
+.ops-shell .pm-tl-dot.progress { background: #d97706; }
+.ops-shell .pm-tl-dot.resolve  { background: #059669; }
+.ops-shell .pm-tl-dot.close    { background: #0c1f40; }
+.ops-shell .pm-tl-body { flex: 1; min-width: 0; }
+.ops-shell .pm-tl-line {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: #0c1f40;
+}
+.ops-shell .pm-tl-line > strong { font-weight: 700; }
+.ops-shell .pm-tl-from-to {
+  font-size: 11px; color: #6b7280;
+  background: #ffffff;
+  padding: 1px 7px; border-radius: 100px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.ops-shell .pm-tl-meta {
+  font-size: 11px; color: #6b7280;
+  margin-top: 2px;
+}
+.ops-shell .pm-tl-meta .mono { font-family: 'JetBrains Mono', monospace; }
+.ops-shell .pm-tl-note {
+  font-size: 11.5px; color: #4a5b78;
+  background: #ffffff;
+  padding: 5px 10px;
+  border-radius: 5px;
+  margin-top: 4px;
+  border-left: 2px solid #c9d4e3;
+}
 
 /* anomaly modal select */
 .ops-shell .pm-ticket-note select {
