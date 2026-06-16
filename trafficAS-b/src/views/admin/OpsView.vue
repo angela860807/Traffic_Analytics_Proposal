@@ -109,6 +109,24 @@
       />
 
       <template v-if="tab === 'status'">
+        <!-- ============ 데이터 소스 필터 ============ -->
+        <div class="pm-ds-row">
+          <label class="pm-ds-lab">
+            <i class="bi bi-database"></i> 데이터 소스
+          </label>
+          <select v-model="pmDataSource" class="pm-ds-sel">
+            <option value="REAL">실데이터</option>
+            <option value="OPEN_DATA">공개데이터</option>
+            <option value="SIMULATED">시뮬레이션</option>
+            <option value="FAULT_INJECTED">장애 주입</option>
+            <option value="MOCK">목업</option>
+          </select>
+          <span v-if="pmDataSource !== 'REAL'" class="pm-ds-bdg" :class="pmDataSourceTone(pmDataSource)">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            {{ pmDataSourceLabel(pmDataSource) }} 모드 — 실제 운영 데이터 아님
+          </span>
+        </div>
+
         <!-- ============ 예지보전 인사이트 스트립 ============ -->
         <section class="pm-strip">
           <div class="pm-kpi" :class="{ ok: pmSloOk, bad: !pmSloOk }">
@@ -150,8 +168,8 @@
 
         <!-- ============ 메인 그리드 (좌 2x2 + 우 풀세로 장애상세) ============ -->
         <section class="main-grid">
-          <!-- 네트워크 지연 (top-left, 위치 변경) -->
-          <div class="card net-card">
+          <!-- 네트워크 지연 카드 — net 탭에 동일 기능 있어 제거 -->
+          <div class="card net-card" v-if="false">
             <div class="ch">
               <h3>네트워크 지연 <span class="ch-kpi">평균 128ms · 최대 286ms</span></h3>
               <a class="ch-link" @click="tab = 'net'">전체 보기 ›</a>
@@ -173,8 +191,8 @@
             </div>
           </div>
 
-          <!-- 서버 상태 (3 cards with CPU/메모리/디스크/서비스 bars) -->
-          <div class="card srv-card">
+          <!-- 서버 상태 카드 — srv 탭에 동일 기능 있어 제거 -->
+          <div class="card srv-card" v-if="false">
             <div class="ch">
               <h3>서버 상태 <span class="ch-kpi gr">대표 · ocr-srv-01</span></h3>
               <a class="ch-link" @click="tab = 'srv'">전체 보기 ›</a>
@@ -290,7 +308,7 @@
                   장애 상세 <span class="b-rd">진행 중</span>
                   <span class="ch-kpi rd">1건 장애 · 2건 처리 대기</span>
                 </h3>
-                <i class="bi bi-arrows-fullscreen"></i>
+                <a class="ch-link" @click="tab = 'fault'">전체 보기 ›</a>
               </div>
               <div class="fl-head">
                 <div class="fl-title">
@@ -316,7 +334,6 @@
                   <i class="bi bi-circle-fill hst-i"></i><span class="hst-t">10:28:11</span> 김기사(IT) 상황 확인 — 현장 출동 예정
                 </div>
               </div>
-              <a class="ch-link" @click="tab = 'fault'">전체 보기 ›</a>
               <div class="act-row">
                 <button class="ab bl"><i class="bi bi-arrow-repeat"></i> 재연결</button>
                 <button class="ab rd"><i class="bi bi-exclamation-octagon"></i> 장애 등록</button>
@@ -370,7 +387,7 @@
                 </thead>
                 <tbody>
                   <tr
-                    v-for="(c, i) in cams.slice(0, 5)"
+                    v-for="(c, i) in cams.slice(0, 4)"
                     :key="i"
                     :class="{ bad: c.st === '장애' }"
                     @click="openCam(c)"
@@ -489,35 +506,6 @@
           </div>
         </div>
 
-        <!-- 위치별 분포 -->
-        <div class="nd-block">
-          <div class="nd-h">
-            <h4>위치별 분포</h4>
-            <span class="nd-h-cnt">6개 구역</span>
-          </div>
-          <div class="cd-zones">
-            <div class="cdz" v-for="z in camZones" :key="z.name">
-              <div class="cdz-h">
-                <span class="cdz-n">{{ z.name }}</span>
-                <span class="cdz-c"
-                  ><strong>{{ z.ok + z.warn + z.bad }}</strong
-                  ><em>대</em></span
-                >
-              </div>
-              <div class="cdz-bar">
-                <span class="gr" :style="{ flex: z.ok }"></span>
-                <span class="yl" :style="{ flex: z.warn }"></span>
-                <span class="rd" :style="{ flex: z.bad }"></span>
-              </div>
-              <div class="cdz-leg">
-                <span><span class="ns-d gr"></span>{{ z.ok }}</span>
-                <span><span class="ns-d yl"></span>{{ z.warn }}</span>
-                <span><span class="ns-d rd"></span>{{ z.bad }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- 카메라 전체 목록 -->
         <div class="nd-block">
           <div class="nd-h">
@@ -627,61 +615,6 @@
           </div>
         </div>
 
-        <!-- 최근 카메라 이벤트 -->
-        <div class="nd-block">
-          <div class="nd-h"><h4>최근 카메라 이벤트</h4></div>
-          <table class="pnl-tbl nd-tbl">
-            <thead>
-              <tr>
-                <th>발생 시각</th>
-                <th>장비 ID</th>
-                <th>이벤트</th>
-                <th>심각도</th>
-                <th>지속 시간</th>
-                <th>담당자</th>
-                <th>조치</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td class="mono">14:24:17</td>
-                <td class="mono">CAM-M-002</td>
-                <td>오프라인 (RTSP timeout)</td>
-                <td><span class="stat no">CRIT</span></td>
-                <td class="mono rd-txt">8분 1초</td>
-                <td>김기사</td>
-                <td><button class="pnl-act sm">상세</button></td>
-              </tr>
-              <tr>
-                <td class="mono">14:11:42</td>
-                <td class="mono">CAM-J-007</td>
-                <td>지연 286ms 임계 초과</td>
-                <td><span class="stat wn">HIGH</span></td>
-                <td class="mono yl-txt">20분 36초</td>
-                <td>자동</td>
-                <td><button class="pnl-act sm">상세</button></td>
-              </tr>
-              <tr>
-                <td class="mono">13:55:18</td>
-                <td class="mono">CAM-IC-0011</td>
-                <td>연결 복구 완료 (재기동)</td>
-                <td><span class="stat ok">INFO</span></td>
-                <td class="mono">—</td>
-                <td>이대리</td>
-                <td><button class="pnl-act sm">상세</button></td>
-              </tr>
-              <tr>
-                <td class="mono">12:48:22</td>
-                <td class="mono">GBN-S-0032</td>
-                <td>이미지 노이즈 임계 초과</td>
-                <td><span class="stat wn">MED</span></td>
-                <td class="mono">1시간 44분</td>
-                <td>자동</td>
-                <td><button class="pnl-act sm">상세</button></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
       </section>
 
       <section v-if="tab === 'srv'" class="card pnl net-detail">
@@ -1406,6 +1339,38 @@
               </div>
             </div>
 
+            <!-- 통계 지표 + detector 정보 -->
+            <div class="pm-stats-row" v-if="activeAnomaly.trend || activeAnomaly.detector">
+              <div v-if="activeAnomaly.trend?.robustZScore != null" class="pm-stat">
+                <div class="pm-stat-l">Robust Z-score</div>
+                <div class="pm-stat-v" :class="zScoreTone(activeAnomaly.trend.robustZScore)">
+                  {{ activeAnomaly.trend.robustZScore.toFixed(2) }}
+                </div>
+                <div class="pm-stat-s">기준선 대비 편차</div>
+              </div>
+              <div v-if="activeAnomaly.trend?.slope != null" class="pm-stat">
+                <div class="pm-stat-l">추세 기울기</div>
+                <div class="pm-stat-v" :class="slopeTone(activeAnomaly.trend.slope)">
+                  {{ activeAnomaly.trend.slope > 0 ? '+' : '' }}{{ activeAnomaly.trend.slope.toFixed(2) }}<small>/분</small>
+                </div>
+                <div class="pm-stat-s">{{ activeAnomaly.trend.slope < 0 ? '하향' : '상승' }} 추세</div>
+              </div>
+              <div v-if="activeAnomaly.trend?.confidence != null" class="pm-stat">
+                <div class="pm-stat-l">추세 신뢰도</div>
+                <div class="pm-stat-v" :class="confTone(activeAnomaly.trend.confidence)">
+                  {{ (activeAnomaly.trend.confidence * 100).toFixed(0) }}<small>%</small>
+                </div>
+                <div class="pm-stat-s">{{ activeAnomaly.trend.confidence >= 0.7 ? '높음' : '보통' }}</div>
+              </div>
+              <div v-if="activeAnomaly.detector" class="pm-stat pm-stat-det">
+                <div class="pm-stat-l">탐지기</div>
+                <div class="pm-stat-v pm-stat-det-name">{{ activeAnomaly.detector.name }}</div>
+                <div class="pm-stat-s">
+                  v{{ activeAnomaly.detector.version }} · {{ activeAnomaly.detector.policyCode }}
+                </div>
+              </div>
+            </div>
+
             <!-- 관측값 / 기준값 / 임계값 비교 표 -->
             <table class="pm-evidence-tbl">
               <thead>
@@ -1551,6 +1516,7 @@
                 :disabled="!canAssignTicket"
                 :aria-disabled="!canAssignTicket"
                 :title="canAssignTicket ? '' : 'OPERATOR/ADMIN만 담당자 배정 가능'"
+                @click="openAssignModal(activeAnomaly)"
               >
                 <i class="bi bi-person-plus" aria-hidden="true"></i> 담당자 배정
               </button>
@@ -1558,33 +1524,6 @@
           </div>
         </div>
 
-        <!-- 장애 유형 분포 -->
-        <div class="nd-block">
-          <div class="nd-h">
-            <h4>장애 유형 분포 (최근 7일)</h4>
-            <span class="nd-h-cnt">총 21건</span>
-          </div>
-          <div class="cd-zones">
-            <div class="cdz" v-for="t in faultTypes" :key="t.name">
-              <div class="cdz-h">
-                <span class="cdz-n">{{ t.name }}</span>
-                <span class="cdz-c"
-                  ><strong>{{ t.count }}</strong
-                  ><em>건</em></span
-                >
-              </div>
-              <div class="cdz-bar">
-                <span class="rd" :style="{ flex: t.ongoing }"></span>
-                <span class="gr" :style="{ flex: t.count - t.ongoing }"></span>
-              </div>
-              <div class="cdz-leg">
-                <span><span class="ns-d rd"></span>{{ t.ongoing }}</span>
-                <span><span class="ns-d gr"></span>{{ t.count - t.ongoing }} 복구</span>
-                <span style="color: #6b7a92">{{ t.mttr }}분</span>
-              </div>
-            </div>
-          </div>
-        </div>
 
         <!-- 전체 장애·이상 목록 -->
         <div class="nd-block">
@@ -1711,6 +1650,60 @@
         </div>
 
       </section>
+
+      <!-- ============ 담당자 배정 모달 ============ -->
+      <div
+        v-if="assignModal"
+        class="cam-modal-bg"
+        @click="closeAssignModal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="담당자 배정"
+      >
+        <div class="cam-modal pm-ticket-modal" @click.stop>
+          <div class="cm-h">
+            <div class="cm-title">
+              <i class="bi bi-person-plus" aria-hidden="true"></i>
+              <span>담당자 배정</span>
+            </div>
+            <button class="cm-x" @click="closeAssignModal" aria-label="닫기"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+          </div>
+          <div class="pm-ticket-body">
+            <div class="cm-row">
+              <span>대상 ID</span><strong>{{ assignModal.target.id }}</strong>
+            </div>
+            <div class="cm-row">
+              <span>장비</span><strong>{{ assignModal.target.dev }}</strong>
+            </div>
+            <div class="pm-ticket-note">
+              <label>담당자 선택 <span class="req">* 필수</span></label>
+              <select v-model="assignModal.assigneeId">
+                <option value="">선택…</option>
+                <option v-for="a in assignees" :key="a.id" :value="a.id">
+                  {{ a.name }} ({{ a.role }})
+                </option>
+              </select>
+            </div>
+            <div class="pm-ticket-note">
+              <label>전달 메모 (선택)</label>
+              <textarea
+                v-model="assignModal.note"
+                placeholder="담당자에게 전달할 내용 (예: 현장 점검 / 원격 진단 / 부품 교체 등)"
+                rows="3"
+              ></textarea>
+            </div>
+            <div v-if="assignModal.error" class="pm-ticket-err">
+              <i class="bi bi-exclamation-circle"></i> {{ assignModal.error }}
+            </div>
+            <div class="pm-ticket-acts">
+              <button class="pnl-act" @click="closeAssignModal">취소</button>
+              <button class="pnl-act gr" @click="submitAssignModal">
+                <i class="bi bi-check2"></i> 배정
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- ============ 이상 이벤트 resolve / dismiss 모달 ============ -->
       <div
@@ -1897,14 +1890,6 @@
             </div>
             <div class="set-row"><label>정기 점검 알림</label><input type="checkbox" checked /></div>
           </div>
-          <div class="ops-set-blk">
-            <h4>현장 출동</h4>
-            <div class="set-row"><label>기본 담당자</label>
-              <select><option>김기사</option><option>이엔지</option><option>박기사</option></select>
-            </div>
-            <div class="set-row"><label>출동 SMS 발송</label><input type="checkbox" checked /></div>
-            <div class="set-row"><label>예비 부품 부족 알림</label><input type="checkbox" checked /></div>
-          </div>
         </div>
         <div class="ops-set-foot">
           <button class="ops-set-save" @click="saveSettings"><i class="bi bi-check2"></i> 저장</button>
@@ -1956,48 +1941,91 @@
               <div class="pm-policy-code">{{ p.policyCode }}</div>
 
               <div class="pm-policy-fields">
-                <div class="pm-field">
+                <div class="pm-field" :class="{ err: policyFieldErrors[p.policyCode]?.warningThreshold }">
                   <label>경고 임계</label>
                   <input
                     type="number"
                     v-model.number="p.warningThreshold"
                     :disabled="!canEditPolicy"
                     :step="p.step || 1"
+                    :min="p.min"
+                    :max="p.max"
+                    @input="validatePolicy(p)"
                   />
                   <span class="pm-field-unit">{{ p.unit }}</span>
                 </div>
-                <div class="pm-field">
+                <div class="pm-field" :class="{ err: policyFieldErrors[p.policyCode]?.criticalThreshold }">
                   <label>위험 임계</label>
                   <input
                     type="number"
                     v-model.number="p.criticalThreshold"
                     :disabled="!canEditPolicy"
                     :step="p.step || 1"
+                    :min="p.min"
+                    :max="p.max"
+                    @input="validatePolicy(p)"
                   />
                   <span class="pm-field-unit">{{ p.unit }}</span>
                 </div>
-                <div class="pm-field">
+                <div class="pm-field" :class="{ err: policyFieldErrors[p.policyCode]?.warningConsecutiveWindows }">
                   <label>경고 연속 윈도</label>
                   <input
                     type="number"
                     v-model.number="p.warningConsecutiveWindows"
                     :disabled="!canEditPolicy"
-                    min="1"
-                    max="10"
+                    min="1" max="10"
+                    @input="validatePolicy(p)"
                   />
                   <span class="pm-field-unit">회</span>
                 </div>
-                <div class="pm-field">
+                <div class="pm-field" :class="{ err: policyFieldErrors[p.policyCode]?.criticalConsecutiveWindows }">
                   <label>위험 연속 윈도</label>
                   <input
                     type="number"
                     v-model.number="p.criticalConsecutiveWindows"
                     :disabled="!canEditPolicy"
-                    min="1"
-                    max="10"
+                    min="1" max="10"
+                    @input="validatePolicy(p)"
                   />
                   <span class="pm-field-unit">회</span>
                 </div>
+              </div>
+
+              <!-- 정책 방식별 추가 입력 (Rule / z-score / 추세) -->
+              <div v-if="p.detectionMethod === 'ROBUST_Z_SCORE'" class="pm-policy-extra">
+                <div class="pm-field">
+                  <label>z-score 윈도(분)</label>
+                  <input type="number" v-model.number="p.zScoreWindowMinutes" :disabled="!canEditPolicy" min="5" max="120" />
+                  <span class="pm-field-unit">분</span>
+                </div>
+                <div class="pm-field">
+                  <label>최소 표본 수</label>
+                  <input type="number" v-model.number="p.minimumSampleCount" :disabled="!canEditPolicy" min="10" max="200" />
+                  <span class="pm-field-unit">개</span>
+                </div>
+              </div>
+              <div v-else-if="p.detectionMethod === 'TREND_PROJECTION'" class="pm-policy-extra">
+                <div class="pm-field">
+                  <label>예측 horizon</label>
+                  <input type="number" v-model.number="p.predictionHorizonMinutes" :disabled="!canEditPolicy" min="5" max="60" />
+                  <span class="pm-field-unit">분</span>
+                </div>
+                <div class="pm-field">
+                  <label>EWMA α</label>
+                  <input type="number" v-model.number="p.ewmaAlpha" :disabled="!canEditPolicy" min="0.1" max="0.9" step="0.05" />
+                  <span class="pm-field-unit"></span>
+                </div>
+                <div class="pm-field">
+                  <label>최소 신뢰도</label>
+                  <input type="number" v-model.number="p.minimumTrendConfidence" :disabled="!canEditPolicy" min="0.3" max="0.95" step="0.05" />
+                  <span class="pm-field-unit"></span>
+                </div>
+              </div>
+
+              <!-- validation 에러 메시지 -->
+              <div v-if="hasPolicyError(p)" class="pm-policy-err">
+                <i class="bi bi-exclamation-circle"></i>
+                <span>{{ policyErrorMessage(p) }}</span>
               </div>
 
               <div v-if="p.warningConsecutiveWindows !== p.criticalConsecutiveWindows" class="pm-policy-warn">
@@ -2006,7 +2034,11 @@
               </div>
 
               <div class="pm-policy-actions" v-if="canEditPolicy">
-                <button class="pnl-act sm" @click="openPolicyConfirm(p)">
+                <button
+                  class="pnl-act sm"
+                  :disabled="hasPolicyError(p)"
+                  @click="openPolicyConfirm(p)"
+                >
                   <i class="bi bi-check2"></i> 변경 저장
                 </button>
               </div>
@@ -2201,16 +2233,32 @@
             </svg>
           </div>
 
-          <!-- 핵심 지표 4종 (현재 / 기준선 / 임계) -->
+          <!-- 핵심 지표 4종 (현재 / 기준선 / 임계 + 미니 시계열) -->
           <div class="cm-pm-mtx">
             <div v-for="m in pmCameraMetrics(camModal)" :key="m.label" class="cm-pm-mtx-row" :class="m.tone">
-              <div class="cm-pm-mtx-l">{{ m.label }}</div>
-              <div class="cm-pm-mtx-vals">
-                <span class="cm-pm-mtx-cur" :class="m.tone">{{ m.cur }}{{ m.unit }}</span>
-                <span class="cm-pm-mtx-sep">vs</span>
-                <span class="cm-pm-mtx-base">{{ m.base }}{{ m.unit }} <em>기준</em></span>
-                <span class="cm-pm-mtx-thr">임계 {{ m.thr }}{{ m.unit }}</span>
+              <div class="cm-pm-mtx-head">
+                <div class="cm-pm-mtx-l">{{ m.label }}</div>
+                <div class="cm-pm-mtx-vals">
+                  <span class="cm-pm-mtx-cur" :class="m.tone">{{ m.cur }}{{ m.unit }}</span>
+                  <span class="cm-pm-mtx-sep">vs</span>
+                  <span class="cm-pm-mtx-base">{{ m.base }}{{ m.unit }} <em>기준</em></span>
+                  <span class="cm-pm-mtx-thr">임계 {{ m.thr }}{{ m.unit }}</span>
+                </div>
               </div>
+              <!-- 미니 시계열 sparkline (30분, 외부 lib 0) -->
+              <svg viewBox="0 0 200 36" class="cm-pm-mtx-svg" preserveAspectRatio="none" :aria-label="`${m.label} 30분 추세`">
+                <!-- 임계선 -->
+                <line x1="0" :y1="thresholdY(m)" x2="200" :y2="thresholdY(m)" stroke="#dc2626" stroke-width="0.6" stroke-dasharray="3 3" opacity="0.4"/>
+                <!-- 기준선 -->
+                <line x1="0" :y1="baselineY(m)" x2="200" :y2="baselineY(m)" stroke="#9aa6b8" stroke-width="0.6" stroke-dasharray="2 3" opacity="0.5"/>
+                <!-- 실측 폴리라인 -->
+                <polyline
+                  :points="metricSparkline(m)"
+                  fill="none"
+                  :stroke="metricStrokeColor(m.tone)"
+                  stroke-width="1.5"
+                />
+              </svg>
             </div>
           </div>
           </template>
@@ -3039,6 +3087,19 @@ const faults = Object.freeze([
     ],
     suspectedCauses: ["분석 프로세스 과부하 (CPU 91.3%)", "RTSP 입력 일시 jitter"],
     confirmedCause: null,
+    // 운영 detector 정보 (계약 §3-6)
+    detector: {
+      name: "camera-trend-projection",
+      version: "1.0.0",
+      policyCode: "CAMERA_TREND_PROJECTION_V1",
+    },
+    // 통계 지표 (계약 §3-6 trend)
+    trend: {
+      slope: -0.73,            // 분당 -0.73 fps (하향)
+      confidence: 0.81,         // 추세 신뢰도
+      robustZScore: -4.2,       // robust z-score (관측-기준선) / mad
+      predictionHorizonMinutes: 10,
+    },
     // 교통 맥락 교차검증 — 인접 카메라는 정상이면 이 카메라 자체 문제일 가능성 ↑
     trafficContext: {
       currentVehicleCount: 8,
@@ -3220,6 +3281,24 @@ function adjacentSpeedAvg(ctx) {
   return (arr.reduce((s, c) => s + (c.avgSpeed || 0), 0) / arr.length).toFixed(1)
 }
 
+// 통계 지표 톤 분기
+function zScoreTone(z) {
+  const abs = Math.abs(z)
+  if (abs >= 4) return "rd"
+  if (abs >= 2.5) return "yl"
+  return "gr"
+}
+function slopeTone(s) {
+  if (s == null) return "gy"
+  return s < 0 ? "rd" : "gr"
+}
+function confTone(c) {
+  if (c == null) return "gy"
+  if (c >= 0.7) return "gr"
+  if (c >= 0.5) return "yl"
+  return "rd"
+}
+
 // 티켓 변경 이력 (현재 상태에 맞춰 발생한 단계까지의 history 생성)
 // 실제 백엔드 연동 시 GET /tickets/{id}/history 로 교체
 function ticketHistory(fault) {
@@ -3384,6 +3463,30 @@ function submitTicketTransition() {
 //              dismiss = reason 필수
 const anomalyModal = ref(null)
 
+// ─── 담당자 배정 모달 ───
+const assignees = [
+  { id: 7,  name: "김기사",  role: "MAINTAINER" },
+  { id: 8,  name: "이엔지",  role: "MAINTAINER" },
+  { id: 9,  name: "박엔지",  role: "MAINTAINER" },
+  { id: 12, name: "정매니저", role: "OPERATOR" },
+]
+const assignModal = ref(null)
+function openAssignModal(target) {
+  assignModal.value = { target, assigneeId: "", note: "", error: "" }
+}
+function closeAssignModal() { assignModal.value = null }
+function submitAssignModal() {
+  if (!assignModal.value) return
+  if (!assignModal.value.assigneeId) {
+    assignModal.value.error = "담당자를 선택해주세요."
+    return
+  }
+  // 실제 호출: assignMaintenanceTicket(ticketId, { assigneeId, note })
+  console.info("[assign]", assignModal.value.target.id,
+    "→", assignModal.value.assigneeId, assignModal.value.note)
+  closeAssignModal()
+}
+
 function openAnomalyResolve(anom) {
   anomalyModal.value = {
     mode: "resolve",
@@ -3522,8 +3625,83 @@ const pmPolicies = ref([
     enabled: true,
     unit: "fps",
     step: 0.5,
+    min: 0, max: 60,
+    // TREND_PROJECTION 전용
+    predictionHorizonMinutes: 10,
+    ewmaAlpha: 0.3,
+    minimumTrendConfidence: 0.6,
+  },
+  {
+    policyCode: "CAMERA_ROBUST_ZSCORE_V1",
+    anomalyType: "LATENCY_DEGRADATION",
+    detectionMethod: "ROBUST_Z_SCORE",
+    warningThreshold: 3.0,
+    criticalThreshold: 5.0,
+    warningConsecutiveWindows: 2,
+    criticalConsecutiveWindows: 2,
+    enabled: true,
+    unit: "σ",
+    step: 0.1,
+    min: 1, max: 10,
+    // ROBUST_Z_SCORE 전용
+    zScoreWindowMinutes: 30,
+    minimumSampleCount: 30,
   },
 ])
+
+// 정책 입력 범위 설정 (min/max 미설정 시 사용)
+;(function setPolicyRanges() {
+  pmPolicies.value.forEach((p) => {
+    if (p.min == null) p.min = 0
+    if (p.max == null) {
+      p.max = p.unit === "%" ? 100 : p.unit === "ms" ? 10000 : 1000
+    }
+  })
+})()
+
+// 정책 validation
+const policyFieldErrors = ref({})
+function validatePolicy(p) {
+  const errs = {}
+  // 1. 경고가 위험보다 더 위험한 값이면 안 됨 (방향에 따라 다르지만 단순화)
+  // FPS_DEGRADATION (LOWER_IS_WORSE): warning(10) > critical(5)
+  // LATENCY (HIGHER_IS_WORSE):       warning(2000) < critical(5000)
+  const isLowerWorse = ["FPS_DEGRADATION"].includes(p.anomalyType)
+  if (isLowerWorse) {
+    if (p.warningThreshold <= p.criticalThreshold) {
+      errs.warningThreshold = true; errs.criticalThreshold = true
+    }
+  } else {
+    if (p.warningThreshold >= p.criticalThreshold) {
+      errs.warningThreshold = true; errs.criticalThreshold = true
+    }
+  }
+  // 2. 연속 윈도 1~10
+  if (p.warningConsecutiveWindows < 1 || p.warningConsecutiveWindows > 10) errs.warningConsecutiveWindows = true
+  if (p.criticalConsecutiveWindows < 1 || p.criticalConsecutiveWindows > 10) errs.criticalConsecutiveWindows = true
+  // 3. 범위 검증
+  if (p.warningThreshold < p.min || p.warningThreshold > p.max) errs.warningThreshold = true
+  if (p.criticalThreshold < p.min || p.criticalThreshold > p.max) errs.criticalThreshold = true
+
+  policyFieldErrors.value = { ...policyFieldErrors.value, [p.policyCode]: errs }
+}
+function hasPolicyError(p) {
+  const e = policyFieldErrors.value[p.policyCode] || {}
+  return Object.values(e).some(Boolean)
+}
+function policyErrorMessage(p) {
+  const e = policyFieldErrors.value[p.policyCode] || {}
+  const msgs = []
+  const isLowerWorse = ["FPS_DEGRADATION"].includes(p.anomalyType)
+  if (e.warningThreshold && e.criticalThreshold) {
+    msgs.push(isLowerWorse
+      ? "경고 임계는 위험 임계보다 커야 합니다 (낮을수록 위험)"
+      : "위험 임계는 경고 임계보다 커야 합니다")
+  }
+  if (e.warningConsecutiveWindows || e.criticalConsecutiveWindows) msgs.push("연속 윈도는 1~10회 사이여야 합니다")
+  if (e.warningThreshold && !e.criticalThreshold) msgs.push(`경고 임계는 ${p.min}~${p.max}${p.unit} 범위여야 합니다`)
+  return msgs.join(" / ")
+}
 
 const policyConfirm = ref(null)
 function openPolicyConfirm(p) {
@@ -3671,6 +3849,7 @@ if (typeof document !== "undefined") {
 }
 
 // 카메라 데이터 — 기존 운영 필드(st/lat/ts) + 예지보전 필드(healthScore/predictedRisk) 통합
+// 3건: 정상 / 지연+악화예측 / 장애 (각 상태 대표 1건씩)
 const cams = Object.freeze([
   {
     name: "한남대교_남단_A4",
@@ -3703,27 +3882,7 @@ const cams = Object.freeze([
     predictedRisk: 0,
   },
   {
-    name: "잠실대교_북단_D2",
-    loc: "올림픽대로 22K+400",
-    st: "정상", stTone: "ok",
-    lat: 88, ts: "10:32:18",
-    id: "OLP-N-0028",
-    healthScore: 91.8, healthStatus: "NORMAL",
-    predictedRisk: 0,
-  },
-  {
-    name: "강변북로_여의도_E1",
-    loc: "강변북로 16K+050",
-    st: "지연", stTone: "wn",
-    lat: 168, ts: "10:32:14",
-    id: "GBN-W-0019",
-    healthScore: 58.6, healthStatus: "DEGRADED",
-    predictedRisk: 1,
-    predictedType: "OCR 품질 저하",
-    predictedAt: "10:51",
-  },
-  {
-    // 신규 설치 카메라 — 기준선 학습 중 (14일 표본 수집)
+    // 신규 설치 카메라 — 기준선 학습 중 (예지보전 케이스 다양성)
     name: "마곡대로_C7",
     loc: "마곡대로 04K+700",
     st: "수집 중", stTone: "wn",
@@ -3746,6 +3905,15 @@ const pmPredictedCount = computed(() => cams.filter((c) => c.predictedRisk > 0).
 const pmCriticalCount = computed(() => cams.filter((c) => c.healthStatus === "CRITICAL").length)
 const pmBaselineLearning = computed(() => cams.filter((c) => c.healthStatus === "BASELINE_LEARNING").length)
 const pmOverdueTickets = ref(1) // SLA 초과 티켓 — 추후 백엔드 연동 시 교체
+
+// dataSource 필터 (status 탭) — 백엔드 호출 시 query parameter로 전달
+const pmDataSource = ref("REAL")
+function pmDataSourceLabel(v) {
+  return { REAL: "실데이터", OPEN_DATA: "공개데이터", SIMULATED: "시뮬레이션", FAULT_INJECTED: "장애 주입", MOCK: "목업" }[v] || v
+}
+function pmDataSourceTone(v) {
+  return v === "FAULT_INJECTED" ? "rd" : v === "MOCK" ? "gy" : "yl"
+}
 const pmSloOk = computed(() => pmHealthAvg.value >= 75)
 function pmScoreTone(score) {
   if (score == null) return "gy"
@@ -3790,6 +3958,38 @@ function pmPredictedPoints(cam) {
     pts.push(`${x.toFixed(1)},${Math.max(0, Math.min(100, y)).toFixed(1)}`)
   }
   return pts.join(" ")
+}
+
+// 메트릭별 sparkline (viewBox 200x36)
+function metricSparkline(m) {
+  if (!m) return ""
+  const cur = parseFloat(m.cur) || 0
+  const base = parseFloat(m.base) || 0
+  // 12 표본 — 시작은 base 근처, 끝은 cur
+  const pts = []
+  for (let i = 0; i < 12; i++) {
+    const t = i / 11
+    const noise = Math.sin(i * 1.3 + cur * 0.1) * (Math.abs(cur - base) * 0.08)
+    const v = base + (cur - base) * t + noise
+    const x = (200 / 11) * i
+    const y = metricYCoord(v, m)
+    pts.push(`${x.toFixed(1)},${y.toFixed(1)}`)
+  }
+  return pts.join(" ")
+}
+function metricYCoord(v, m) {
+  // y: 0(상) ~ 36(하), 값이 작을수록 정상인 경우(FPS만)
+  const base = parseFloat(m.base) || 0
+  const thr = parseFloat(m.thr) || 0
+  const range = Math.max(Math.abs(base - thr) * 2, 1)
+  const center = (base + thr) / 2
+  const norm = (v - center) / range  // -0.5 ~ 0.5
+  return Math.max(2, Math.min(34, 18 - norm * 24))
+}
+function baselineY(m) { return metricYCoord(parseFloat(m.base), m) }
+function thresholdY(m) { return metricYCoord(parseFloat(m.thr), m) }
+function metricStrokeColor(tone) {
+  return tone === "rd" ? "#dc2626" : tone === "yl" ? "#d97706" : tone === "gr" ? "#059669" : "#9aa6b8"
 }
 
 // 카메라 헬스 핵심 지표 4종 — 현재 / 기준선 / 임계
@@ -3860,45 +4060,55 @@ const servers = Object.freeze([
 
 <style scoped src="./OpsView.css"></style>
 <style scoped>
-/* ── 예지보전 KPI 스트립 (status 탭 상단) ── */
+/* ── 예지보전 KPI 스트립 (status 탭 상단) — 세련된 미니멀 ── */
 .ops-shell .pm-strip {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 10px;
+  margin-bottom: 12px;
   flex-shrink: 0;
 }
 .ops-shell .pm-kpi {
   background: #ffffff;
-  border: 1px solid #c9d4e3;
-  border-left: 3px solid #2563eb;
-  border-radius: 8px;
-  padding: 10px 14px;
+  border: 1px solid #eaeef5;
+  border-radius: 12px;
+  padding: 14px 18px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   min-width: 0;
-  transition: all .15s;
+  transition: all .2s ease;
+  box-shadow: 0 1px 2px rgba(12, 31, 64, 0.04);
+}
+.ops-shell .pm-kpi:hover {
+  border-color: #d8e0ec;
+  box-shadow: 0 4px 12px rgba(12, 31, 64, 0.06);
+  transform: translateY(-1px);
 }
 .ops-shell .pm-kpi > i {
-  font-size: 22px;
-  color: #2563eb;
+  font-size: 18px;
+  color: #94a3b8;
   flex-shrink: 0;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  background: #f4f7fb;
+  border-radius: 8px;
 }
 .ops-shell .pm-kpi-b { flex: 1; min-width: 0; }
 .ops-shell .pm-kpi-v {
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 800;
-  font-size: 22px;
+  font-family: 'Inter', 'Pretendard Variable', sans-serif;
+  font-weight: 700;
+  font-size: 24px;
   color: #0c1f40;
   line-height: 1.1;
+  letter-spacing: -0.02em;
 }
-.ops-shell .pm-kpi-v > small { font-size: 11px; font-weight: 600; color: #4a5b78; margin-left: 2px; }
+.ops-shell .pm-kpi-v > small { font-size: 11.5px; font-weight: 500; color: #94a3b8; margin-left: 3px; }
 .ops-shell .pm-kpi-l {
   font-size: 11.5px;
-  color: #4a5b78;
-  font-weight: 600;
-  margin-top: 2px;
+  color: #64748b;
+  font-weight: 500;
+  margin-top: 4px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -3908,17 +4118,14 @@ const servers = Object.freeze([
 }
 .ops-shell .pm-sub {
   font-size: 10.5px;
-  font-weight: 500;
-  opacity: 0.7;
+  font-weight: 400;
+  color: #94a3b8;
 }
-.ops-shell .pm-kpi.ok { border-left-color: #059669; }
-.ops-shell .pm-kpi.ok > i { color: #059669; }
-.ops-shell .pm-kpi.bad { border-left-color: #d97706; }
-.ops-shell .pm-kpi.bad > i { color: #d97706; }
-.ops-shell .pm-kpi.alert { border-left-color: #dc2626; background: #fff7f7; }
-.ops-shell .pm-kpi.alert > i { color: #dc2626; }
-.ops-shell .pm-kpi.bl { border-left-color: #7c3aed; }
-.ops-shell .pm-kpi.bl > i { color: #7c3aed; }
+.ops-shell .pm-kpi.ok > i { color: #059669; background: #ecfdf5; }
+.ops-shell .pm-kpi.bad > i { color: #d97706; background: #fffbeb; }
+.ops-shell .pm-kpi.alert > i { color: #dc2626; background: #fef2f2; }
+.ops-shell .pm-kpi.alert .pm-kpi-v { color: #dc2626; }
+.ops-shell .pm-kpi.bl > i { color: #7c3aed; background: #f5f3ff; }
 
 /* ── 카메라 표 — Health 컬럼 + 악화 예측 배지 ── */
 .ops-shell .pm-cam-tbl .num { text-align: right; }
@@ -4127,134 +4334,165 @@ const servers = Object.freeze([
   border-radius: 100px;
 }
 
-/* ============ fault 탭 — 활성 이상 카드 ============ */
+/* ============ fault 탭 — 활성 이상 카드 (세련된 톤) ============ */
 .ops-shell .pm-anom-card {
   background: #ffffff;
-  border: 1px solid #c9d4e3;
-  border-left: 4px solid #ea580c;
-  border-radius: 10px;
-  padding: 16px;
+  border: 1px solid #eaeef5;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(12, 31, 64, 0.04);
+  position: relative;
+}
+.ops-shell .pm-anom-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 24px; right: 24px;
+  height: 2px;
+  background: linear-gradient(90deg, #ea580c, transparent);
+  border-radius: 2px 2px 0 0;
 }
 .ops-shell .pm-anom-head {
   display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: 10px;
-  margin-bottom: 14px;
+  flex-wrap: wrap; gap: 12px;
+  margin-bottom: 20px;
 }
 .ops-shell .pm-anom-titles {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   font-size: 14px;
 }
-.ops-shell .pm-anom-titles > strong { font-size: 15px; color: #0c1f40; }
+.ops-shell .pm-anom-titles > strong {
+  font-size: 16px; color: #0c1f40;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
 .ops-shell .sev-bdg {
-  padding: 2px 8px; border-radius: 100px;
-  font-size: 10.5px; font-weight: 800; letter-spacing: 0.04em;
+  padding: 3px 10px; border-radius: 6px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
-.ops-shell .sev-bdg.no, .ops-shell .sev-bdg.rd { background: rgba(220,38,38,0.12); color: #dc2626; }
-.ops-shell .sev-bdg.wn, .ops-shell .sev-bdg.yl { background: rgba(217,119,6,0.12); color: #d97706; }
+.ops-shell .sev-bdg.no, .ops-shell .sev-bdg.rd { background: #fef2f2; color: #dc2626; }
+.ops-shell .sev-bdg.wn, .ops-shell .sev-bdg.yl { background: #fffbeb; color: #d97706; }
 .ops-shell .dm-bdg {
-  padding: 2px 8px; border-radius: 100px;
-  background: rgba(37,99,235,0.08);
-  color: #2563eb; font-size: 11px; font-weight: 700;
-  border: 1px solid rgba(37,99,235,0.25);
+  padding: 3px 10px; border-radius: 6px;
+  background: #eff6ff;
+  color: #2563eb; font-size: 11px; font-weight: 600;
+  border: 1px solid #dbeafe;
 }
-.ops-shell .dm-bdg.sm { font-size: 10px; padding: 1px 6px; }
+.ops-shell .dm-bdg.sm { font-size: 10px; padding: 2px 7px; }
 .ops-shell .pri-bdg {
   display: inline-block;
-  padding: 2px 8px; border-radius: 4px;
+  padding: 3px 8px; border-radius: 6px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px; font-weight: 800;
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.02em;
 }
-.ops-shell .pri-bdg.rd { background: rgba(220,38,38,0.12); color: #dc2626; }
-.ops-shell .pri-bdg.yl { background: rgba(217,119,6,0.12); color: #d97706; }
-.ops-shell .pri-bdg.gy { background: rgba(107,114,128,0.15); color: #6b7280; }
+.ops-shell .pri-bdg.rd { background: #fef2f2; color: #dc2626; }
+.ops-shell .pri-bdg.yl { background: #fffbeb; color: #d97706; }
+.ops-shell .pri-bdg.gy { background: #f1f5f9; color: #64748b; }
 .ops-shell .pm-anom-time {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13px; color: #4a5b78;
+  font-size: 13px; color: #64748b;
 }
 .ops-shell .pm-anom-time > i { color: #ea580c; }
+.ops-shell .pm-anom-time > strong { color: #ea580c; font-weight: 600; }
 
-/* 관측값 테이블 */
+/* 관측값 테이블 — 미니멀 */
 .ops-shell .pm-evidence-tbl {
   width: 100%; border-collapse: collapse;
-  background: #f4f7fb;
-  border-radius: 8px;
+  background: #fafbfd;
+  border: 1px solid #eaeef5;
+  border-radius: 10px;
   overflow: hidden;
-  margin-bottom: 14px;
+  margin-bottom: 20px;
 }
 .ops-shell .pm-evidence-tbl th {
-  font-size: 11px; font-weight: 700; color: #4a5b78;
-  padding: 8px 10px; text-align: left;
-  border-bottom: 1px solid #e3e9f1;
+  font-size: 11px; font-weight: 600; color: #64748b;
+  padding: 10px 14px; text-align: left;
+  border-bottom: 1px solid #eaeef5;
   letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: #f4f7fb;
 }
 .ops-shell .pm-evidence-tbl .num { text-align: right; }
 .ops-shell .pm-evidence-tbl td {
-  padding: 8px 10px; font-size: 13px; color: #0c1f40;
-  border-bottom: 1px solid #e3e9f1;
+  padding: 10px 14px; font-size: 13px; color: #0c1f40;
+  border-bottom: 1px solid #eaeef5;
 }
 .ops-shell .pm-evidence-tbl tr:last-child td { border-bottom: 0; }
-.ops-shell .pm-evidence-tbl .mono { font-family: 'JetBrains Mono', monospace; }
+.ops-shell .pm-evidence-tbl tr:hover td { background: #ffffff; }
+.ops-shell .pm-evidence-tbl .mono { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; }
 .ops-shell .ev-jd {
-  padding: 1px 8px; border-radius: 100px;
-  font-size: 10.5px; font-weight: 800;
+  padding: 3px 10px; border-radius: 6px;
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.02em;
 }
-.ops-shell .ev-jd.rd { background: rgba(220,38,38,0.12); color: #dc2626; }
-.ops-shell .ev-jd.gr { background: rgba(5,150,105,0.12); color: #059669; }
+.ops-shell .ev-jd.rd { background: #fef2f2; color: #dc2626; }
+.ops-shell .ev-jd.gr { background: #ecfdf5; color: #059669; }
 .ops-shell strong.rd { color: #dc2626; }
 .ops-shell strong.gr { color: #059669; }
 .ops-shell .rd-txt { color: #dc2626; }
 .ops-shell .yl-txt { color: #d97706; }
 
-/* 원인 후보 */
+/* 원인 후보 — 미니멀 카드 */
 .ops-shell .pm-causes {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-  margin-bottom: 14px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin-bottom: 20px;
 }
 .ops-shell .pm-cause-blk {
-  background: #ffffff;
-  border: 1px solid #e3e9f1;
-  border-radius: 8px;
-  padding: 10px 14px;
+  background: #fafbfd;
+  border: 1px solid #eaeef5;
+  border-radius: 10px;
+  padding: 14px 18px;
 }
-.ops-shell .pm-cause-blk.confirmed { border-color: rgba(5,150,105,0.3); }
+.ops-shell .pm-cause-blk.confirmed {
+  background: #ecfdf5;
+  border-color: #d1fae5;
+}
 .ops-shell .pm-cause-h {
-  font-size: 11.5px; font-weight: 700; color: #4a5b78;
-  margin-bottom: 8px;
+  font-size: 11px; font-weight: 600; color: #64748b;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
-.ops-shell .pm-cause-h em { font-style: normal; opacity: 0.65; font-weight: 500; margin-left: 4px; }
+.ops-shell .pm-cause-h em { font-style: normal; color: #94a3b8; font-weight: 400; margin-left: 4px; text-transform: none; letter-spacing: 0; }
 .ops-shell .pm-cause-list {
   margin: 0; padding-left: 18px;
-  font-size: 13px; color: #0c1f40; line-height: 1.6;
+  font-size: 13px; color: #0c1f40; line-height: 1.7;
 }
-.ops-shell .pm-confirmed { font-size: 13px; color: #059669; font-weight: 700; }
+.ops-shell .pm-confirmed { font-size: 13.5px; color: #059669; font-weight: 600; }
 .ops-shell .pm-confirmed-empty {
-  font-size: 12.5px; color: #9aa6b8;
-  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12.5px; color: #94a3b8;
+  display: inline-flex; align-items: center; gap: 6px;
 }
 
-/* SHADOW 비교 모델 */
+/* SHADOW 비교 모델 — 부드러운 톤 */
 .ops-shell .pm-shadow {
-  background: rgba(124,58,237,0.04);
-  border: 1px solid rgba(124,58,237,0.25);
-  border-radius: 8px;
-  padding: 12px 14px;
-  margin-bottom: 14px;
+  background: #faf8ff;
+  border: 1px solid #ede9fe;
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
 }
 .ops-shell .pm-shadow-h {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 13px; color: #4a3a8a;
-  margin-bottom: 10px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: #5b21b6;
+  margin-bottom: 14px; flex-wrap: wrap;
 }
-.ops-shell .pm-shadow-h > i { color: #7c3aed; }
-.ops-shell .pm-shadow-h > strong { color: #4c1d95; font-size: 13.5px; }
+.ops-shell .pm-shadow-h > i { color: #7c3aed; font-size: 15px; }
+.ops-shell .pm-shadow-h > strong { color: #4c1d95; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
 .ops-shell .shadow-bdg {
-  padding: 2px 8px; border-radius: 100px;
-  background: rgba(124,58,237,0.12);
-  color: #7c3aed; font-size: 10.5px; font-weight: 800; letter-spacing: 0.04em;
+  padding: 3px 10px; border-radius: 6px;
+  background: #ede9fe;
+  color: #6d28d9; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .ops-shell .pm-shadow-note {
-  font-size: 10.5px; color: #6b6383; font-style: italic;
+  font-size: 11px; color: #7c6f9c;
   margin-left: auto;
+  background: #ffffff;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid #ede9fe;
 }
 .ops-shell .pm-shadow-body {
   display: grid; grid-template-columns: 200px 1fr; gap: 14px;
@@ -4367,28 +4605,109 @@ const servers = Object.freeze([
   .ops-shell .pm-field { grid-template-columns: 90px 1fr 28px; gap: 4px; }
 }
 
-/* fault 탭 — 활성 이상 카드 추가로 콘텐츠가 길어져 내부 스크롤 허용 */
-.ops-shell .pm-fault-scroll {
+/* ===== status 탭 카드 잘림 수정 =====
+   pm-strip(KPI 5칩)가 .main-grid 위에 들어가서 가용 높이가 줄어
+   카드 내부 표/리스트/장애 상세가 overflow:hidden에 잘림.
+   해결: 카드 자체는 overflow:auto, 단 fail-card는 일부 자식만 스크롤. */
+.ops-shell .main-grid > .card,
+.ops-shell .main-grid > .bot-row > .card,
+.ops-shell .main-grid > .col3-stack > .card {
+  overflow: auto !important;
+}
+.ops-shell .main-grid .fl-cur,
+.ops-shell .main-grid .tl-list,
+.ops-shell .main-grid .cam-tbl tbody {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* status 탭 — 네트워크/서버 카드 제거 후 그리드 단순화
+   카메라 상태 위 + 알람타임라인/장애상세 아래로 swap */
+.ops-shell .main-grid {
+  grid-template-columns: 1fr !important;
+  grid-template-rows: 1fr 1fr !important;
+}
+/* bot-row: 원래 display:contents → 박스로 부활시키고 row 1로 배치 */
+.ops-shell .main-grid .bot-row {
+  display: block !important;
+  grid-column: 1 / -1 !important;
+  grid-row: 1 !important;
+}
+/* bot-row 안의 cam-card는 원래 grid-row:2 강제 → 해제 */
+.ops-shell .main-grid .bot-row .cam-card {
+  grid-column: auto !important;
+  grid-row: auto !important;
+  width: 100%;
+}
+.ops-shell .main-grid .col3-stack {
+  grid-column: 1 / -1 !important;
+  grid-row: 2 !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 10px;
+  overflow: visible !important;
+  min-height: 0;
+}
+/* 좌측: 장애 상세, 우측: 알람 타임라인 */
+.ops-shell .main-grid .col3-stack > .fail-card    { order: 1; min-height: 0; max-height: none !important; }
+.ops-shell .main-grid .col3-stack > .timeline-card { order: 2; min-height: 0; max-height: none !important; }
+
+/* fail-card 내부 hst가 flex:1로 squash되어 act-row와 겹치는 문제 수정.
+   hst를 natural height + 자체 스크롤로 변경 — 항상 act-row와 명확히 분리. */
+.ops-shell .main-grid .fail-card .hst {
+  flex: 0 0 auto !important;
+  max-height: 90px;
+  overflow-y: auto;
+  padding-bottom: 4px;
+}
+.ops-shell .main-grid .fail-card .act-row {
+  margin-top: 6px !important;
+  flex-shrink: 0;
+}
+.ops-shell .main-grid .fail-card h4 {
+  margin-top: 8px !important;
+  margin-bottom: 4px !important;
+}
+
+/* ===== 사이드바 푸터 가림 수정 ===== */
+/* .snav가 가용 공간 차지하며 내부 스크롤 → .side-foot 항상 하단 노출 */
+.ops-shell .side {
+  height: 100vh;
+  overflow: hidden;
+}
+.ops-shell .snav {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
+  overflow-x: hidden;
 }
-.ops-shell .pm-fault-scroll > .pnl-head { flex-shrink: 0; }
+.ops-shell .side-foot {
+  flex-shrink: 0;
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(31, 48, 85, 0.4);
+}
 
-/* settings 탭 — 정책 블록 추가로 본문 길어져 내부 스크롤 */
+/* 모든 탭 섹션 내부 스크롤 — viewport 초과 시 하단 잘림 방지 */
+.ops-shell .main > section.pnl,
+.ops-shell .main > section.net-detail,
+.ops-shell .pm-fault-scroll,
 .ops-shell .pm-settings-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+}
+.ops-shell .main > section.pnl > .pnl-head,
+.ops-shell .pm-fault-scroll > .pnl-head {
+  flex-shrink: 0;
 }
 
 /* ============ 탐지 정책 블록 ============ */
 .ops-shell .pm-policy-block {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 2px dashed #c9d4e3;
+  margin-top: 32px;
+  padding-top: 28px;
+  border-top: 1px solid #eaeef5;
 }
 .ops-shell .pm-policy-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -4433,14 +4752,18 @@ const servers = Object.freeze([
 }
 .ops-shell .pm-policy-card {
   background: #ffffff;
-  border: 1px solid #c9d4e3;
-  border-left: 4px solid #2563eb;
-  border-radius: 8px;
-  padding: 14px 16px;
-  display: flex; flex-direction: column; gap: 10px;
-  transition: opacity .15s;
+  border: 1px solid #eaeef5;
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+  transition: all .2s ease;
+  box-shadow: 0 1px 2px rgba(12, 31, 64, 0.04);
 }
-.ops-shell .pm-policy-card.disabled { opacity: 0.5; }
+.ops-shell .pm-policy-card:hover {
+  border-color: #d8e0ec;
+  box-shadow: 0 4px 12px rgba(12, 31, 64, 0.06);
+}
+.ops-shell .pm-policy-card.disabled { opacity: 0.55; }
 .ops-shell .pm-policy-card-head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
 }
@@ -4545,6 +4868,107 @@ const servers = Object.freeze([
 }
 .ops-shell .pm-fault-flag input { cursor: pointer; }
 
+/* dataSource 행 (status 탭 상단) */
+.ops-shell .pm-ds-row {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 10px; flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.ops-shell .pm-ds-lab {
+  font-size: 12px; font-weight: 600; color: #64748b;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.ops-shell .pm-ds-lab > i { color: #2563eb; }
+.ops-shell .pm-ds-sel {
+  padding: 6px 12px;
+  border: 1px solid #c9d4e3; border-radius: 6px;
+  background: #ffffff; color: #0c1f40;
+  font-family: inherit; font-size: 12.5px;
+}
+.ops-shell .pm-ds-bdg {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 6px;
+  font-size: 11.5px; font-weight: 600;
+}
+.ops-shell .pm-ds-bdg.yl { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+.ops-shell .pm-ds-bdg.rd { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.ops-shell .pm-ds-bdg.gy { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+
+/* 활성 이상 통계 지표 4박스 (z-score / slope / confidence / detector) */
+.ops-shell .pm-stats-row {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  margin-bottom: 20px;
+}
+.ops-shell .pm-stat {
+  background: #fafbfd;
+  border: 1px solid #eaeef5;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.ops-shell .pm-stat-l {
+  font-size: 10.5px; font-weight: 600; color: #64748b;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.ops-shell .pm-stat-v {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700; font-size: 22px;
+  color: #0c1f40;
+  margin: 4px 0 2px;
+  line-height: 1.1;
+}
+.ops-shell .pm-stat-v > small { font-size: 11.5px; font-weight: 500; color: #94a3b8; margin-left: 2px; }
+.ops-shell .pm-stat-v.rd { color: #dc2626; }
+.ops-shell .pm-stat-v.yl { color: #d97706; }
+.ops-shell .pm-stat-v.gr { color: #059669; }
+.ops-shell .pm-stat-v.gy { color: #94a3b8; }
+.ops-shell .pm-stat-s {
+  font-size: 11px; color: #64748b;
+}
+.ops-shell .pm-stat-det .pm-stat-det-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; font-weight: 600; color: #0c1f40;
+  word-break: break-word; line-height: 1.3;
+}
+@media (max-width: 1200px) {
+  .ops-shell .pm-stats-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* 메트릭 미니 sparkline */
+.ops-shell .cm-pm-mtx-row {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.ops-shell .cm-pm-mtx-head {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.ops-shell .cm-pm-mtx-svg {
+  width: 100%; height: 32px;
+  display: block;
+  margin-top: 4px;
+}
+
+/* 정책 입력 에러 표시 */
+.ops-shell .pm-field.err > input { border-color: #dc2626 !important; background: #fef2f2; }
+.ops-shell .pm-policy-err {
+  background: #fef2f2; border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #dc2626; font-size: 12px;
+  display: flex; align-items: center; gap: 6px;
+}
+.ops-shell .pm-policy-extra {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 10px;
+  background: #f4f7fb;
+  border-radius: 8px;
+  border-left: 3px solid #7c3aed;
+}
+.ops-shell .pm-policy-extra .pm-field { font-size: 11.5px; }
+@media (max-width: 900px) {
+  .ops-shell .pm-policy-extra { grid-template-columns: 1fr; }
+}
+
 /* ====== 연결된 정비 티켓 ====== */
 .ops-shell .pm-linked-ticket {
   display: flex; align-items: center; gap: 8px;
@@ -4622,31 +5046,32 @@ const servers = Object.freeze([
   font-size: 11.5px; color: #6b7280; font-weight: 500;
 }
 
-/* 교통 맥락 교차검증 */
+/* 교통 맥락 교차검증 — 부드러운 카드 */
 .ops-shell .pm-traffic {
-  background: #f4f7fb;
-  border: 1px solid #e3e9f1;
-  border-radius: 8px;
-  padding: 12px 14px;
-  margin-bottom: 14px;
+  background: #fafbfd;
+  border: 1px solid #eaeef5;
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
 }
 .ops-shell .pm-traffic-h {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 13px; color: #4a5b78;
-  margin-bottom: 10px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: #64748b;
+  margin-bottom: 14px;
 }
-.ops-shell .pm-traffic-h > i { color: #2563eb; font-size: 14px; }
-.ops-shell .pm-traffic-h > strong { color: #0c1f40; font-size: 13.5px; }
+.ops-shell .pm-traffic-h > i { color: #2563eb; font-size: 15px; }
+.ops-shell .pm-traffic-h > strong { color: #0c1f40; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
 .ops-shell .pm-traffic-jd {
   margin-left: auto;
-  padding: 2px 10px; border-radius: 100px;
-  font-size: 10.5px; font-weight: 800;
-  letter-spacing: 0.04em;
+  padding: 3px 10px; border-radius: 6px;
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
-.ops-shell .pm-traffic-jd.rd { background: rgba(220,38,38,0.12); color: #dc2626; }
-.ops-shell .pm-traffic-jd.yl { background: rgba(217,119,6,0.12); color: #d97706; }
-.ops-shell .pm-traffic-jd.gr { background: rgba(5,150,105,0.12); color: #059669; }
-.ops-shell .pm-traffic-jd.gy { background: rgba(107,114,128,0.15); color: #6b7280; }
+.ops-shell .pm-traffic-jd.rd { background: #fef2f2; color: #dc2626; }
+.ops-shell .pm-traffic-jd.yl { background: #fffbeb; color: #d97706; }
+.ops-shell .pm-traffic-jd.gr { background: #ecfdf5; color: #059669; }
+.ops-shell .pm-traffic-jd.gy { background: #f1f5f9; color: #64748b; }
 
 .ops-shell .pm-traffic-body {
   display: grid; grid-template-columns: 1fr 24px 1fr; gap: 12px;
@@ -4680,6 +5105,26 @@ const servers = Object.freeze([
 
 /* 티켓 변경 이력 timeline (모달 내부) */
 .ops-shell .pm-ticket-modal-wide { max-width: 580px; }
+/* 티켓·이상 모달 본문이 viewport보다 길어지면 내부 스크롤 */
+.ops-shell .pm-ticket-modal .pm-ticket-body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.ops-shell .pm-ticket-modal .pm-ticket-acts {
+  position: sticky;
+  bottom: 0;
+  background: #ffffff;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid #f1f4f8;
+  z-index: 1;
+}
+.ops-shell .pm-policy-modal .pm-policy-confirm-body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
 .ops-shell .pm-ticket-timeline {
   margin-top: 14px;
   background: #f4f7fb;
