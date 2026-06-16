@@ -1,0 +1,17 @@
+{
+  "feature_schema_version": "camera-health-sequence-v1",
+  "sequence_len": 30,
+  "features": [
+    "fps_avg",
+    "frame_drop_rate",
+    "latency_p95_ms",
+    "blur_score_avg",
+    "ocr_fail_rate",
+    "cpu_usage_pct",
+    "memory_usage_pct",
+    "network_rtt_ms"
+  ],
+  "dtype": "float32",
+  "missing_value_policy": "reject_inference",
+  "scaler": "StandardScaler fitted on v6 normal samples only"
+}
