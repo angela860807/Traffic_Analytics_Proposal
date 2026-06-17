@@ -1,8 +1,10 @@
 package com.example.traffic.dto.response.predictive;
 
 import com.example.traffic.common.enums.*;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -11,81 +13,95 @@ import java.util.Map;
 
 @Getter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class DetectionEvaluationResponse {
-    private final Detector detector;
-    private final OffsetDateTime evaluatedAt;
-    private final BaselineStatus baselineStatus;
-    private final Integer requiredSampleCount;
-    private final Integer currentSampleCount;
-    private final List<Candidate> candidates;
-    private final List<ShadowCandidate> shadowCandidates;
+    private Detector detector;
+    private OffsetDateTime evaluatedAt;
+    private BaselineStatus baselineStatus;
+    private Integer requiredSampleCount;
+    private Integer currentSampleCount;
+    private List<Candidate> candidates;
+    private List<ShadowCandidate> shadowCandidates;
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class Detector {
-        private final String name;
-        private final String version;
-        private final DetectionMethod method;
+        private String name;
+        private String version;
+        private DetectionMethod method;
     }
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class Candidate {
-        private final AnomalyTargetType targetType;
-        private final Long cameraId;
-        private final AnomalyType anomalyType;
-        private final AnomalySeverity severity;
-        private final BigDecimal anomalyScore;
-        private final String policyCode;
-        private final Trend trend;
-        private final List<SuspectedCause> suspectedCauses;
-        private final List<Evidence> evidence;
+        private AnomalyTargetType targetType;
+        private Long cameraId;
+        private AnomalyType anomalyType;
+        private AnomalySeverity severity;
+        private BigDecimal anomalyScore;
+        private String policyCode;
+        private Trend trend;
+        private List<SuspectedCause> suspectedCauses;
+        private List<Evidence> evidence;
     }
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class Trend {
-        private final BigDecimal slope;
-        private final BigDecimal confidence;
-        private final Integer predictionHorizonMinutes;
-        private final OffsetDateTime projectedThresholdCrossingAt;
+        private BigDecimal slope;
+        private BigDecimal confidence;
+        private Integer predictionHorizonMinutes;
+        private OffsetDateTime projectedThresholdCrossingAt;
     }
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class Evidence {
-        private final String metricName;
-        private final BigDecimal observedValue;
-        private final BigDecimal baselineValue;
-        private final BigDecimal thresholdValue;
-        private final BigDecimal metricScore;
-        private final String unit;
-        private final OffsetDateTime sampledAt;
-        private final Map<String, Object> context;
+        private String metricName;
+        private BigDecimal observedValue;
+        private BigDecimal baselineValue;
+        private BigDecimal thresholdValue;
+        private BigDecimal metricScore;
+        private String unit;
+        private OffsetDateTime sampledAt;
+        private Map<String, Object> context;
     }
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class ShadowCandidate {
-        private final AnomalyTargetType targetType;
-        private final Long cameraId;
-        private final DetectionMethod detectionMethod;
-        private final DetectorOperatingMode operatingMode;
-        private final BigDecimal anomalyScore;
-        private final BigDecimal warningThreshold;
-        private final BigDecimal criticalThreshold;
-        private final boolean predictedAnomaly;
-        private final AnomalySeverity predictedSeverity;
-        private final OffsetDateTime inputWindowFrom;
-        private final OffsetDateTime inputWindowTo;
-        private final String featureSchemaVersion;
-        private final List<TopFeature> topFeatures;
+        private AnomalyTargetType targetType;
+        private Long cameraId;
+        private DetectionMethod detectionMethod;
+        private DetectorOperatingMode operatingMode;
+        private BigDecimal anomalyScore;
+        private BigDecimal warningThreshold;
+        private BigDecimal criticalThreshold;
+        private boolean predictedAnomaly;
+        private AnomalySeverity predictedSeverity;
+        private OffsetDateTime inputWindowFrom;
+        private OffsetDateTime inputWindowTo;
+        private String featureSchemaVersion;
+        private List<TopFeature> topFeatures;
     }
 
     @Getter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class TopFeature {
-        private final String featureName;
-        private final BigDecimal featureValue;
+        private String featureName;
+        private BigDecimal featureValue;
     }
 }
