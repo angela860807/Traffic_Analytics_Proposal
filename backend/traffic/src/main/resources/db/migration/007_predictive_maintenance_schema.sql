@@ -6,6 +6,20 @@
 -- ============================================================
 
 -- ------------------------------------------------------------
+-- Existing members role constraint extension
+-- Predictive maintenance demo and operations require OPERATOR and MAINTAINER.
+-- ------------------------------------------------------------
+ALTER TABLE members DROP CONSTRAINT IF EXISTS members_role_check;
+ALTER TABLE members
+ADD CONSTRAINT members_role_check
+CHECK ((role)::text = ANY (ARRAY[
+    ('USER'::character varying)::text,
+    ('ADMIN'::character varying)::text,
+    ('OPERATOR'::character varying)::text,
+    ('MAINTAINER'::character varying)::text
+]));
+
+-- ------------------------------------------------------------
 -- camera_health_samples
 -- 카메라·AI 처리 파이프라인의 1분 상태 스냅샷
 -- ------------------------------------------------------------
@@ -182,7 +196,7 @@ CREATE TABLE IF NOT EXISTS detector_versions (
     model_format            VARCHAR(20),    -- pt, pkl, onnx 등
     artifact_path           VARCHAR(500),
     artifact_sha256         VARCHAR(64),    -- 모델 파일 무결성 검증
-    feature_schema_version  VARCHAR(20),    -- 입력 feature 스키마 버전
+    feature_schema_version  VARCHAR(100),    -- 입력 feature 스키마 버전
     dataset_version         VARCHAR(50),    -- 학습 데이터셋 버전
     config_hash             VARCHAR(64),
     metrics_json            JSONB           NOT NULL DEFAULT '{}',
@@ -310,7 +324,7 @@ CREATE TABLE IF NOT EXISTS model_prediction_logs (
                                 CHECK (data_source IN ('REAL','OPEN_DATA','SIMULATED','FAULT_INJECTED','MOCK')),
     quality_status          VARCHAR(50)     NOT NULL DEFAULT 'COMPLETE'
                                 CHECK (quality_status IN ('COMPLETE','PARTIAL','INSUFFICIENT')),
-    feature_schema_version  VARCHAR(20),
+    feature_schema_version  VARCHAR(100),
     top_features_json       JSONB           NOT NULL DEFAULT '[]',
     created_at              TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
