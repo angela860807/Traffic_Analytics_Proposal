@@ -1,0 +1,13 @@
+{
+  "model": "model/lstm_ae_v2_ep25_thr999.pt",
+  "warning_threshold": 0.23163,
+  "critical_threshold": 0.263194,
+  "scenario_count": 8,
+  "detected_count": 8,
+  "early_detection_count": 2,
+  "avg_lead_time_minutes": 65.5,
+  "max_lead_time_minutes": 85,
+  "best_scenario": "CAMERA_OFFLINE",
+  "worst_scenario": "EXTERNAL_TRAFFIC_NORMAL_DEVICE",
+  "avg_f1": 0.6194
+}

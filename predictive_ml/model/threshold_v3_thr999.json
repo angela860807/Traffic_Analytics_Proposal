@@ -1,0 +1,16 @@
+{
+  "warning_threshold": 0.429772,
+  "critical_threshold": 0.572504,
+  "basis": "normal reconstruction error 99.9th / 99.99th percentile",
+  "sequence_len": 30,
+  "features": [
+    "fps_avg",
+    "frame_drop_rate",
+    "latency_p95_ms",
+    "blur_score_avg",
+    "ocr_fail_rate",
+    "cpu_usage_pct",
+    "memory_usage_pct",
+    "network_rtt_ms"
+  ]
+}

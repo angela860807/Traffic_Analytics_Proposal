@@ -1,0 +1,39 @@
+﻿{
+  "detector": {
+    "name": "camera-rule",
+    "version": "1.1.0",
+    "method": "RULE"
+  },
+  "evaluatedAt": "2026-06-18T12:00:00+09:00",
+  "baselineStatus": "READY",
+  "status": "WARNING",
+  "candidates": [
+    {
+      "targetType": "CAMERA",
+      "cameraId": 1,
+      "anomalyType": "FPS_DEGRADATION",
+      "severity": "WARNING",
+      "detectionMethod": "RULE",
+      "anomalyScore": 0.5,
+      "policyCode": "FPS_DEGRADATION_RULE_V1",
+      "suspectedCauses": [
+        "AI_PROCESSING_OVERLOAD",
+        "CAMERA_POWER_OR_NETWORK"
+      ],
+      "evidence": [
+        {
+          "metricName": "fpsAvg",
+          "observedValue": 7.5,
+          "thresholdValue": 10.0,
+          "unit": "fps",
+          "sampledAt": "2026-06-18T12:00:00+09:00",
+          "context": {
+            "requiredConsecutiveWindows": 3,
+            "actualConsecutiveWindows": 3
+          }
+        }
+      ]
+    }
+  ],
+  "shadowCandidates": []
+}
