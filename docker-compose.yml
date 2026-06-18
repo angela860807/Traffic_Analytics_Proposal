@@ -87,15 +87,19 @@ services:
       SPEED_TRACK_DELTA_MIN_ELAPSED_SECONDS: 0.3
     ports:
       - "8000:8000"
+    cpus: "2.0"
+    mem_limit: 4g
     healthcheck:
       test:
         - CMD-SHELL
         - >-
           python -c "import os,urllib.request;
+          import json;
           request=urllib.request.Request(
           'http://127.0.0.1:8000/internal/v1/anomaly-detection/health',
           headers={'X-Internal-Api-Key':os.environ['BACKEND_INTERNAL_API_KEY']});
-          urllib.request.urlopen(request,timeout=3)"
+          payload=json.load(urllib.request.urlopen(request,timeout=3));
+          raise SystemExit(0 if payload.get('status') == 'UP' else 1)"
       interval: 30s
       timeout: 5s
       retries: 3

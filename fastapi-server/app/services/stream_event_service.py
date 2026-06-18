@@ -170,17 +170,15 @@ class StreamEventService:
                 else detection.confidence_score
             ),
         )
-        if self.health_collector is not None:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            self.health_collector.record_frame(
-                camera_code=camera_code,
-                captured_at=captured_at,
-                processing_latency_ms=(time.monotonic() - received_monotonic) * 1000,
-                blur_variance=frame.blur_score,
-                brightness_score=float(np.mean(gray) / 255.0),
-                detection_count=len(bboxes),
-                frame_number=frame_number,
-            )
+        self._record_frame_health(
+            camera_code=camera_code,
+            captured_at=captured_at,
+            received_monotonic=received_monotonic,
+            image=image,
+            frame=frame,
+            detection_count=len(bboxes),
+            frame_number=frame_number,
+        )
         self.buffer.add_frame(frame)
 
         has_detection_trigger = (
@@ -312,6 +310,41 @@ class StreamEventService:
         self._events_by_camera.clear()
         self.speed_tracker.clear()
         self.bbox_tracker.clear()
+
+    def _record_frame_health(
+        self,
+        *,
+        camera_code: str,
+        captured_at: datetime,
+        received_monotonic: float,
+        image: np.ndarray,
+        frame: BufferedFrame,
+        detection_count: int,
+        frame_number: int | None,
+    ) -> None:
+        if self.health_collector is None:
+            return
+
+        try:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            self.health_collector.record_frame(
+                camera_code=camera_code,
+                captured_at=captured_at,
+                processing_latency_ms=(
+                    time.monotonic() - received_monotonic
+                ) * 1000,
+                blur_variance=frame.blur_score,
+                brightness_score=float(np.mean(gray) / 255.0),
+                detection_count=detection_count,
+                frame_number=frame_number,
+            )
+        except Exception:
+            logger.exception(
+                "camera health frame collection failed; "
+                "video analysis continues: cameraCode=%s frameNumber=%s",
+                camera_code,
+                frame_number,
+            )
 
     def _attach_high_res_crop_to_event_frame(
         self,

@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 
 from app.core.config import (
     DETECTION_CONFIDENCE_THRESHOLD,
@@ -21,6 +22,9 @@ from app.services.plate_recognizer import PlateRecognizer
 from app.services.camera_health_collector import CameraHealthCollector
 from app.services.vehicle_detector import VehicleDetection
 from app.services.vehicle_detector import VehicleDetector
+
+
+logger = logging.getLogger(__name__)
 
 
 class InferenceService:
@@ -281,11 +285,18 @@ class InferenceService:
     ) -> None:
         if self.health_collector is None:
             return
-        self.health_collector.record_ocr_result(
-            camera_code=camera_code,
-            captured_at=captured_at,
-            failed=failed,
-        )
+        try:
+            self.health_collector.record_ocr_result(
+                camera_code=camera_code,
+                captured_at=captured_at,
+                failed=failed,
+            )
+        except Exception:
+            logger.exception(
+                "camera health OCR collection failed; "
+                "video analysis continues: cameraCode=%s",
+                camera_code,
+            )
 
 
 # TODO:

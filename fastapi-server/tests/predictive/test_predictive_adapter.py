@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -157,6 +158,24 @@ def build_fake_module(*, baseline_status: str = "READY") -> ModuleType:
     return module
 
 
+def write_valid_artifacts(model_dir: Path) -> None:
+    model_dir.mkdir(parents=True, exist_ok=True)
+    for filename in REQUIRED_ARTIFACT_FILES:
+        path = model_dir / filename
+        if filename == "feature_schema.json":
+            path.write_text(
+                json.dumps(
+                    {
+                        "featureSchemaVersion": "camera-health-sequence-v1",
+                        "features": list(EXPECTED_FEATURES),
+                    }
+                ),
+                encoding="utf-8",
+            )
+        else:
+            path.write_bytes(filename.encode("utf-8"))
+
+
 def test_adapter_converts_fastapi_request_to_ai_contract() -> None:
     module = build_fake_module()
     adapter = PredictiveDetectorAdapter(module=module)
@@ -169,9 +188,16 @@ def test_adapter_converts_fastapi_request_to_ai_contract() -> None:
     assert not isinstance(module.received[0][1], RuleEvaluationRequest)
 
 
-def test_adapter_keeps_model_result_in_shadow_candidates() -> None:
+def test_adapter_keeps_model_result_in_shadow_candidates(
+    tmp_path: Path,
+) -> None:
     module = build_fake_module()
-    adapter = PredictiveDetectorAdapter(module=module)
+    write_valid_artifacts(tmp_path)
+    adapter = PredictiveDetectorAdapter(
+        module=module,
+        model_dir=str(tmp_path),
+        artifact_required=True,
+    )
 
     response = adapter.evaluate_degradation(make_degradation_request())
 
@@ -182,6 +208,35 @@ def test_adapter_keeps_model_result_in_shadow_candidates() -> None:
         "degradation",
         "shadow",
     ]
+
+
+def test_adapter_logs_package_and_artifact_status_once(
+    tmp_path: Path,
+    caplog,
+) -> None:
+    module = build_fake_module()
+    write_valid_artifacts(tmp_path)
+    adapter = PredictiveDetectorAdapter(
+        module=module,
+        model_dir=str(tmp_path),
+        artifact_required=True,
+    )
+    caplog.set_level(
+        logging.INFO,
+        logger="app.services.predictive_detector_adapter",
+    )
+
+    adapter.initialize()
+    adapter.initialize()
+
+    startup_logs = [
+        record.getMessage()
+        for record in caplog.records
+        if "predictive detector initialized" in record.getMessage()
+    ]
+    assert len(startup_logs) == 1
+    assert "packageVersion=0.2.0" in startup_logs[0]
+    assert "artifactStatus=READY" in startup_logs[0]
 
 
 def test_adapter_skips_shadow_model_when_baseline_is_learning() -> None:
@@ -195,21 +250,67 @@ def test_adapter_skips_shadow_model_when_baseline_is_learning() -> None:
     assert [name for name, _ in module.received] == ["degradation"]
 
 
+def test_adapter_skips_shadow_model_when_artifacts_are_not_configured(
+    tmp_path: Path,
+) -> None:
+    module = build_fake_module()
+    model_dir = tmp_path / "not-configured"
+    adapter = PredictiveDetectorAdapter(
+        module=module,
+        model_dir=str(model_dir),
+        artifact_required=False,
+    )
+
+    response = adapter.evaluate_degradation(make_degradation_request())
+    health = adapter.get_health()
+
+    assert response.shadow_candidates == []
+    assert [name for name, _ in module.received] == ["degradation"]
+    assert health.status == "DEGRADED"
+    assert health.artifact_status == "NOT_CONFIGURED"
+
+
+def test_adapter_skips_shadow_model_when_required_artifacts_are_missing(
+    tmp_path: Path,
+) -> None:
+    module = build_fake_module()
+    model_dir = tmp_path / "missing"
+    adapter = PredictiveDetectorAdapter(
+        module=module,
+        model_dir=str(model_dir),
+        artifact_required=True,
+    )
+
+    response = adapter.evaluate_degradation(make_degradation_request())
+    health = adapter.get_health()
+
+    assert response.shadow_candidates == []
+    assert [name for name, _ in module.received] == ["degradation"]
+    assert health.status == "DEGRADED"
+    assert health.artifact_status == "MISSING"
+
+
+def test_adapter_skips_shadow_model_when_artifacts_are_invalid(
+    tmp_path: Path,
+) -> None:
+    module = build_fake_module()
+    adapter = PredictiveDetectorAdapter(
+        module=module,
+        model_dir=str(tmp_path),
+        artifact_required=True,
+    )
+
+    response = adapter.evaluate_degradation(make_degradation_request())
+    health = adapter.get_health()
+
+    assert response.shadow_candidates == []
+    assert [name for name, _ in module.received] == ["degradation"]
+    assert health.status == "DEGRADED"
+    assert health.artifact_status == "INVALID"
+
+
 def test_artifact_validator_checks_hash_and_feature_order(tmp_path: Path) -> None:
-    for filename in REQUIRED_ARTIFACT_FILES:
-        path = tmp_path / filename
-        if filename == "feature_schema.json":
-            path.write_text(
-                json.dumps(
-                    {
-                        "featureSchemaVersion": "camera-health-sequence-v1",
-                        "features": list(EXPECTED_FEATURES),
-                    }
-                ),
-                encoding="utf-8",
-            )
-        else:
-            path.write_bytes(filename.encode("utf-8"))
+    write_valid_artifacts(tmp_path)
 
     model_hash = hashlib.sha256(
         (tmp_path / "lstm_ae.pt").read_bytes()
