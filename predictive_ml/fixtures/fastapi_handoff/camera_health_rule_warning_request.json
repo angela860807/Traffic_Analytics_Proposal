@@ -1,0 +1,62 @@
+﻿{
+  "cameraId": 1,
+  "evaluatedAt": "2026-06-18T12:00:00+09:00",
+  "samples": [
+    {
+      "sampledAt": "2026-06-18T11:58:00+09:00",
+      "fpsAvg": 7.8,
+      "frameDropRate": 0.12,
+      "latencyP95Ms": 800,
+      "blurScoreAvg": 0.2,
+      "ocrFailRate": 0.1,
+      "ocrAttemptCount": 40,
+      "cpuUsagePct": 72,
+      "memoryUsagePct": 65,
+      "networkRttMs": 70,
+      "lastFrameAgeSeconds": 10,
+      "qualityStatus": "COMPLETE",
+      "isImputed": false,
+      "isLateSample": false
+    },
+    {
+      "sampledAt": "2026-06-18T11:59:00+09:00",
+      "fpsAvg": 7.6,
+      "frameDropRate": 0.12,
+      "latencyP95Ms": 800,
+      "blurScoreAvg": 0.2,
+      "ocrFailRate": 0.1,
+      "ocrAttemptCount": 40,
+      "cpuUsagePct": 72,
+      "memoryUsagePct": 65,
+      "networkRttMs": 70,
+      "lastFrameAgeSeconds": 10,
+      "qualityStatus": "COMPLETE",
+      "isImputed": false,
+      "isLateSample": false
+    },
+    {
+      "sampledAt": "2026-06-18T12:00:00+09:00",
+      "fpsAvg": 7.5,
+      "frameDropRate": 0.12,
+      "latencyP95Ms": 800,
+      "blurScoreAvg": 0.2,
+      "ocrFailRate": 0.1,
+      "ocrAttemptCount": 40,
+      "cpuUsagePct": 72,
+      "memoryUsagePct": 65,
+      "networkRttMs": 70,
+      "lastFrameAgeSeconds": 10,
+      "qualityStatus": "COMPLETE",
+      "isImputed": false,
+      "isLateSample": false
+    }
+  ],
+  "policies": [
+    {
+      "policyCode": "FPS_DEGRADATION_RULE_V1",
+      "warningThreshold": 10.0,
+      "criticalThreshold": 5.0,
+      "consecutiveWindows": 3
+    }
+  ]
+}
