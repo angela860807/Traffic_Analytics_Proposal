@@ -14,6 +14,12 @@ RUN apt-get update \
 COPY fastapi-server/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY fastapi-server/vendor /tmp/predictive-vendor
+RUN set -eu; \
+    wheel="$(find /tmp/predictive-vendor -maxdepth 1 -type f -name '*.whl' -print -quit)"; \
+    if [ -n "$wheel" ]; then pip install --no-cache-dir "$wheel"; fi; \
+    rm -rf /tmp/predictive-vendor
+
 COPY fastapi-server/app ./app
 COPY fastapi-server/samples ./samples
 

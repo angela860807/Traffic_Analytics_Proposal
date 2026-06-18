@@ -24,6 +24,7 @@ from app.core.config import (
 from app.schemas.detection import DetectionResult
 from app.schemas.speed import SpeedMeasurementResult
 from app.services.bbox_tracker import BboxTracker
+from app.services.camera_health_collector import CameraHealthCollector
 from app.services.frame_buffer import BufferedFrame, FrameBuffer, frame_buffer
 from app.services.image_decoder import ImageDecoder
 from app.services.inference_service import InferenceService
@@ -85,12 +86,14 @@ class StreamEventService:
         inference_service: InferenceService | None = None,
         speed_tracker: SpeedTracker | None = None,
         bbox_tracker: BboxTracker | None = None,
+        health_collector: CameraHealthCollector | None = None,
     ) -> None:
         self.buffer = buffer
         self.image_decoder = image_decoder or ImageDecoder()
         self.inference_service = inference_service or InferenceService()
         self.speed_tracker = speed_tracker or SpeedTracker()
         self.bbox_tracker = bbox_tracker or BboxTracker()
+        self.health_collector = health_collector
         self._events_by_camera: dict[str, StreamEvent] = {}
         self._stream_bbox_roi = self._parse_normalized_roi(STREAM_BBOX_ROI_NORMALIZED)
 
@@ -166,6 +169,15 @@ class StreamEventService:
                 if primary_track is not None
                 else detection.confidence_score
             ),
+        )
+        self._record_frame_health(
+            camera_code=camera_code,
+            captured_at=captured_at,
+            received_monotonic=received_monotonic,
+            image=image,
+            frame=frame,
+            detection_count=len(bboxes),
+            frame_number=frame_number,
         )
         self.buffer.add_frame(frame)
 
@@ -298,6 +310,41 @@ class StreamEventService:
         self._events_by_camera.clear()
         self.speed_tracker.clear()
         self.bbox_tracker.clear()
+
+    def _record_frame_health(
+        self,
+        *,
+        camera_code: str,
+        captured_at: datetime,
+        received_monotonic: float,
+        image: np.ndarray,
+        frame: BufferedFrame,
+        detection_count: int,
+        frame_number: int | None,
+    ) -> None:
+        if self.health_collector is None:
+            return
+
+        try:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            self.health_collector.record_frame(
+                camera_code=camera_code,
+                captured_at=captured_at,
+                processing_latency_ms=(
+                    time.monotonic() - received_monotonic
+                ) * 1000,
+                blur_variance=frame.blur_score,
+                brightness_score=float(np.mean(gray) / 255.0),
+                detection_count=detection_count,
+                frame_number=frame_number,
+            )
+        except Exception:
+            logger.exception(
+                "camera health frame collection failed; "
+                "video analysis continues: cameraCode=%s frameNumber=%s",
+                camera_code,
+                frame_number,
+            )
 
     def _attach_high_res_crop_to_event_frame(
         self,

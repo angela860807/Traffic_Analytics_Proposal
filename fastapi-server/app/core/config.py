@@ -1,8 +1,64 @@
+import json
 import os
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def _load_camera_id_map(raw_value: str) -> dict[str, int]:
+    if not raw_value.strip():
+        return {}
+
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError as exc:
+        raise ValueError("CAMERA_ID_MAP_JSON must be valid JSON") from exc
+
+    if not isinstance(parsed, dict):
+        raise ValueError("CAMERA_ID_MAP_JSON must be a JSON object")
+
+    camera_ids: dict[str, int] = {}
+    for camera_code, camera_id in parsed.items():
+        if not isinstance(camera_code, str) or not camera_code.strip():
+            raise ValueError("CAMERA_ID_MAP_JSON keys must be camera code strings")
+        if isinstance(camera_id, bool) or not isinstance(camera_id, int) or camera_id <= 0:
+            raise ValueError("CAMERA_ID_MAP_JSON values must be positive integers")
+        camera_ids[camera_code.strip()] = camera_id
+
+    return camera_ids
+
+
+def _load_sha256_map(raw_value: str) -> dict[str, str]:
+    if not raw_value.strip():
+        return {}
+
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            "PREDICTIVE_ARTIFACT_SHA256_JSON must be valid JSON"
+        ) from exc
+
+    if not isinstance(parsed, dict):
+        raise ValueError(
+            "PREDICTIVE_ARTIFACT_SHA256_JSON must be a JSON object"
+        )
+
+    checksums: dict[str, str] = {}
+    for filename, checksum in parsed.items():
+        if (
+            not isinstance(filename, str)
+            or not filename.strip()
+            or not isinstance(checksum, str)
+            or len(checksum.strip()) != 64
+        ):
+            raise ValueError(
+                "PREDICTIVE_ARTIFACT_SHA256_JSON values must be SHA-256 strings"
+            )
+        checksums[filename.strip()] = checksum.strip().lower()
+    return checksums
+
 
 APP_NAME = os.getenv("APP_NAME", "traffic-ai-server")
 APP_ENV = os.getenv("APP_ENV", "local")
@@ -26,6 +82,19 @@ SPRING_SPEED_VIOLATION_RETRY_ATTEMPTS = int(
 SPRING_SPEED_VIOLATION_RETRY_DELAY_SECONDS = float(
     os.getenv("SPRING_SPEED_VIOLATION_RETRY_DELAY_SECONDS", "0.2")
 )
+SPRING_CAMERA_HEALTH_PATH = os.getenv(
+    "SPRING_CAMERA_HEALTH_PATH",
+    "/internal/v1/camera-health-samples",
+)
+SPRING_CAMERA_HEALTH_TIMEOUT_SECONDS = float(
+    os.getenv("SPRING_CAMERA_HEALTH_TIMEOUT_SECONDS", "3")
+)
+SPRING_CAMERA_HEALTH_RETRY_ATTEMPTS = int(
+    os.getenv("SPRING_CAMERA_HEALTH_RETRY_ATTEMPTS", "3")
+)
+SPRING_CAMERA_HEALTH_RETRY_BASE_DELAY_SECONDS = float(
+    os.getenv("SPRING_CAMERA_HEALTH_RETRY_BASE_DELAY_SECONDS", "0.5")
+)
 
 BACKEND_INTERNAL_API_KEY = os.getenv(
     "BACKEND_INTERNAL_API_KEY",
@@ -33,6 +102,37 @@ BACKEND_INTERNAL_API_KEY = os.getenv(
 )
 
 DEFAULT_TIMEZONE = os.getenv("DEFAULT_TIMEZONE", "Asia/Seoul")
+
+CAMERA_HEALTH_WINDOW_SECONDS = int(
+    os.getenv("CAMERA_HEALTH_WINDOW_SECONDS", "60")
+)
+CAMERA_HEALTH_DELIVERY_QUEUE_MAX_SIZE = int(
+    os.getenv("CAMERA_HEALTH_DELIVERY_QUEUE_MAX_SIZE", "1000")
+)
+CAMERA_HEALTH_DELIVERY_ENABLED = (
+    os.getenv("CAMERA_HEALTH_DELIVERY_ENABLED", "false").lower() == "true"
+)
+CAMERA_HEALTH_DELIVERY_POLL_SECONDS = float(
+    os.getenv("CAMERA_HEALTH_DELIVERY_POLL_SECONDS", "1")
+)
+CAMERA_HEALTH_SHUTDOWN_TIMEOUT_SECONDS = float(
+    os.getenv("CAMERA_HEALTH_SHUTDOWN_TIMEOUT_SECONDS", "5")
+)
+CAMERA_PROCESSOR_CODE = os.getenv("CAMERA_PROCESSOR_CODE", "edge-01")
+CAMERA_ID_MAP = _load_camera_id_map(os.getenv("CAMERA_ID_MAP_JSON", ""))
+PREDICTIVE_MODEL_DIR = os.getenv(
+    "PREDICTIVE_MODEL_DIR",
+    "models/predictive",
+)
+PREDICTIVE_ARTIFACT_REQUIRED = (
+    os.getenv("PREDICTIVE_ARTIFACT_REQUIRED", "false").lower() == "true"
+)
+PREDICTIVE_ARTIFACT_SHA256 = _load_sha256_map(
+    os.getenv("PREDICTIVE_ARTIFACT_SHA256_JSON", "")
+)
+INTERNAL_API_MAX_BODY_BYTES = int(
+    os.getenv("INTERNAL_API_MAX_BODY_BYTES", str(1024 * 1024))
+)
 
 DETECTION_CONFIDENCE_THRESHOLD = float(
     os.getenv("DETECTION_CONFIDENCE_THRESHOLD", "0.7")

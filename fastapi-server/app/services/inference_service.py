@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 
 from app.core.config import (
     DETECTION_CONFIDENCE_THRESHOLD,
@@ -18,17 +19,26 @@ from app.services.image_preprocessor import (
 from app.services.plate_detector import PlateDetector
 from app.services.plate_detector import PlateDetection
 from app.services.plate_recognizer import PlateRecognizer
+from app.services.camera_health_collector import CameraHealthCollector
 from app.services.vehicle_detector import VehicleDetection
 from app.services.vehicle_detector import VehicleDetector
 
 
+logger = logging.getLogger(__name__)
+
+
 class InferenceService:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        health_collector: CameraHealthCollector | None = None,
+    ) -> None:
         self.image_decoder = ImageDecoder()
         self.image_storage_service = ImageStorageService()
         self.vehicle_detector = VehicleDetector()
         self.plate_detector = PlateDetector()
         self.plate_recognizer = PlateRecognizer()
+        self.health_collector = health_collector
 
     async def detect_from_frame(
         self,
@@ -204,11 +214,19 @@ class InferenceService:
                     )
 
                 ocr_variants = build_plate_ocr_variants(plate_crop)
-                recognition = (
-                    self.plate_recognizer.recognize_best(ocr_variants)
-                    if hasattr(self.plate_recognizer, "recognize_best")
-                    else self.plate_recognizer.recognize(ocr_variants[-1][1])
-                )
+                try:
+                    recognition = (
+                        self.plate_recognizer.recognize_best(ocr_variants)
+                        if hasattr(self.plate_recognizer, "recognize_best")
+                        else self.plate_recognizer.recognize(ocr_variants[-1][1])
+                    )
+                except Exception:
+                    self._record_ocr_result(
+                        camera_code=camera_code,
+                        captured_at=captured_at,
+                        failed=True,
+                    )
+                    raise
                 ocr_image = (
                     recognition.variant_image
                     if recognition.variant_image is not None
@@ -232,6 +250,11 @@ class InferenceService:
                 processing_status = (
                     "OCR_COMPLETED" if plate_number else "OCR_FAILED"
                 )
+                self._record_ocr_result(
+                    camera_code=camera_code,
+                    captured_at=captured_at,
+                    failed=not bool(plate_number),
+                )
 
         return DetectionResult(
             camera_code=camera_code,
@@ -252,6 +275,28 @@ class InferenceService:
             detected_at=captured_at,
             processing_status=processing_status,
         )
+
+    def _record_ocr_result(
+        self,
+        *,
+        camera_code: str,
+        captured_at: datetime,
+        failed: bool,
+    ) -> None:
+        if self.health_collector is None:
+            return
+        try:
+            self.health_collector.record_ocr_result(
+                camera_code=camera_code,
+                captured_at=captured_at,
+                failed=failed,
+            )
+        except Exception:
+            logger.exception(
+                "camera health OCR collection failed; "
+                "video analysis continues: cameraCode=%s",
+                camera_code,
+            )
 
 
 # TODO:
