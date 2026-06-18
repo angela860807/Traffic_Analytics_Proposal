@@ -10,6 +10,8 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.util.Map;
+
 @Component
 @RequiredArgsConstructor
 public class PredictiveDetectionClient {
@@ -38,7 +40,29 @@ public class PredictiveDetectionClient {
                 .body(DetectionEvaluationResponse.class);
     }
 
+    public DetectionEvaluationResponse evaluateCameraHealth(Map<String, Object> request) {
+        return restClient()
+                .post()
+                .uri(CAMERA_HEALTH_EVALUATE_PATH)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(INTERNAL_API_KEY_HEADER, internalApiKey)
+                .body(request)
+                .retrieve()
+                .body(DetectionEvaluationResponse.class);
+    }
+
     public DetectionEvaluationResponse evaluateCameraDegradation(DegradationEvaluationRequest request) {
+        return restClient()
+                .post()
+                .uri(CAMERA_DEGRADATION_EVALUATE_PATH)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(INTERNAL_API_KEY_HEADER, internalApiKey)
+                .body(request)
+                .retrieve()
+                .body(DetectionEvaluationResponse.class);
+    }
+
+    public DetectionEvaluationResponse evaluateCameraDegradation(Map<String, Object> request) {
         return restClient()
                 .post()
                 .uri(CAMERA_DEGRADATION_EVALUATE_PATH)

@@ -1,4 +1,5 @@
 from dataclasses import asdict, is_dataclass
+from datetime import datetime
 from importlib import import_module
 import logging
 from pathlib import Path
@@ -107,12 +108,13 @@ class PredictiveDetectorAdapter:
         self,
         request: RuleEvaluationRequest,
     ) -> DetectionEvaluationResponse:
-        detector_input = self._build_detector_input(
-            "RuleDetectionInput",
-            request.model_dump(mode="python"),
-        )
+        detector_input = self._build_rule_detector_input(request)
         result = self._call_detector("detect_rules", detector_input)
-        response = self._validate_detection_response(result)
+        response = self._validate_detection_response(
+            result,
+            fallback_sampled_at=detector_input.sample.sampled_at,
+            fallback_evaluated_at=request.evaluated_at,
+        )
         self._validate_response_context(
             response=response,
             camera_id=request.camera_id,
@@ -138,13 +140,13 @@ class PredictiveDetectorAdapter:
         self,
         request: DegradationEvaluationRequest,
     ) -> DetectionEvaluationResponse:
-        request_payload = request.model_dump(mode="python")
-        detector_input = self._build_detector_input(
-            "DegradationDetectionInput",
-            request_payload,
-        )
+        detector_input = self._build_degradation_detector_input(request)
         result = self._call_detector("detect_degradation", detector_input)
-        response = self._validate_detection_response(result)
+        response = self._validate_detection_response(
+            result,
+            fallback_sampled_at=detector_input.sample.sampled_at,
+            fallback_evaluated_at=request.evaluated_at,
+        )
         self._validate_response_context(
             response=response,
             camera_id=request.camera_id,
@@ -164,7 +166,7 @@ class PredictiveDetectorAdapter:
                 "predict_anomaly",
                 self._build_detector_input(
                     "ModelPredictionInput",
-                    request_payload,
+                    self._build_model_prediction_payload(request),
                 ),
             )
             if shadow_result is not None:
@@ -270,6 +272,176 @@ class PredictiveDetectorAdapter:
                 f"{contract_name} 입력 변환에 실패했습니다."
             ) from exc
 
+    def _build_rule_detector_input(
+        self,
+        request: RuleEvaluationRequest,
+    ) -> Any:
+        sample = self._build_camera_sample(
+            camera_id=request.camera_id,
+            evaluated_at=request.evaluated_at,
+            observation=max(request.samples, key=lambda item: item.sampled_at),
+        )
+        return self._build_detector_input(
+            "RuleDetectionInput",
+            {
+                "sample": sample,
+                "consecutive_windows": self._count_rule_consecutive_windows(
+                    request
+                ),
+            },
+        )
+
+    def _build_degradation_detector_input(
+        self,
+        request: DegradationEvaluationRequest,
+    ) -> Any:
+        latest_observation = (
+            max(request.recent_health_samples, key=lambda item: item.sampled_at)
+            if request.recent_health_samples
+            else None
+        )
+        sample = self._build_camera_sample(
+            camera_id=request.camera_id,
+            evaluated_at=request.evaluated_at,
+            observation=latest_observation,
+        )
+        baseline_metrics = {
+            metric_name: self._build_baseline_metric(
+                metric,
+                sample_count=request.baseline.sample_count,
+                baseline_from=request.baseline.from_at,
+                baseline_to=request.baseline.to_at,
+            )
+            for metric_name, metric in request.baseline.metrics.items()
+        }
+        trend_metric_names = set(baseline_metrics) | {
+            "fps_avg",
+            "frame_drop_rate",
+            "latency_p95_ms",
+            "blur_score_avg",
+            "ocr_fail_rate",
+            "cpu_usage_pct",
+            "memory_usage_pct",
+            "network_rtt_ms",
+        }
+        ordered_observations = sorted(
+            request.recent_health_samples,
+            key=lambda item: item.sampled_at,
+        )
+        return self._build_detector_input(
+            "DegradationDetectionInput",
+            {
+                "sample": sample,
+                "baselines": baseline_metrics,
+                "trends": {
+                    metric_name: [
+                        self._build_trend_point(observation, metric_name)
+                        for observation in ordered_observations
+                    ]
+                    for metric_name in trend_metric_names
+                },
+                "prediction_horizon_minutes": (
+                    request.policy.prediction_horizon_minutes
+                ),
+            },
+        )
+
+    def _build_model_prediction_payload(
+        self,
+        request: DegradationEvaluationRequest,
+    ) -> dict[str, Any]:
+        return {
+            "camera_id": request.camera_id,
+            "sampled_at": request.evaluated_at,
+            "sequence": [
+                self._build_camera_sample(
+                    camera_id=request.camera_id,
+                    evaluated_at=request.evaluated_at,
+                    observation=observation,
+                )
+                for observation in sorted(
+                    request.recent_health_samples,
+                    key=lambda item: item.sampled_at,
+                )
+            ],
+        }
+
+    def _build_camera_sample(
+        self,
+        *,
+        camera_id: int,
+        evaluated_at: datetime,
+        observation: Any | None,
+    ) -> Any:
+        contract_type = self._find_contract_type("CameraSample")
+        if contract_type is None:
+            raise DetectorUnavailableError(
+                "predictive_ml.CameraSample 입력 계약을 사용할 수 없습니다."
+            )
+
+        sampled_at = observation.sampled_at if observation else evaluated_at
+        last_frame_age_seconds = None
+        if observation is not None and observation.last_frame_at is not None:
+            last_frame_age_seconds = max(
+                0.0,
+                (evaluated_at - observation.last_frame_at).total_seconds(),
+            )
+
+        return contract_type(
+            camera_id=camera_id,
+            sampled_at=sampled_at,
+            fps_avg=getattr(observation, "fps_avg", None),
+            frame_drop_rate=getattr(observation, "frame_drop_rate", None),
+            latency_p95_ms=getattr(observation, "latency_p95_ms", None),
+            blur_score_avg=getattr(observation, "blur_score_avg", None),
+            ocr_fail_rate=getattr(observation, "ocr_fail_rate", None),
+            cpu_usage_pct=getattr(observation, "cpu_usage_pct", None),
+            memory_usage_pct=getattr(observation, "memory_usage_pct", None),
+            network_rtt_ms=getattr(observation, "network_rtt_ms", None),
+            last_frame_age_seconds=last_frame_age_seconds,
+            ocr_attempt_count=getattr(observation, "ocr_attempt_count", None),
+            quality_status=getattr(observation, "quality_status", "COMPLETE"),
+            is_imputed=getattr(observation, "is_imputed", False),
+        )
+
+    def _build_baseline_metric(
+        self,
+        metric: Any,
+        *,
+        sample_count: int,
+        baseline_from: datetime,
+        baseline_to: datetime,
+    ) -> Any:
+        contract_type = self._find_contract_type("BaselineMetric")
+        if contract_type is None:
+            raise DetectorUnavailableError(
+                "predictive_ml.BaselineMetric 입력 계약을 사용할 수 없습니다."
+            )
+        return contract_type(
+            median=metric.median,
+            mad=metric.mad,
+            sample_count=sample_count,
+            baseline_from=baseline_from,
+            baseline_to=baseline_to,
+        )
+
+    def _build_trend_point(
+        self,
+        observation: Any,
+        metric_name: str,
+    ) -> Any:
+        contract_type = self._find_contract_type("TrendPoint")
+        if contract_type is None:
+            raise DetectorUnavailableError(
+                "predictive_ml.TrendPoint 입력 계약을 사용할 수 없습니다."
+            )
+        return contract_type(
+            sampled_at=observation.sampled_at,
+            value=getattr(observation, metric_name, None),
+            quality_status=observation.quality_status,
+            is_imputed=observation.is_imputed,
+        )
+
     def _find_contract_type(self, contract_name: str) -> Any | None:
         if not self.available or self._module is None:
             raise DetectorUnavailableError()
@@ -363,10 +535,17 @@ class PredictiveDetectorAdapter:
     def _validate_detection_response(
         self,
         result: Any,
+        *,
+        fallback_sampled_at: datetime,
+        fallback_evaluated_at: datetime,
     ) -> DetectionEvaluationResponse:
         try:
             return DetectionEvaluationResponse.model_validate(
-                self._to_validation_value(result)
+                self._to_detection_response_value(
+                    result,
+                    fallback_sampled_at=fallback_sampled_at,
+                    fallback_evaluated_at=fallback_evaluated_at,
+                )
             )
         except ValidationError as exc:
             raise DetectorUnavailableError(
@@ -377,7 +556,7 @@ class PredictiveDetectorAdapter:
         self,
         result: Any,
     ) -> list[ShadowPrediction]:
-        raw_value = self._to_validation_value(result)
+        raw_value = self._to_shadow_validation_value(result)
         if isinstance(raw_value, dict) and "shadowCandidates" in raw_value:
             raw_value = raw_value["shadowCandidates"]
         elif isinstance(raw_value, dict) and "shadow_candidates" in raw_value:
@@ -389,6 +568,7 @@ class PredictiveDetectorAdapter:
             return [
                 ShadowPrediction.model_validate(item)
                 for item in raw_value
+                if _shadow_prediction_has_required_scores(item)
             ]
         except ValidationError as exc:
             raise DetectorUnavailableError(
@@ -443,11 +623,260 @@ class PredictiveDetectorAdapter:
             return dict(result)
         return result
 
+    def _to_detection_response_value(
+        self,
+        result: Any,
+        *,
+        fallback_sampled_at: datetime,
+        fallback_evaluated_at: datetime,
+    ) -> Any:
+        if isinstance(result, Mapping) and "detector" in result:
+            return dict(result)
+        if not hasattr(result, "detector") or not hasattr(result, "candidates"):
+            return self._to_validation_value(result)
+
+        detector = result.detector
+        return {
+            "detector": {
+                "name": detector.name,
+                "version": detector.version,
+                "method": detector.method,
+            },
+            "evaluatedAt": fallback_evaluated_at,
+            "baselineStatus": getattr(result, "baseline_status", None),
+            "requiredSampleCount": getattr(
+                result,
+                "required_sample_count",
+                None,
+            ),
+            "currentSampleCount": getattr(
+                result,
+                "current_sample_count",
+                None,
+            ),
+            "candidates": [
+                self._to_candidate_value(
+                    result.camera_id,
+                    candidate,
+                    fallback_sampled_at=fallback_sampled_at,
+                )
+                for candidate in result.candidates
+                if getattr(candidate, "severity", None)
+                in {"WARNING", "CRITICAL"}
+            ],
+            "shadowCandidates": [],
+        }
+
+    @staticmethod
+    def _to_candidate_value(
+        camera_id: int,
+        candidate: Any,
+        *,
+        fallback_sampled_at: datetime,
+    ) -> dict[str, Any]:
+        trend = None
+        if (
+            getattr(candidate, "trend_slope", None) is not None
+            or getattr(candidate, "trend_confidence", None) is not None
+            or getattr(candidate, "projected_threshold_crossing_at", None)
+            is not None
+        ):
+            trend = {
+                "slope": getattr(candidate, "trend_slope", 0.0) or 0.0,
+                "confidence": (
+                    getattr(candidate, "trend_confidence", 0.0) or 0.0
+                ),
+                "predictionHorizonMinutes": 10,
+                "projectedThresholdCrossingAt": getattr(
+                    candidate,
+                    "projected_threshold_crossing_at",
+                    None,
+                ),
+            }
+
+        return {
+            "targetType": "CAMERA",
+            "cameraId": camera_id,
+            "anomalyType": candidate.anomaly_type,
+            "severity": candidate.severity,
+            "anomalyScore": candidate.anomaly_score or 0.0,
+            "policyCode": candidate.policy_code,
+            "trend": trend,
+            "suspectedCauses": list(candidate.suspected_causes or []),
+            "evidence": [
+                {
+                    "metricName": evidence.metric_name,
+                    "observedValue": evidence.observed_value,
+                    "baselineValue": evidence.baseline_value,
+                    "thresholdValue": evidence.threshold_value,
+                    "metricScore": evidence.metric_score,
+                    "unit": evidence.unit,
+                    "sampledAt": getattr(
+                        evidence,
+                        "sampled_at",
+                        fallback_sampled_at,
+                    ),
+                    "context": dict(evidence.context or {}),
+                }
+                for evidence in candidate.evidence
+            ],
+        }
+
+    def _to_shadow_validation_value(self, result: Any) -> Any:
+        raw_value = self._to_validation_value(result)
+        if isinstance(raw_value, list):
+            return [self._to_shadow_prediction_value(item) for item in raw_value]
+        return self._to_shadow_prediction_value(raw_value)
+
+    @staticmethod
+    def _to_shadow_prediction_value(item: Any) -> Any:
+        if isinstance(item, Mapping):
+            if "camera_id" in item:
+                return {
+                    "targetType": item.get("target_type", "CAMERA"),
+                    "cameraId": item["camera_id"],
+                    "detectionMethod": item.get(
+                        "detection_method",
+                        "LSTM_AUTOENCODER",
+                    ),
+                    "operatingMode": item.get("operating_mode", "SHADOW"),
+                    "anomalyScore": item.get("anomaly_score"),
+                    "warningThreshold": item.get("warning_threshold"),
+                    "criticalThreshold": item.get("critical_threshold"),
+                    "predictedAnomaly": item.get("predicted_anomaly", False),
+                    "predictedSeverity": item.get("predicted_severity"),
+                    "inputWindowFrom": item.get("input_window_from"),
+                    "inputWindowTo": item.get("input_window_to"),
+                    "featureSchemaVersion": item.get(
+                        "feature_schema_version"
+                    ),
+                    "topFeatures": [
+                        {
+                            "featureName": feature.get("feature_name"),
+                            "featureValue": feature.get("feature_value"),
+                        }
+                        if isinstance(feature, Mapping)
+                        else feature
+                        for feature in item.get("top_features", [])
+                    ],
+                }
+            return item
+        if not hasattr(item, "camera_id"):
+            return item
+        return {
+            "targetType": getattr(item, "target_type", "CAMERA"),
+            "cameraId": item.camera_id,
+            "detectionMethod": getattr(
+                item,
+                "detection_method",
+                "LSTM_AUTOENCODER",
+            ),
+            "operatingMode": getattr(item, "operating_mode", "SHADOW"),
+            "anomalyScore": item.anomaly_score,
+            "warningThreshold": item.warning_threshold,
+            "criticalThreshold": item.critical_threshold,
+            "predictedAnomaly": item.predicted_anomaly,
+            "predictedSeverity": item.predicted_severity,
+            "inputWindowFrom": item.input_window_from,
+            "inputWindowTo": item.input_window_to,
+            "featureSchemaVersion": item.feature_schema_version,
+            "topFeatures": [
+                {
+                    "featureName": feature.feature_name,
+                    "featureValue": feature.feature_value,
+                }
+                for feature in item.top_features
+            ],
+        }
+
+    @staticmethod
+    def _count_rule_consecutive_windows(
+        request: RuleEvaluationRequest,
+    ) -> dict[str, int]:
+        policies_by_metric = {
+            metric_name: policy
+            for policy in request.policies
+            for metric_name in _metrics_for_policy_code(policy.policy_code)
+        }
+        ordered_samples = sorted(
+            request.samples,
+            key=lambda item: item.sampled_at,
+            reverse=True,
+        )
+        consecutive_windows: dict[str, int] = {}
+        for metric_name, policy in policies_by_metric.items():
+            threshold = policy.warning_threshold
+            if threshold is None:
+                threshold = policy.critical_threshold
+            if threshold is None:
+                consecutive_windows[metric_name] = len(ordered_samples)
+                continue
+
+            count = 0
+            for sample in ordered_samples:
+                value = getattr(sample, metric_name, None)
+                if value is None:
+                    break
+                if _is_policy_threshold_violated(
+                    policy.policy_code,
+                    metric_name,
+                    float(value),
+                    float(threshold),
+                ):
+                    count += 1
+                    continue
+                break
+            consecutive_windows[metric_name] = count
+        return consecutive_windows
+
     def _package_version(self) -> str | None:
         if self._module is None:
             return None
         raw_version = getattr(self._module, "__version__", None)
         return str(raw_version) if raw_version is not None else None
+
+
+def _metrics_for_policy_code(policy_code: str) -> tuple[str, ...]:
+    if policy_code == "CAMERA_OFFLINE_RULE_V1":
+        return ("last_frame_age_seconds",)
+    if policy_code == "FPS_DEGRADATION_RULE_V1":
+        return ("fps_avg",)
+    if policy_code == "FRAME_DROP_DEGRADATION_RULE_V1":
+        return ("frame_drop_rate",)
+    if policy_code == "LATENCY_DEGRADATION_RULE_V1":
+        return ("latency_p95_ms",)
+    if policy_code == "BLUR_DEGRADATION_RULE_V1":
+        return ("blur_score_avg",)
+    if policy_code == "OCR_QUALITY_DEGRADATION_RULE_V1":
+        return ("ocr_fail_rate",)
+    if policy_code == "RESOURCE_SATURATION_RULE_V1":
+        return ("cpu_usage_pct", "memory_usage_pct")
+    if policy_code == "NETWORK_INSTABILITY_RULE_V1":
+        return ("network_rtt_ms", "last_frame_age_seconds")
+    return ()
+
+
+def _is_policy_threshold_violated(
+    policy_code: str,
+    metric_name: str,
+    value: float,
+    threshold: float,
+) -> bool:
+    if policy_code == "FPS_DEGRADATION_RULE_V1":
+        return value < threshold
+    if metric_name == "last_frame_age_seconds":
+        return value > threshold
+    return value > threshold
+
+
+def _shadow_prediction_has_required_scores(item: Mapping[str, Any]) -> bool:
+    return (
+        item.get("anomalyScore", item.get("anomaly_score")) is not None
+        and item.get("warningThreshold", item.get("warning_threshold"))
+        is not None
+        and item.get("criticalThreshold", item.get("critical_threshold"))
+        is not None
+    )
 
 
 predictive_detector_adapter = PredictiveDetectorAdapter()

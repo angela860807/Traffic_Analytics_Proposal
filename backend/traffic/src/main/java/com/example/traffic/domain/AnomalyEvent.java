@@ -178,4 +178,30 @@ public class AnomalyEvent {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = this.createdAt;
     }
+
+    public void refreshDetection(AnomalySeverity newSeverity,
+                                 BigDecimal newAnomalyScore,
+                                 LocalDateTime detectedAt,
+                                 BigDecimal newTrendSlope,
+                                 BigDecimal newTrendConfidence,
+                                 Integer newPredictionHorizonMinutes,
+                                 LocalDateTime newProjectedThresholdCrossingAt,
+                                 List<Object> newSuspectedCausesJson) {
+        if (AnomalySeverity.CRITICAL.equals(newSeverity)) {
+            this.severity = AnomalySeverity.CRITICAL;
+        }
+        this.anomalyScore = newAnomalyScore;
+        this.lastDetectedAt = detectedAt;
+        this.trendSlope = newTrendSlope;
+        this.trendConfidence = newTrendConfidence;
+        this.predictionHorizonMinutes = newPredictionHorizonMinutes;
+        this.projectedThresholdCrossingAt = newProjectedThresholdCrossingAt;
+        this.suspectedCausesJson = newSuspectedCausesJson != null
+                ? new ArrayList<>(newSuspectedCausesJson) : new ArrayList<>();
+        if (AnomalyEventStatus.RECOVERED.equals(this.status)) {
+            this.status = AnomalyEventStatus.OPEN;
+            this.recurrenceCount = this.recurrenceCount == null ? 1 : this.recurrenceCount + 1;
+        }
+        this.updatedAt = LocalDateTime.now();
+    }
 }

@@ -25,6 +25,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class PredictiveShadowPredictionService {
 
+    private static final String LSTM_DETECTOR_NAME = "camera-lstm-autoencoder";
+    private static final String LSTM_DETECTOR_VERSION = "1.0.0";
+
     private final ModelPredictionLogRepository modelPredictionLogRepository;
     private final DetectorVersionRepository detectorVersionRepository;
     private final CameraRepository cameraRepository;
@@ -35,7 +38,7 @@ public class PredictiveShadowPredictionService {
             return 0;
         }
 
-        DetectorVersion detectorVersion = findDetectorVersion(response.getDetector());
+        DetectorVersion detectorVersion = findShadowDetectorVersion();
         LocalDateTime evaluatedAt = PredictiveTimeUtils.toLocalDateTime(response.getEvaluatedAt());
         int savedCount = 0;
 
@@ -77,13 +80,10 @@ public class PredictiveShadowPredictionService {
         return savedCount;
     }
 
-    private DetectorVersion findDetectorVersion(DetectionEvaluationResponse.Detector detector) {
-        if (detector == null || detector.getName() == null || detector.getVersion() == null) {
-            throw new BusinessException("Detector information is missing.", HttpStatus.BAD_REQUEST);
-        }
-        return detectorVersionRepository.findByDetectorNameAndVersion(detector.getName(), detector.getVersion())
+    private DetectorVersion findShadowDetectorVersion() {
+        return detectorVersionRepository.findByDetectorNameAndVersion(LSTM_DETECTOR_NAME, LSTM_DETECTOR_VERSION)
                 .orElseThrow(() -> new BusinessException(
-                        "Detector version not found: " + detector.getName() + " " + detector.getVersion(),
+                        "Shadow detector version not found: " + LSTM_DETECTOR_NAME + " " + LSTM_DETECTOR_VERSION,
                         HttpStatus.NOT_FOUND));
     }
 

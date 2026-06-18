@@ -56,7 +56,8 @@
       "policyCode": "FPS_DEGRADATION_RULE_V1",
       "warningThreshold": 10.0,
       "criticalThreshold": 5.0,
-      "consecutiveWindows": 3
+      "warningConsecutiveWindows": 3,
+      "criticalConsecutiveWindows": 3
     }
   ]
 }
