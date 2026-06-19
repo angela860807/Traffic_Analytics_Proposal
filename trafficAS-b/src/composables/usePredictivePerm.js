@@ -25,6 +25,11 @@ function normalizeRole(rawRole) {
   return firstRole.replace(/^ROLE_/, '') || ROLE.USER
 }
 
+export function isBackendJwt(token) {
+  if (!token || token.startsWith('local-')) return false
+  return String(token).split('.').length === 3
+}
+
 // MAINTAINER 허용 상태 전이 (요구사항 정의서 7-2)
 const MAINTAINER_ALLOWED_TRANSITIONS = Object.freeze({
   ASSIGNED:    ['IN_PROGRESS'],
@@ -105,6 +110,11 @@ export function usePredictivePerm() {
 // 라우터 가드용 — 역할 기반 진입 차단
 export function hasPredictiveAccess(user) {
   if (!user) return false
+  const token = typeof localStorage !== 'undefined'
+    ? localStorage.getItem('tas_access_token')
+    : null
+  if (!isBackendJwt(token)) return false
+
   const role = normalizeRole(user.predictiveRole
     || user.role
     || (Array.isArray(user.roles) ? user.roles[0] : null))

@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 import java.util.Map;
@@ -85,6 +86,7 @@ public class PredictiveDetectionClient {
     private RestClient restClient() {
         return restClientBuilder
                 .baseUrl(fastApiBaseUrl)
+                .requestFactory(new SimpleClientHttpRequestFactory())
                 .build();
     }
 }

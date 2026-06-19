@@ -39,7 +39,13 @@ router.beforeEach((to) => {
   if (protectedPaths.some(p => to.path.startsWith(p))) {
     const { isLoggedIn, isAdmin, currentUser } = useAuth()
     if (!isLoggedIn.value) return '/login'
-    if (to.path.startsWith('/admin/ops') && hasPredictiveAccess(currentUser.value)) return true
+    if (to.path.startsWith('/admin/ops')) {
+      if (hasPredictiveAccess(currentUser.value)) return true
+      localStorage.removeItem('tas_access_token')
+      localStorage.removeItem('tas_refresh_token')
+      localStorage.removeItem('tas_user')
+      return '/login'
+    }
     if (!isAdmin.value)    return '/'
   }
 })

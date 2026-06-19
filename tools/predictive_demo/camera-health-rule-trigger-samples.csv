@@ -1,0 +1,5 @@
+scenario,camera_id,zone_id,sampled_at,fps_avg,frame_drop_rate,latency_p95_ms,blur_score_avg,ocr_fail_rate,cpu_usage_pct,memory_usage_pct,network_rtt_ms,quality_status,data_source
+bad_fps_1,1,1,2026-06-19T15:00:00+09:00,3.0,0.72,3200,0.92,0.10,88.0,86.0,720,COMPLETE,REAL
+bad_fps_2,1,1,2026-06-19T15:01:00+09:00,3.0,0.75,3400,0.93,0.12,90.0,88.0,760,COMPLETE,REAL
+bad_fps_3,1,1,2026-06-19T15:02:00+09:00,3.0,0.78,3600,0.94,0.15,92.0,90.0,820,COMPLETE,REAL
+bad_fps_4,1,1,2026-06-19T15:03:00+09:00,3.0,0.82,3800,0.95,0.18,94.0,92.0,900,COMPLETE,REAL

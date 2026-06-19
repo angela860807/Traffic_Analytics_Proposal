@@ -22,6 +22,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/traffic
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: 1004
+      FASTAPI_BASE_URL: http://fastapi-server:8000
     ports:
       - "8080:8080"
 
@@ -99,7 +100,7 @@ services:
           'http://127.0.0.1:8000/internal/v1/anomaly-detection/health',
           headers={'X-Internal-Api-Key':os.environ['BACKEND_INTERNAL_API_KEY']});
           payload=json.load(urllib.request.urlopen(request,timeout=3));
-          raise SystemExit(0 if payload.get('status') == 'UP' else 1)"
+          raise SystemExit(0 if payload.get('status') in ('UP','DEGRADED') else 1)"
       interval: 30s
       timeout: 5s
       retries: 3

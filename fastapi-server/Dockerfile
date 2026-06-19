@@ -20,6 +20,9 @@ RUN set -eu; \
     if [ -n "$wheel" ]; then pip install --no-cache-dir "$wheel"; fi; \
     rm -rf /tmp/predictive-vendor
 
+COPY predictive_ml/src /app/predictive_ml/src
+ENV PYTHONPATH=/app/predictive_ml/src
+
 COPY fastapi-server/app ./app
 COPY fastapi-server/samples ./samples
 

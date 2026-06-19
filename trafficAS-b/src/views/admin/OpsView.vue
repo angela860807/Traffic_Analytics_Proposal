@@ -2483,7 +2483,19 @@ import { INITIAL_DISTRICTS_WEATHER, DISTRICT_LIST } from "@/data/weather";
 import GuideOverlay from "@/components/GuideOverlay.vue";
 import guideSteps from "@/data/guides/ops.js";
 import { usePredictivePerm } from "@/composables/usePredictivePerm";
-import { getSummary, listCameras, listPolicies, updatePolicy } from "@/api/predictiveApi";
+import {
+  getSummary,
+  listCameras,
+  listPolicies,
+  updatePolicy,
+  listAnomalyEvents,
+  getAnomalyEvent,
+  resolveAnomaly,
+  dismissAnomaly,
+  listMaintenanceTickets,
+  assignMaintenanceTicket,
+  changeTicketStatus,
+} from "@/api/predictiveApi";
 
 // 예지보전 권한 헬퍼 (요구사항 정의서 2-4/7-2 + DB 협의 2026-06-12 반영)
 const {
@@ -3090,7 +3102,7 @@ const filteredAlarmExt = computed(() =>
 
 // 장애·이상 통합 목록 — 기존 운영 필드 + 예지보전 필드(priority/방식/SLA/원인 등)
 // kind: 'fault' (전통적 장애) | 'anomaly' (예지보전 탐지)
-const faults = Object.freeze([
+const demoFaults = Object.freeze([
   {
     id: "FLT-2026-00342",
     time: "10:24:17",
@@ -3238,11 +3250,12 @@ const faults = Object.freeze([
     slaRemainingMin: -180,
   },
 ]);
+const faults = ref([]);
 
 // 집계 (헤더/KPI용)
-const pmAnomalyCount   = computed(() => faults.filter((f) => f.kind === "anomaly").length)
-const pmPredictedCount2 = computed(() => faults.filter((f) => f.detectionMethod === "TREND_PROJECTION").length)
-const pmSlaOverdueCount = computed(() => faults.filter((f) => f.slaOverdue).length)
+const pmAnomalyCount   = computed(() => faults.value.filter((f) => f.kind === "anomaly").length)
+const pmPredictedCount2 = computed(() => faults.value.filter((f) => f.detectionMethod === "TREND_PROJECTION").length)
+const pmSlaOverdueCount = computed(() => faults.value.filter((f) => f.slaOverdue).length)
 
 // MTTA (Mean Time To Acknowledge) — 데모 더미값
 const pmMtta = ref(7.4)
@@ -3279,7 +3292,7 @@ watch(faultFilter, (v) => {
 }, { deep: true, flush: "sync" })
 const filteredFaults = computed(() => {
   const f = faultFilter.value
-  return faults.filter((it) => {
+  return faults.value.filter((it) => {
     if (f.kind && it.kind !== f.kind) return false
     if (f.priority && it.priority !== f.priority) return false
     if (f.detectionMethod && it.detectionMethod !== f.detectionMethod) return false
@@ -3295,14 +3308,15 @@ const pmPriorityLabel = (p) => p || "—"
 
 // 가장 우선 처리해야 할 활성 이상 (TREND_PROJECTION 우선, 그 다음 CRITICAL)
 const activeAnomaly = computed(() => {
-  const list = faults.filter((f) => f.kind === "anomaly")
+  const list = faults.value.filter((f) => f.kind === "anomaly")
   return list.find((f) => f.detectionMethod === "TREND_PROJECTION") || list[0] || null
 })
 
 // 이상 이벤트에 연결된 정비 티켓 (현재 mock: 같은 장비의 fault kind 항목)
 function linkedTicket(anom) {
   if (!anom) return null
-  return faults.find((f) => f.kind === "fault" && f.dev === anom.dev) || null
+  if (anom.ticketId) return anom
+  return faults.value.find((f) => f.kind === "fault" && f.dev === anom.dev) || null
 }
 
 // 교통 맥락 헬퍼
@@ -3497,7 +3511,7 @@ function openTicketTransition(fault, toStatus) {
   ticketModal.value = { fault, toStatus, note: "", error: "" }
 }
 function closeTicketModal() { ticketModal.value = null }
-function submitTicketTransition() {
+function legacySubmitTicketTransition() {
   if (!ticketModal.value) return
   const { toStatus, note } = ticketModal.value
   if (toStatus === "RESOLVED" && !note.trim()) {
@@ -3522,11 +3536,14 @@ const assignees = [
   { id: 12, name: "정매니저", role: "OPERATOR" },
 ]
 const assignModal = ref(null)
-function openAssignModal(target) {
+function legacyOpenAssignModalBase(target) {
   assignModal.value = { target, assigneeId: "", note: "", error: "" }
 }
 function closeAssignModal() { assignModal.value = null }
-function submitAssignModal() {
+function legacyOpenAssignModal(target) {
+  assignModal.value = { target, assigneeId: "", note: "", error: "" }
+}
+function legacySubmitAssignModal() {
   if (!assignModal.value) return
   if (!assignModal.value.assigneeId) {
     assignModal.value.error = "담당자를 선택해주세요."
@@ -3560,7 +3577,7 @@ function openAnomalyDismiss(anom) {
 }
 function closeAnomalyModal() { anomalyModal.value = null }
 
-function submitAnomalyModal() {
+function legacySubmitAnomalyModal() {
   if (!anomalyModal.value) return
   const m = anomalyModal.value
   if (m.mode === "resolve") {
@@ -3592,6 +3609,103 @@ function submitAnomalyModal() {
 // 백엔드 계약 §3-14 응답 구조 매핑.
 // thresholdDirection은 B방안(미표시) — DB·백엔드 내부에서만 사용, 프론트는 숫자만.
 // consecutiveWindows는 warning/critical 2필드로 분리 (DB 협의 2026-06-12)
+function ticketIdFor(target) {
+  if (!target) return null
+  return target.ticketId || target.rawTicket?.id || null
+}
+
+async function submitTicketTransition() {
+  if (!ticketModal.value) return
+  const { fault, toStatus, note } = ticketModal.value
+  if (toStatus === "RESOLVED" && !note.trim()) {
+    ticketModal.value.error = "RESOLVED 전환 시 조치 메모가 필요합니다."
+    return
+  }
+  const ticketId = ticketIdFor(fault)
+  if (!ticketId) {
+    ticketModal.value.error = "연결된 정비 티켓이 없습니다. anomaly/ticket 생성 후 다시 시도해 주세요."
+    return
+  }
+  try {
+    await changeTicketStatus(ticketId, { toStatus, note })
+    await loadPredictiveOperations()
+    closeTicketModal()
+  } catch (err) {
+    ticketModal.value.error = err?.normalized?.message || err?.message || "티켓 상태 변경에 실패했습니다."
+  }
+}
+
+function openAssignModal(target) {
+  assignModal.value = { target: linkedTicket(target) || target, assigneeId: "", note: "", error: "" }
+}
+
+async function submitAssignModal() {
+  if (!assignModal.value) return
+  if (!assignModal.value.assigneeId) {
+    assignModal.value.error = "담당자를 선택해 주세요."
+    return
+  }
+  const ticketId = ticketIdFor(assignModal.value.target)
+  if (!ticketId) {
+    assignModal.value.error = "연결된 정비 티켓이 없습니다. anomaly/ticket 생성 후 다시 시도해 주세요."
+    return
+  }
+  try {
+    await assignMaintenanceTicket(ticketId, {
+      assigneeId: Number(assignModal.value.assigneeId),
+      note: assignModal.value.note,
+    })
+    await loadPredictiveOperations()
+    closeAssignModal()
+  } catch (err) {
+    assignModal.value.error = err?.normalized?.message || err?.message || "담당자 배정에 실패했습니다."
+  }
+}
+
+async function submitAnomalyModal() {
+  if (!anomalyModal.value) return
+  const m = anomalyModal.value
+  const eventId = m.anom?.eventId
+  if (!eventId) {
+    m.error = "연결된 이상 이벤트가 없습니다. 실제 anomaly event 생성 후 다시 시도해 주세요."
+    return
+  }
+  if (m.mode === "resolve") {
+    if (!m.confirmedCause.trim()) {
+      m.error = "확정 원인을 선택해 주세요."
+      return
+    }
+    if (!m.resolutionNote.trim()) {
+      m.error = "조치 내용을 입력해 주세요."
+      return
+    }
+    try {
+      await resolveAnomaly(eventId, {
+        confirmedCause: m.confirmedCause,
+        resolutionNote: m.resolutionNote,
+      })
+      await loadPredictiveOperations()
+      closeAnomalyModal()
+    } catch (err) {
+      m.error = err?.normalized?.message || err?.message || "이상 이벤트 해결 처리에 실패했습니다."
+    }
+    return
+  }
+  if (m.mode === "dismiss") {
+    if (!m.reason.trim()) {
+      m.error = "오탐 종료 사유를 입력해 주세요."
+      return
+    }
+    try {
+      await dismissAnomaly(eventId, { reason: m.reason })
+      await loadPredictiveOperations()
+      closeAnomalyModal()
+    } catch (err) {
+      m.error = err?.normalized?.message || err?.message || "이상 이벤트 오탐 종료 처리에 실패했습니다."
+    }
+  }
+}
+
 const pmPolicies = ref([
   {
     policyCode: "FPS_DEGRADATION_RULE_V1",
@@ -4090,6 +4204,184 @@ function policyDefaults(policy) {
   }
 }
 
+const predictiveOpsLoadState = ref("idle")
+const predictiveOpsLoadError = ref("")
+
+function ticketByEventId(tickets) {
+  return new Map(
+    (tickets || [])
+      .filter((ticket) => ticket?.anomalyEventId != null)
+      .map((ticket) => [String(ticket.anomalyEventId), ticket]),
+  )
+}
+
+function minutesUntil(value) {
+  if (!value) return null
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  return Math.round((d.getTime() - Date.now()) / 60000)
+}
+
+function formatElapsedFrom(value) {
+  if (!value) return "-"
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return "-"
+  const total = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000))
+  const h = String(Math.floor(total / 3600)).padStart(2, "0")
+  const m = String(Math.floor((total % 3600) / 60)).padStart(2, "0")
+  const s = String(total % 60).padStart(2, "0")
+  return `${h}:${m}:${s}`
+}
+
+function severityTone(severity) {
+  if (severity === "CRITICAL") return "no"
+  if (severity === "WARNING") return "yl"
+  return "wn"
+}
+
+function severityLabel(severity) {
+  if (severity === "CRITICAL") return "CRIT"
+  if (severity === "WARNING") return "WARN"
+  return severity || "-"
+}
+
+function anomalyStatusLabel(status) {
+  return {
+    OPEN: "탐지",
+    ACKNOWLEDGED: "확인",
+    RECOVERED: "회복",
+    RESOLVED: "해결",
+    DISMISSED: "오탐 종료",
+  }[status] || status || "-"
+}
+
+function anomalyStatusTone(status) {
+  if (status === "RESOLVED" || status === "DISMISSED") return "ok"
+  if (status === "ACKNOWLEDGED" || status === "RECOVERED") return "wn"
+  return "no"
+}
+
+function ticketStatusTone(status) {
+  if (status === "RESOLVED" || status === "CLOSED") return "ok"
+  if (status === "IN_PROGRESS" || status === "ASSIGNED") return "wn"
+  return "no"
+}
+
+function scoreText(score) {
+  const n = numberOrNull(score)
+  return n == null ? "" : ` · score ${n.toFixed(2)}`
+}
+
+function toEvidence(row) {
+  return {
+    metric: row.metricName || "-",
+    observed: numberOrNull(row.observedValue) ?? 0,
+    baseline: numberOrNull(row.baselineValue) ?? 0,
+    threshold: numberOrNull(row.thresholdValue) ?? 0,
+    unit: row.unit || "",
+  }
+}
+
+function toOpsAnomaly(summary, detail, ticket) {
+  const event = detail || summary || {}
+  const linked = ticket || event.ticket || null
+  const ticketStatus = linked?.status || "OPEN"
+  const ticketDue = ticket?.dueStartAt || ticket?.dueAckAt || null
+  const slaRemainingMin = minutesUntil(ticketDue)
+  const detector = event.detector
+    ? {
+      name: event.detector.name || "predictive-detector",
+      version: event.detector.version || "1.0.0",
+      policyCode: event.policyCode || "-",
+    }
+    : null
+  const shadow = event.shadowModel
+    ? {
+      name: event.shadowModel.detectorName || "shadow-model",
+      version: event.shadowModel.version || "1.0.0",
+      score: numberOrNull(event.shadowModel.anomalyScore) ?? 0,
+      warningThreshold: numberOrNull(event.shadowModel.warningThreshold) ?? 0,
+      criticalThreshold: numberOrNull(event.shadowModel.criticalThreshold) ?? 0,
+      predictedSeverity: event.shadowModel.predictedSeverity || "-",
+      topFeatures: [],
+    }
+    : null
+
+  return {
+    id: `ANM-${event.id}`,
+    eventId: event.id,
+    time: formatClock(event.lastDetectedAt || event.firstDetectedAt),
+    dev: event.cameraName || (event.cameraId ? `CAM-${event.cameraId}` : "-"),
+    cameraId: event.cameraId,
+    symp: `${anomalyTypeLabelKo(event.anomalyType)}${scoreText(event.anomalyScore)}`,
+    sev: severityLabel(event.severity),
+    tone: severityTone(event.severity),
+    who: ticket?.assignee?.name || "-",
+    elapsed: formatElapsedFrom(event.firstDetectedAt),
+    st: anomalyStatusLabel(event.status),
+    stTone: anomalyStatusTone(event.status),
+    ticketStatus,
+    ticketId: linked?.id || null,
+    ticketNumber: linked?.ticketNumber || null,
+    kind: "anomaly",
+    priority: linked?.priority || (event.severity === "CRITICAL" ? "P1" : "P2"),
+    detectionMethod: event.detectionMethod || "RULE",
+    anomalyType: event.anomalyType,
+    projectedAt: formatClock(event.projectedThresholdCrossingAt || event.trend?.projectedThresholdCrossingAt),
+    slaDeadline: formatClock(ticketDue),
+    slaOverdue: Boolean(ticket?.ackOverdue || ticket?.startOverdue || (slaRemainingMin != null && slaRemainingMin < 0)),
+    slaRemainingMin,
+    evidence: Array.isArray(event.evidence) ? event.evidence.map(toEvidence) : [],
+    suspectedCauses: Array.isArray(event.suspectedCauses) && event.suspectedCauses.length
+      ? event.suspectedCauses
+      : ["UNKNOWN"],
+    confirmedCause: null,
+    detector,
+    trend: event.trend
+      ? {
+        slope: numberOrNull(event.trend.slope),
+        confidence: numberOrNull(event.trend.confidence),
+        robustZScore: numberOrNull(event.trend.robustZScore),
+        predictionHorizonMinutes: event.trend.predictionHorizonMinutes,
+      }
+      : null,
+    shadowModel: shadow,
+    rawEvent: event,
+    rawTicket: ticket || null,
+  }
+}
+
+async function loadPredictiveOperations() {
+  predictiveOpsLoadState.value = "loading"
+  predictiveOpsLoadError.value = ""
+  try {
+    const [eventPage, ticketPage] = await Promise.all([
+      listAnomalyEvents({ dataSource: pmDataSource.value, page: 0, size: 20, sort: "firstDetectedAt,desc" }),
+      listMaintenanceTickets({ page: 0, size: 20, sort: "createdAt,desc" }),
+    ])
+    const events = Array.isArray(eventPage?.content) ? eventPage.content : []
+    const tickets = Array.isArray(ticketPage?.content) ? ticketPage.content : []
+    const ticketsByEvent = ticketByEventId(tickets)
+    const details = await Promise.all(
+      events.slice(0, 10).map((event) =>
+        getAnomalyEvent(event.id).catch(() => null),
+      ),
+    )
+    const detailsById = new Map(
+      details.filter(Boolean).map((detail) => [String(detail.id), detail]),
+    )
+    faults.value = events.map((event) =>
+      toOpsAnomaly(event, detailsById.get(String(event.id)), ticketsByEvent.get(String(event.id))),
+    )
+    predictiveOpsLoadState.value = "ok"
+  } catch (err) {
+    faults.value = []
+    predictiveOpsLoadState.value = "error"
+    predictiveOpsLoadError.value = err?.normalized?.message || err?.message || "predictive operations load failed"
+    console.warn("[predictive operations load failed]", predictiveOpsLoadError.value)
+  }
+}
+
 async function loadPredictiveDashboard() {
   predictiveLoadState.value = "loading"
   predictiveLoadError.value = ""
@@ -4121,10 +4413,12 @@ async function loadPredictiveDashboard() {
 
 watch(pmDataSource, () => {
   loadPredictiveDashboard()
+  loadPredictiveOperations()
 })
 
 onMounted(() => {
   loadPredictiveDashboard()
+  loadPredictiveOperations()
 })
 
 const pmSloOk = computed(() => pmHealthAvg.value >= 75)

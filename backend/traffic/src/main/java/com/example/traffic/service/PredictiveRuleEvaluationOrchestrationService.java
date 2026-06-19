@@ -27,7 +27,7 @@ public class PredictiveRuleEvaluationOrchestrationService {
     private final PredictiveDetectionClient predictiveDetectionClient;
     private final PredictiveAnomalyEventIngestionService anomalyEventIngestionService;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public int evaluateLatestRuleSamples(Long cameraId, DataSourceType dataSource) {
         List<CameraHealthSample> samples = cameraHealthSampleRepository
                 .findRecentEligibleSamples(

@@ -1184,3 +1184,270 @@ localStorage.getItem("tas_access_token")
 
 정상 JWT는 `eyJ...eyJ...`처럼 점(`.`)이 2개 있는 긴 문자열이다.
 `local-...`이면 프론트 로컬 계정이므로 다시 초기화 후 `admin@email.com / 1234`로 로그인한다.
+
+#### `/admin/ops` 재진입 시 predictive API가 다시 403
+
+원인:
+
+- 프론트 임시 계정(`admin / 1234`, `ops / 1234`)은 화면 라우터상 ADMIN으로 보이지만, 저장되는 access token은 `local-...`이다.
+- Spring `GET /api/v1/predictive/**`는 실제 JWT만 허용하므로 `local-...` 토큰이 붙으면 403이 발생한다.
+- 기존 라우터 가드는 `/admin/ops`에서 local ADMIN 계정도 통과시켜 화면 진입 후 API만 실패하는 상태였다.
+
+조치:
+
+- `trafficAS-b/src/composables/usePredictivePerm.js`
+  - `isBackendJwt()`를 추가해 `local-...` 토큰과 JWT 형식이 아닌 토큰을 predictive 권한에서 제외했다.
+- `trafficAS-b/src/router/index.js`
+  - `/admin/ops` 접근 시 실제 backend JWT가 없으면 `tas_access_token`, `tas_refresh_token`, `tas_user`를 제거하고 `/login`으로 보낸다.
+
+결과:
+
+- `/admin/ops`는 `admin@email.com / 1234` 같은 실제 백엔드 로그인 JWT로만 접근한다.
+- 임시 local 계정으로 들어간 경우 API 403 화면을 보여주지 않고 다시 로그인하게 만든다.
+
+검증:
+
+```powershell
+cd C:\jwdev\Traffic_Analytics_Proposal\trafficAS-b
+npm run build
+```
+
+결과:
+
+- Vite build 성공.
+- Vite CJS deprecation 및 chunk size warning만 표시됨.
+
+### 2026-06-19 `/admin/ops` anomaly/ticket 실제 API 연결
+
+작업 배경:
+
+- 이전 단계에서 `/admin/ops`의 summary, cameras, policies는 실제 predictive API로 연결했다.
+- 장애/이상 목록 영역은 아직 `faults` 데모 배열을 주로 사용했고, anomaly/ticket 처리 버튼도 `console.info`만 호출했다.
+- API 계약 문서 `DOCS/phase2-predictive-maintenance/03_API_계약서_ver2 (1).md` 기준으로 anomaly/ticket 조회와 mutation까지 맞춰야 한다.
+
+변경 파일:
+
+- `trafficAS-b/src/views/admin/OpsView.vue`
+
+연결한 API:
+
+```text
+GET  /api/v1/predictive/anomaly-events?dataSource=REAL&page=0&size=20&sort=firstDetectedAt,desc
+GET  /api/v1/predictive/anomaly-events/{eventId}
+GET  /api/v1/predictive/maintenance-tickets?page=0&size=20&sort=createdAt,desc
+POST /api/v1/predictive/anomaly-events/{eventId}/resolve
+POST /api/v1/predictive/anomaly-events/{eventId}/dismiss
+POST /api/v1/predictive/maintenance-tickets/{ticketId}/assign
+POST /api/v1/predictive/maintenance-tickets/{ticketId}/status
+```
+
+계약 대조 결과:
+
+- anomaly-events 목록 query는 계약서 3-5와 동일하게 `dataSource`, `page`, `size`, `sort=firstDetectedAt,desc`를 사용한다.
+- anomaly detail 응답은 계약서 3-6의 `detector`, `policyCode`, `trend`, `suspectedCauses`, `evidence`, `ticket`, `shadowModel` 필드를 UI 모델로 변환한다.
+- resolve 요청 body는 계약서 3-8과 동일하게 `{ confirmedCause, resolutionNote }`를 보낸다.
+- dismiss 요청 body는 계약서 3-9와 동일하게 `{ reason }`를 보낸다.
+- maintenance-tickets 목록 query는 계약서 3-10과 동일하게 `page`, `size`, `sort=createdAt,desc`를 사용한다.
+- assign 요청 body는 계약서 3-12와 동일하게 `{ assigneeId, note }`를 보낸다.
+- ticket status 요청 body는 계약서 3-13과 동일하게 `{ toStatus, note }`를 보낸다.
+
+UI 동작 변경:
+
+- `/admin/ops` 진입 시 summary/cameras/policies와 별도로 anomaly-events/maintenance-tickets를 조회한다.
+- anomaly 목록은 `AnomalyEventSummaryResponse`와 `AnomalyEventDetailResponse`를 기존 `OpsView` 화면 모델로 변환해서 표시한다.
+- 연결된 maintenance ticket이 있으면 anomaly 행 자체가 ticket action 대상이 된다.
+- 연결된 ticket이 없으면 assign/status 버튼 실행 시 “연결된 정비 티켓이 없다”는 메시지를 표시한다.
+- API 조회가 성공했지만 이벤트가 없으면 더 이상 데모 anomaly/fault를 섞지 않고 빈 목록으로 둔다.
+- API 조회 실패 시 `faults=[]`로 초기화하고 콘솔에 `[predictive operations load failed]`를 남긴다.
+
+검증:
+
+```powershell
+cd C:\jwdev\Traffic_Analytics_Proposal\trafficAS-b
+npm run build
+```
+
+결과:
+
+- Vite build 성공.
+- Vite CJS deprecation 및 chunk size warning만 표시됨.
+
+Docker 반영:
+
+```powershell
+docker compose up -d --build frontend
+```
+
+주의:
+
+- 이번 변경은 Vue frontend만 수정했으므로 기본 반영은 `frontend` rebuild면 된다.
+- Spring backend의 `CameraHealthSampleIngestionService` 변경까지 새 이미지에 반드시 포함해야 하는 환경이면 다음 명령으로 backend도 같이 rebuild한다.
+
+```powershell
+docker compose up -d --build spring-backend frontend
+```
+
+남은 작업:
+
+- 현재 샘플 ingest 결과는 baseline learning 상태라 anomaly event/ticket이 아직 생성되지 않았다.
+- 다음 검증은 FastAPI predictive 평가 결과가 `anomaly_events`, `anomaly_event_evidence`, `maintenance_tickets` 생성까지 이어지는 E2E 경로다.
+
+### 2026-06-19 Docker E2E anomaly/ticket 생성 검증 완료
+
+배경:
+
+- 기존 `test-media/smoke-runs/predictive-demo/camera-health-samples.csv`는 `qualityStatus=PARTIAL` 또는 `INSUFFICIENT` 샘플이 포함되어 Rule detector가 운영 이벤트를 만들기 어려웠다.
+- Rule detector 검증용으로 `quality_status=COMPLETE`이고 fps, frame drop, latency, blur, resource, network 지표가 명확히 나쁜 샘플을 별도 CSV로 추가했다.
+- 목표는 `Spring 상태 샘플 저장 -> FastAPI Rule 평가 -> anomaly_events/evidence 저장 -> CRITICAL 티켓 자동 생성 -> /admin/ops 표시`까지 한 번에 확인하는 것이다.
+
+추가 파일:
+
+- `tools/predictive_demo/camera-health-rule-trigger-samples.csv`
+
+주요 수정:
+
+- `docker-compose.yml`
+  - Spring 컨테이너에서 FastAPI를 `localhost:8000`이 아니라 compose service DNS인 `http://fastapi-server:8000`으로 호출하도록 `FASTAPI_BASE_URL`을 지정했다.
+- `fastapi-server/Dockerfile`
+  - FastAPI 이미지 안에 `predictive_ml/src`를 복사하고 `PYTHONPATH=/app/predictive_ml/src`를 지정했다.
+  - 이유: Docker 이미지에서 `predictive_ml` 패키지를 import하지 못하면 `/internal/v1/anomaly-detection/**` 평가가 실패한다.
+- `backend/traffic/src/main/java/com/example/traffic/client/PredictiveDetectionClient.java`
+  - Spring `RestClient`에 `SimpleClientHttpRequestFactory`를 지정했다.
+  - 이유: 기본 request factory 조합에서 FastAPI/Uvicorn 쪽에 upgrade성 요청처럼 기록되며 body schema가 정상 전달되지 않는 문제가 있었다.
+- `backend/traffic/src/main/java/com/example/traffic/service/PredictiveRuleEvaluationOrchestrationService.java`
+  - 상태 샘플 저장 후 anomaly/evidence/ticket을 저장해야 하므로 `@Transactional(readOnly = true)`를 일반 `@Transactional`로 변경했다.
+- `predictive_ml/src/predictive_ml/manifest.py`
+  - FastAPI health 응답의 `DetectorHealth` 계약에 맞춰 detector manifest field를 `name`, `version`, `method`, `operatingMode`, `active` 중심으로 정리했다.
+- `docker-compose.yml`
+  - FastAPI Docker healthcheck는 `UP`뿐 아니라 `DEGRADED`도 정상 liveness로 인정하도록 조정했다.
+  - 이유: 모델 아티팩트가 없어 `artifactStatus=NOT_CONFIGURED`여도 Rule detector API는 정상 응답하며, 이 상태를 컨테이너 장애로 표시하면 E2E 시연 상태가 헷갈린다.
+
+DB 보정:
+
+현재 개발 DB는 일부 migration을 Flyway가 아니라 Hibernate DDL로 만든 상태라 seed/default가 누락되어 있었다. 로컬 E2E에서는 다음 보정을 적용했다.
+
+```powershell
+docker exec traffic-postgres psql -U postgres -d traffic -c "ALTER TABLE detector_versions ALTER COLUMN metrics_json SET DEFAULT '{}'::jsonb, ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP; ALTER TABLE anomaly_policies ALTER COLUMN config_json SET DEFAULT '{}'::jsonb, ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP, ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP, ALTER COLUMN threshold_direction SET DEFAULT 'HIGHER_IS_WORSE';"
+
+docker cp backend/traffic/src/main/resources/db/migration/008_predictive_seed_policies.sql traffic-postgres:/tmp/008_predictive_seed_policies.sql
+docker exec traffic-postgres psql -U postgres -d traffic -f /tmp/008_predictive_seed_policies.sql
+
+docker exec traffic-postgres psql -U postgres -d traffic -c "CREATE SEQUENCE IF NOT EXISTS maintenance_ticket_number_seq;"
+```
+
+재빌드/재기동:
+
+```powershell
+docker compose up -d --build spring-backend fastapi-server frontend
+```
+
+프론트 변경을 이미 반영했고 backend/FastAPI만 다시 볼 때는 다음처럼 줄여도 된다.
+
+```powershell
+docker compose up -d --build spring-backend fastapi-server
+```
+
+E2E 주입 명령:
+
+```powershell
+.\tools\predictive_demo\import_health_samples.ps1 `
+  -CsvPath "tools\predictive_demo\camera-health-rule-trigger-samples.csv" `
+  -BaseUrl "http://localhost:8080" `
+  -InternalApiKey "traffic-ai-internal-key-2026"
+```
+
+API 검증 명령:
+
+```powershell
+$login = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:8080/api/auth/login" `
+  -ContentType "application/json" `
+  -Body (@{
+    email = "admin@email.com"
+    password = "1234"
+  } | ConvertTo-Json)
+
+$headers = @{
+  Authorization = "Bearer $($login.data.accessToken)"
+}
+
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/summary?dataSource=REAL" `
+  -Headers $headers
+
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/anomaly-events?dataSource=REAL&page=0&size=20&sort=firstDetectedAt,desc" `
+  -Headers $headers
+
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/maintenance-tickets?page=0&size=20&sort=createdAt,desc" `
+  -Headers $headers
+```
+
+DB 검증 명령:
+
+```powershell
+docker exec traffic-postgres psql -U postgres -d traffic -c "select id, target_camera_id, anomaly_type, severity, status, anomaly_score, last_detected_at from anomaly_events order by last_detected_at desc limit 20;"
+
+docker exec traffic-postgres psql -U postgres -d traffic -c "select id, ticket_number, anomaly_event_id, priority, status, due_ack_at, due_start_at from maintenance_tickets order by created_at desc limit 20;"
+```
+
+검증 결과:
+
+- `GET /api/v1/predictive/summary?dataSource=REAL`
+  - `totalCameras=1`
+  - `criticalCameras=1`
+  - `baselineLearningCameras=0`
+  - `openAnomalies=6`
+  - `predictedRisks=0`
+  - `overdueTickets=0`
+- `GET /api/v1/predictive/anomaly-events`
+  - 6건 생성 확인.
+  - `FPS_DEGRADATION`, `FRAME_DROP_DEGRADATION`, `LATENCY_DEGRADATION`, `BLUR_DEGRADATION`, `RESOURCE_SATURATION`, `NETWORK_INSTABILITY`
+  - CRITICAL 3건, WARNING 3건.
+- `GET /api/v1/predictive/maintenance-tickets`
+  - 3건 생성 확인.
+  - CRITICAL 이상 이벤트 3건에 대해 `P1`, `OPEN` 티켓 자동 생성.
+  - 예: `MNT-20260619-0001`, `MNT-20260619-0002`, `MNT-20260619-0003`
+
+FastAPI health:
+
+```powershell
+Invoke-RestMethod `
+  -Uri "http://localhost:8000/internal/v1/anomaly-detection/health" `
+  -Headers @{"X-Internal-Api-Key"="traffic-ai-internal-key-2026"} |
+  ConvertTo-Json -Depth 8
+```
+
+현재 기대 상태:
+
+- detector manifest schema는 정상.
+- `camera-rule`, `camera-robust-zscore`, `camera-trend-projection`, `camera-context-cross-validator`는 `ACTIVE`.
+- `camera-lstm-autoencoder`는 `SHADOW`, `active=false`.
+- 모델 디렉토리 `/app/models/predictive`가 아직 없어 `artifactStatus=NOT_CONFIGURED`, 전체 status는 `DEGRADED`.
+- 이 상태는 룰 기반 anomaly/ticket 시연에는 영향이 없고, LSTM 모델 아티팩트 시연 범위가 아직 아니라는 의미다.
+- Docker healthcheck는 `UP` 또는 `DEGRADED` 응답이면 컨테이너 liveness 정상으로 본다.
+
+브라우저 확인:
+
+- `http://localhost:5174/admin/ops`
+- 로그인: `admin@email.com / 1234`
+- 기대값:
+  - 상단 KPI에서 위험 카메라 1대, 열린 이상 6건, 기준선 학습 0대.
+  - 이상/장애 목록에 6건 표시.
+  - CRITICAL 이벤트 3건은 연결된 P1 정비 티켓 표시.
+  - resolve/dismiss/assign/status 버튼은 실제 API mutation을 호출한 뒤 화면을 재조회한다.
+
+계약 대조:
+
+- API query/body/response field는 `03_API_계약서_ver2 (1).md`의 anomaly/ticket 계약과 일치한다.
+- `dataSource`, `page`, `size`, `sort` query shape 유지.
+- anomaly event enum과 ticket enum은 backend DTO 기준으로 노출하며 JPA entity는 직접 반환하지 않는다.
+- FastAPI health manifest도 FastAPI response schema에 맞게 정리했다.
+
+남은 주의사항:
+
+- 현재 DB 보정 SQL은 로컬 개발 DB 복구용이다. 새 DB에서는 migration 적용 순서가 정상이라면 같은 보정이 필요 없어야 한다.
+- Hibernate DDL 경고 중 `congestion_score numeric(5,2) default 0.00` alter 문 syntax warning이 남아 있으나 앱 기동과 이번 E2E에는 영향이 없었다.
+- LSTM/ONNX 또는 PyTorch artifact를 실제로 시연하려면 `/app/models/predictive` 모델 파일과 artifact validation 시나리오가 별도로 필요하다.
