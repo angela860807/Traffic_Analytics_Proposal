@@ -442,6 +442,12 @@
             <span class="ch-kpi">전체 25대 모니터링</span>
           </h3>
           <div class="pnl-tools">
+            <select v-model="camSort" class="pnl-sort" :title="'정렬 (현재: ' + camSortLabel + ')'">
+              <option value="healthScore,asc">위험 카메라 우선</option>
+              <option value="healthScore,desc">정상 카메라 우선</option>
+              <option value="cameraName,asc">이름 가나다순</option>
+              <option value="latestSampledAt,desc">최근 응답순</option>
+            </select>
             <input
               v-model="camQuery"
               placeholder="카메라명 / ID / 위치 검색"
@@ -2576,9 +2582,37 @@ watch([camQuery, camSt], ([q, st]) => {
     st: st === "all" ? "" : st,
   })
 }, { flush: "sync" })
+// 카메라 정렬 — Health Score 오름차순(위험 우선) 기본. 운영자가 즉시 우선순위 식별
+// 백엔드 계약 §3-2 sort=healthScore,asc 와 동일
+const camSort = ref("healthScore,asc");
+const ALLOWED_CAM_SORT = ["healthScore,asc", "healthScore,desc", "cameraName,asc", "latestSampledAt,desc"];
+const camSortLabel = computed(() => ({
+  "healthScore,asc":  "위험 우선",
+  "healthScore,desc": "정상 우선",
+  "cameraName,asc":   "이름순",
+  "latestSampledAt,desc": "최근 응답순",
+}[camSort.value] || ""));
+
+function compareCams(a, b, key) {
+  if (key === "healthScore,asc") {
+    // BASELINE_LEARNING (healthScore null) / OFFLINE(0) 정렬 안정화
+    const av = a.healthScore == null ? 100 : a.healthScore;  // 학습 중은 끝으로
+    const bv = b.healthScore == null ? 100 : b.healthScore;
+    return av - bv;  // 낮을수록 위험 → 위로
+  }
+  if (key === "healthScore,desc") {
+    const av = a.healthScore == null ? -1 : a.healthScore;
+    const bv = b.healthScore == null ? -1 : b.healthScore;
+    return bv - av;
+  }
+  if (key === "cameraName,asc") return a.name.localeCompare(b.name);
+  if (key === "latestSampledAt,desc") return (b.ts || "").localeCompare(a.ts || "");
+  return 0;
+}
+
 const filteredCams = computed(() => {
   const q = camQuery.value.trim().toLowerCase();
-  return cams.filter((c) => {
+  const filtered = cams.filter((c) => {
     if (camSt.value !== "all" && c.st !== camSt.value) return false;
     if (!q) return true;
     return (
@@ -2587,6 +2621,8 @@ const filteredCams = computed(() => {
       c.loc.toLowerCase().includes(q)
     );
   });
+  // 정렬 적용 (기본: 위험 카메라 우선)
+  return [...filtered].sort((a, b) => compareCams(a, b, camSort.value));
 });
 if (typeof window !== "undefined") {
   window.addEventListener("keydown", (e) => {
@@ -3707,17 +3743,31 @@ const policyConfirm = ref(null)
 function openPolicyConfirm(p) {
   policyConfirm.value = { ...p }
 }
-function submitPolicyUpdate() {
+// 정책 저장 (백엔드 PATCH + 성공 후 서버 데이터 재조회 — TODO 5-6)
+async function submitPolicyUpdate() {
   if (!policyConfirm.value) return
-  // 실제 호출: updatePolicy(policyCode, payload)
-  // payload는 thresholdDirection 보내지 않음 (B방안)
-  console.info("[policy update]", policyConfirm.value.policyCode, {
-    warningThreshold: policyConfirm.value.warningThreshold,
-    criticalThreshold: policyConfirm.value.criticalThreshold,
-    warningConsecutiveWindows: policyConfirm.value.warningConsecutiveWindows,
+  const code = policyConfirm.value.policyCode
+  // payload: thresholdDirection 보내지 않음 (B방안), consecutiveWindows는 2필드
+  const payload = {
+    warningThreshold:           policyConfirm.value.warningThreshold,
+    criticalThreshold:          policyConfirm.value.criticalThreshold,
+    warningConsecutiveWindows:  policyConfirm.value.warningConsecutiveWindows,
     criticalConsecutiveWindows: policyConfirm.value.criticalConsecutiveWindows,
-    enabled: policyConfirm.value.enabled,
-  })
+    enabled:                    policyConfirm.value.enabled,
+  }
+  try {
+    const { updatePolicy, listPolicies } = await import("@/api/predictiveApi")
+    await updatePolicy(code, payload)
+    // 성공 후 서버 데이터 재조회 — 다른 사용자의 변경분도 함께 반영
+    const result = await listPolicies()
+    if (Array.isArray(result?.content)) {
+      pmPolicies.value = result.content
+    }
+  } catch (err) {
+    // 백엔드 미연동 상태 (현재 데모) — console 출력 + 로컬 상태만 갱신
+    console.info("[policy update] (오프라인 데모 모드)", code, payload,
+      err?.normalized?.message || err?.message)
+  }
   policyConfirm.value = null
 }
 
@@ -4867,6 +4917,15 @@ const servers = Object.freeze([
   border: 1px solid #c9d4e3; cursor: pointer;
 }
 .ops-shell .pm-fault-flag input { cursor: pointer; }
+
+/* cams 탭 정렬 셀렉트 */
+.ops-shell .pnl-sort {
+  padding: 6px 10px;
+  border: 1px solid #c9d4e3; border-radius: 6px;
+  background: #ffffff; color: #0c1f40;
+  font-family: inherit; font-size: 12px;
+  cursor: pointer;
+}
 
 /* dataSource 행 (status 탭 상단) */
 .ops-shell .pm-ds-row {
