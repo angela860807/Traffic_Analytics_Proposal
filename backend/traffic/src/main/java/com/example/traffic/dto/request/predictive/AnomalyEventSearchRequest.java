@@ -5,10 +5,13 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.OffsetDateTime;
 
 @Getter
+@Setter
 @NoArgsConstructor
 public class AnomalyEventSearchRequest {
     private Long cameraId;
@@ -17,7 +20,9 @@ public class AnomalyEventSearchRequest {
     private AnomalyType anomalyType;
     private DetectionMethod detectionMethod;
     private DataSourceType dataSource = DataSourceType.REAL;
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private OffsetDateTime from;
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private OffsetDateTime to;
     @Min(0)
     private int page = 0;

@@ -204,4 +204,37 @@ public class AnomalyEvent {
         }
         this.updatedAt = LocalDateTime.now();
     }
+
+    public void acknowledge(Member member, LocalDateTime acknowledgedAt) {
+        if (!AnomalyEventStatus.OPEN.equals(this.status)) {
+            throw new IllegalStateException("Only OPEN anomaly events can be acknowledged.");
+        }
+        this.status = AnomalyEventStatus.ACKNOWLEDGED;
+        this.acknowledgedBy = member;
+        this.acknowledgedAt = acknowledgedAt != null ? acknowledgedAt : LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void resolve(Member member, SuspectedCause confirmedCause, String resolutionNote, LocalDateTime resolvedAt) {
+        if (AnomalyEventStatus.RESOLVED.equals(this.status) || AnomalyEventStatus.DISMISSED.equals(this.status)) {
+            throw new IllegalStateException("Closed anomaly events cannot be resolved again.");
+        }
+        this.status = AnomalyEventStatus.RESOLVED;
+        this.resolvedBy = member;
+        this.confirmedCause = confirmedCause;
+        this.resolutionNote = resolutionNote;
+        this.resolvedAt = resolvedAt != null ? resolvedAt : LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void dismiss(Member member, String reason, LocalDateTime dismissedAt) {
+        if (AnomalyEventStatus.RESOLVED.equals(this.status) || AnomalyEventStatus.DISMISSED.equals(this.status)) {
+            throw new IllegalStateException("Closed anomaly events cannot be dismissed again.");
+        }
+        this.status = AnomalyEventStatus.DISMISSED;
+        this.resolvedBy = member;
+        this.resolutionNote = reason;
+        this.resolvedAt = dismissedAt != null ? dismissedAt : LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
 }

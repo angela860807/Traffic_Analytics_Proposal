@@ -595,9 +595,123 @@ docker exec traffic-postgres psql -U postgres -d traffic -c "select ticket_numbe
 - 같은 `anomaly_event_id`로 이미 티켓이 있으면 중복 생성하지 않는다.
 - DB에 `maintenance_ticket_number_seq`가 있어야 한다.
 
-## 8. 다음 단계 제안
+## 8. 5단계 진행 내역: Spring Boot 운영 API
 
-### 5단계: 실제 시연 테스트 준비
+진행일: 2026-06-19
+
+이번 단계에서는 이미 연결된 수집/평가/자동 티켓 생성 흐름 위에 운영자가 사용할 공개 API를 추가했다.
+빌드는 사용자가 별도로 진행 중이므로, Codex는 코드 수정과 가벼운 정적 확인만 수행했다.
+
+### 8-1. 추가 파일
+
+- `backend/traffic/src/main/java/com/example/traffic/controller/PredictiveOperationsController.java`
+- `backend/traffic/src/main/java/com/example/traffic/service/PredictiveOperationsService.java`
+
+### 8-2. 수정 파일
+
+- `backend/traffic/src/main/java/com/example/traffic/domain/AnomalyEvent.java`
+  - `acknowledge`, `resolve`, `dismiss` 상태 변경 메서드 추가
+  - 서비스가 JPA 필드를 직접 조작하지 않도록 도메인 메서드로 상태 전이를 제한
+
+- `backend/traffic/src/main/java/com/example/traffic/domain/MaintenanceTicket.java`
+  - `assign`, `changeStatus` 메서드 추가
+  - 상태 변경 시 `acknowledgedAt`, `startedAt`, `resolvedAt`, `closedAt` 시각을 함께 기록
+
+- `backend/traffic/src/main/java/com/example/traffic/domain/AnomalyPolicy.java`
+  - `updateRuntimePolicy` 추가
+  - 정책 수정 API가 `predictionHorizonMinutes`, `minimumSampleCount`, `config`, `enabled`만 좁게 바꾸도록 제한
+
+- `backend/traffic/src/main/java/com/example/traffic/dto/request/predictive/AnomalyEventSearchRequest.java`
+  - `from`, `to` query parameter에 ISO date-time 바인딩 명시
+
+- `backend/traffic/src/main/java/com/example/traffic/repository/AnomalyEventRepository.java`
+- `backend/traffic/src/main/java/com/example/traffic/repository/MaintenanceTicketRepository.java`
+  - 목록 필터링을 위해 `JpaSpecificationExecutor` 추가
+
+- `backend/traffic/src/main/java/com/example/traffic/repository/AnomalyEventEvidenceRepository.java`
+  - 이벤트 상세 근거 목록 조회 추가
+
+- `backend/traffic/src/main/java/com/example/traffic/repository/ModelPredictionLogRepository.java`
+  - 이벤트 상세에서 같은 카메라의 최신 SHADOW 결과를 표시하기 위한 조회 추가
+
+### 8-3. 추가된 endpoint
+
+```http
+GET /api/v1/predictive/anomaly-events
+GET /api/v1/predictive/anomaly-events/{eventId}
+POST /api/v1/predictive/anomaly-events/{eventId}/acknowledge
+POST /api/v1/predictive/anomaly-events/{eventId}/resolve
+POST /api/v1/predictive/anomaly-events/{eventId}/dismiss
+GET /api/v1/predictive/maintenance-tickets
+POST /api/v1/predictive/maintenance-tickets
+POST /api/v1/predictive/maintenance-tickets/{ticketId}/assign
+POST /api/v1/predictive/maintenance-tickets/{ticketId}/status
+PATCH /api/v1/predictive/policies/{policyCode}
+```
+
+구현 기준:
+
+- Controller, Service, Repository, DTO 계층을 분리했다.
+- JPA entity를 API 응답으로 직접 반환하지 않고 기존 predictive response DTO로 변환한다.
+- 목록 API는 계약서 기준 sort whitelist를 적용한다.
+  - anomaly-events: `firstDetectedAt`, `lastDetectedAt`, `severity`, `anomalyScore`
+  - maintenance-tickets: `createdAt`, `dueAckAt`, `dueStartAt`, `priority`
+- 권한은 기존 `SecurityConfig` 규칙을 따른다.
+  - 이벤트 acknowledge/resolve/dismiss: `OPERATOR`, `ADMIN`
+  - 티켓 생성/배정: `OPERATOR`, `ADMIN`
+  - 티켓 상태 변경: `OPERATOR`, `MAINTAINER`, `ADMIN`
+  - 정책 수정: `ADMIN`
+- 인증 사용자는 JWT의 email로 `Member`를 다시 조회해 `updatedBy`, `createdBy`, `changedBy`, `acknowledgedBy`, `resolvedBy`에 반영한다.
+- 수동 티켓 생성은 같은 `anomalyEventId`에 기존 티켓이 있으면 `409 CONFLICT`로 중복 생성을 막는다.
+- 티켓 상태 변경은 기존 `MaintenanceTicketStateTransitionService`의 허용 전이/권한 검사를 사용한다.
+- 티켓 생성/배정/상태 변경은 `MaintenanceTicketHistory`에 append-only로 남긴다.
+
+### 8-4. 현재 한계
+
+- 이상 이벤트 acknowledge/resolve/dismiss 자체에는 별도 event history 테이블이 없어 이벤트 필드만 갱신한다.
+- 이벤트 상세의 `shadowModel`은 현재 같은 카메라/dataSource의 최신 SHADOW 결과를 붙인다. 계약서의 “이벤트 평가 시각과 가장 가까운 SHADOW 결과 매칭”은 다음 고도화 범위다.
+- `RECOVERED` 자동 전환, WARNING 지속/재발 기반 P2 자동 티켓 생성은 아직 미구현이다.
+- Spring `compileJava`/테스트/실행 검증은 사용자가 별도 build에서 확인해야 한다.
+
+### 8-5. 5단계 Troubleshooting
+
+#### 목록 API sort 요청이 400
+
+허용된 sort만 사용해야 한다.
+
+```http
+GET /api/v1/predictive/anomaly-events?sort=firstDetectedAt,desc
+GET /api/v1/predictive/maintenance-tickets?sort=createdAt,desc
+```
+
+#### 이벤트 acknowledge가 409
+
+현재 구현은 `OPEN` 이벤트만 acknowledge할 수 있다.
+이미 `ACKNOWLEDGED`, `RESOLVED`, `DISMISSED` 상태인 이벤트인지 확인한다.
+
+#### 티켓 생성이 409
+
+같은 `anomalyEventId`에 이미 티켓이 있으면 중복 생성하지 않는다.
+
+확인 SQL:
+
+```powershell
+docker exec traffic-postgres psql -U postgres -d traffic -c "select id, anomaly_event_id, ticket_number, status from maintenance_tickets where anomaly_event_id = 101;"
+```
+
+#### 티켓 상태 변경이 409
+
+허용 상태 전이만 처리한다.
+
+```text
+OPEN -> ASSIGNED -> IN_PROGRESS -> RESOLVED -> CLOSED
+```
+
+`RESOLVED`로 변경할 때는 `note`가 필수다.
+
+## 9. 다음 단계 제안
+
+### 6단계: 실제 시연 테스트 준비
 
 우선순위:
 
@@ -608,7 +722,7 @@ docker exec traffic-postgres psql -U postgres -d traffic -c "select ticket_numbe
 5. 상태 샘플 ingest 요청 후 event/evidence/ticket 생성 확인
 6. 대시보드 조회 API 확인
 
-### 6단계: demo profile 정리
+### 7단계: demo profile 정리
 
 우선순위:
 
@@ -618,7 +732,7 @@ docker exec traffic-postgres psql -U postgres -d traffic -c "select ticket_numbe
 4. docker compose에서 demo profile 사용
 5. seed 재실행 없이 migration 기반 기동 확인
 
-### 7단계: 테스트 보강
+### 8단계: 테스트 보강
 
 우선순위:
 
@@ -628,12 +742,13 @@ docker exec traffic-postgres psql -U postgres -d traffic -c "select ticket_numbe
 4. TrafficContext aggregation SQL 통합 테스트
 5. MaintenanceTicket 중복 생성 방지 테스트
 
-## 9. 현재까지 검증 결과
+## 10. 현재까지 검증 결과
 
 통과:
 
 - Spring `compileJava`
 - FastAPI 관련 Python 파일 `py_compile`
+- 2026-06-19 코드 수정 후 `git diff --check`
 
 미실행:
 
@@ -647,7 +762,7 @@ docker exec traffic-postgres psql -U postgres -d traffic -c "select ticket_numbe
 - 현재 기본 Python 환경에 `pydantic` 등 FastAPI 의존성이 설치되어 있지 않음
 - 사용자가 전체 build는 직접 진행 예정
 
-## 10. 최종 병합 검수 메모
+## 11. 최종 병합 검수 메모
 
 검수일: 2026-06-18
 
@@ -663,12 +778,12 @@ docker exec traffic-postgres psql -U postgres -d traffic -c "select ticket_numbe
 - ACTIVE 후보만 `anomaly_events`와 evidence로 저장
 - SHADOW 후보는 `model_prediction_logs`에만 저장
 - CRITICAL ACTIVE 이벤트의 P1 유지보수 티켓 자동 생성
-
-계약서 대비 남은 범위:
-
 - 이상 이벤트 목록/상세/acknowledge/resolve/dismiss API
 - 유지보수 티켓 목록/생성/배정/상태 변경 API
 - 정책 수정 `PATCH /api/v1/predictive/policies/{policyCode}`
+
+계약서 대비 남은 범위:
+
 - 기준선 산출의 동일 30분 시간대 bucket 정밀화
 - 정상 3회 연속 `RECOVERED`, WARNING 지속/재발 기반 P2 티켓 정책
 - SHADOW와 이벤트 상세 화면의 근접 평가 시각 매칭

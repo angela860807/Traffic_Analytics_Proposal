@@ -111,4 +111,25 @@ public class AnomalyPolicy {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = this.createdAt;
     }
+
+    public void updateRuntimePolicy(Integer predictionHorizonMinutes,
+                                    Integer minimumSampleCount,
+                                    Map<String, Object> configJson,
+                                    Boolean enabled,
+                                    Member updatedBy) {
+        if (predictionHorizonMinutes != null) {
+            this.predictionHorizonMinutes = predictionHorizonMinutes;
+        }
+        if (minimumSampleCount != null) {
+            this.minimumSampleCount = minimumSampleCount;
+        }
+        if (configJson != null) {
+            this.configJson = new HashMap<>(configJson);
+        }
+        if (enabled != null) {
+            this.enabled = enabled;
+        }
+        this.updatedBy = updatedBy;
+        this.updatedAt = LocalDateTime.now();
+    }
 }

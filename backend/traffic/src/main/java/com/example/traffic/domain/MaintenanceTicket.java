@@ -99,4 +99,35 @@ public class MaintenanceTicket {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = this.createdAt;
     }
+
+    public void assign(Member assignee, String note) {
+        this.assignee = assignee;
+        this.actionNote = note;
+        if (MaintenanceStatus.OPEN.equals(this.status)) {
+            this.status = MaintenanceStatus.ASSIGNED;
+        }
+        if (this.acknowledgedAt == null) {
+            this.acknowledgedAt = LocalDateTime.now();
+        }
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void changeStatus(MaintenanceStatus toStatus, String note) {
+        this.status = toStatus;
+        this.actionNote = note;
+        LocalDateTime now = LocalDateTime.now();
+        if (MaintenanceStatus.ASSIGNED.equals(toStatus) && this.acknowledgedAt == null) {
+            this.acknowledgedAt = now;
+        }
+        if (MaintenanceStatus.IN_PROGRESS.equals(toStatus) && this.startedAt == null) {
+            this.startedAt = now;
+        }
+        if (MaintenanceStatus.RESOLVED.equals(toStatus) && this.resolvedAt == null) {
+            this.resolvedAt = now;
+        }
+        if (MaintenanceStatus.CLOSED.equals(toStatus) && this.closedAt == null) {
+            this.closedAt = now;
+        }
+        this.updatedAt = now;
+    }
 }
