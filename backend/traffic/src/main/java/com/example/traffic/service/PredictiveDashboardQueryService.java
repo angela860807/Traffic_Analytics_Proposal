@@ -21,6 +21,7 @@ import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -75,7 +76,7 @@ public class PredictiveDashboardQueryService {
                 .degradedCameras(countByStatus(cameras, HealthStatus.DEGRADED))
                 .criticalCameras(countByStatus(cameras, HealthStatus.CRITICAL))
                 .offlineCameras(countByStatus(cameras, HealthStatus.OFFLINE))
-                .baselineLearningCameras(countByStatus(cameras, HealthStatus.BASELINE_LEARNING))
+                .baselineLearningCameras(countLearningOrInsufficient(cameras))
                 .openAnomalies(openAnomalies)
                 .predictedRisks(predictedRisks)
                 .overdueTickets(overdueTickets)
@@ -97,6 +98,7 @@ public class PredictiveDashboardQueryService {
         SortSpec sortSpec = parseSort(sort, CAMERA_SORT_FIELDS);
 
         MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("zoneFilterDisabled", zoneId == null)
                 .addValue("zoneId", zoneId)
                 .addValue("dataSource", dataSource.name());
 
@@ -140,7 +142,7 @@ public class PredictiveDashboardQueryService {
                       AND mpl.predicted_anomaly = TRUE
                       AND mpl.data_source = :dataSource
                 ) p ON TRUE
-                WHERE (:zoneId IS NULL OR c.zone_id = :zoneId)
+                WHERE (:zoneFilterDisabled = TRUE OR c.zone_id = :zoneId)
                 """, params, (rs, rowNum) -> toCameraOperatingStatus(rs, dataSource));
 
         List<CameraOperatingStatusResponse> filtered = rows.stream()
@@ -319,8 +321,7 @@ public class PredictiveDashboardQueryService {
         BigDecimal memoryScore = higherIsWorseScore(rs.getBigDecimal("memory_usage_pct"), new BigDecimal("85"), new BigDecimal("95"));
         BigDecimal networkScore = higherIsWorseScore(toBigDecimal(rs.getObject("network_rtt_ms")), new BigDecimal("500"), new BigDecimal("1000"));
 
-        List<BigDecimal> scores = List.of(fpsScore, frameDropScore, latencyScore, blurScore, ocrScore, cpuScore, memoryScore, networkScore)
-                .stream()
+        List<BigDecimal> scores = Stream.of(fpsScore, frameDropScore, latencyScore, blurScore, ocrScore, cpuScore, memoryScore, networkScore)
                 .filter(score -> score != null)
                 .toList();
         if (scores.size() < 4) {
@@ -383,6 +384,14 @@ public class PredictiveDashboardQueryService {
     private long countByStatus(List<CameraOperatingStatusResponse> cameras, HealthStatus status) {
         return cameras.stream()
                 .filter(camera -> camera.getHealthStatus() == status)
+                .count();
+    }
+
+    private long countLearningOrInsufficient(List<CameraOperatingStatusResponse> cameras) {
+        return cameras.stream()
+                .filter(camera -> camera.getHealthStatus() == HealthStatus.BASELINE_LEARNING
+                        || camera.getHealthStatus() == HealthStatus.INSUFFICIENT_DATA
+                        || camera.getBaselineStatus() == BaselineStatus.LEARNING)
                 .count();
     }
 

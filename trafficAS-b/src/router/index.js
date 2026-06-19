@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
+import { hasPredictiveAccess } from '@/composables/usePredictivePerm'
 
 const MainView          = () => import('@/views/MainView.vue')
 const IntroView         = () => import('@/views/IntroView.vue')
@@ -36,8 +37,9 @@ const router = createRouter({
 router.beforeEach((to) => {
   const protectedPaths = ['/admin']
   if (protectedPaths.some(p => to.path.startsWith(p))) {
-    const { isLoggedIn, isAdmin } = useAuth()
+    const { isLoggedIn, isAdmin, currentUser } = useAuth()
     if (!isLoggedIn.value) return '/login'
+    if (to.path.startsWith('/admin/ops') && hasPredictiveAccess(currentUser.value)) return true
     if (!isAdmin.value)    return '/'
   }
 })

@@ -455,9 +455,11 @@
             />
             <select v-model="camSt">
               <option value="all">전체 상태</option>
-              <option>정상</option>
-              <option>지연</option>
-              <option>장애</option>
+              <option value="정상">정상</option>
+              <option value="저하">저하</option>
+              <option value="위험">위험</option>
+              <option value="오프라인">오프라인</option>
+              <option value="수집 중">수집 중</option>
             </select>
             <button class="pnl-act"><i class="bi bi-download"></i> CSV 내보내기</button>
           </div>
@@ -2477,6 +2479,7 @@ import { INITIAL_DISTRICTS_WEATHER, DISTRICT_LIST } from "@/data/weather";
 import GuideOverlay from "@/components/GuideOverlay.vue";
 import guideSteps from "@/data/guides/ops.js";
 import { usePredictivePerm } from "@/composables/usePredictivePerm";
+import { getSummary, listCameras, listPolicies, updatePolicy } from "@/api/predictiveApi";
 
 // 예지보전 권한 헬퍼 (요구사항 정의서 2-4/7-2 + DB 협의 2026-06-12 반영)
 const {
@@ -2488,6 +2491,7 @@ const {
   canResolveAnomaly,
   canChangeTicketStatus,
   canTransitionTicket,
+  canEditPolicy,
 } = usePredictivePerm();
 
 const guideOpen = ref(false);
@@ -2573,9 +2577,16 @@ function openAlarm(a) {
   alarmModal.value = a;
 }
 // cams 탭 필터 — URL 동기화
-const ALLOWED_CAM_ST = ["all", "정상", "지연", "장애"]
 const camQuery = ref(typeof route.query.q === "string" ? route.query.q : "");
-const camSt = ref(ALLOWED_CAM_ST.includes(route.query.st) ? route.query.st : "all");
+const PM_CAM_STATUS_FILTERS = [
+  "all",
+  "\uC815\uC0C1",
+  "\uC800\uD558",
+  "\uC704\uD5D8",
+  "\uC624\uD504\uB77C\uC778",
+  "\uC218\uC9D1 \uC911",
+]
+const camSt = ref(PM_CAM_STATUS_FILTERS.includes(route.query.st) ? route.query.st : "all");
 watch([camQuery, camSt], ([q, st]) => {
   syncToQuery({
     q: q || "",
@@ -2612,7 +2623,7 @@ function compareCams(a, b, key) {
 
 const filteredCams = computed(() => {
   const q = camQuery.value.trim().toLowerCase();
-  const filtered = cams.filter((c) => {
+  const filtered = cams.value.filter((c) => {
     if (camSt.value !== "all" && c.st !== camSt.value) return false;
     if (!q) return true;
     return (
@@ -3756,12 +3767,11 @@ async function submitPolicyUpdate() {
     enabled:                    policyConfirm.value.enabled,
   }
   try {
-    const { updatePolicy, listPolicies } = await import("@/api/predictiveApi")
     await updatePolicy(code, payload)
     // 성공 후 서버 데이터 재조회 — 다른 사용자의 변경분도 함께 반영
     const result = await listPolicies()
     if (Array.isArray(result?.content)) {
-      pmPolicies.value = result.content
+      pmPolicies.value = result.content.map(policyDefaults)
     }
   } catch (err) {
     // 백엔드 미연동 상태 (현재 데모) — console 출력 + 로컬 상태만 갱신
@@ -3900,7 +3910,7 @@ if (typeof document !== "undefined") {
 
 // 카메라 데이터 — 기존 운영 필드(st/lat/ts) + 예지보전 필드(healthScore/predictedRisk) 통합
 // 3건: 정상 / 지연+악화예측 / 장애 (각 상태 대표 1건씩)
-const cams = Object.freeze([
+const demoCams = Object.freeze([
   {
     name: "한남대교_남단_A4",
     loc: "강변북로 09K+200",
@@ -3944,17 +3954,19 @@ const cams = Object.freeze([
     predictedRisk: 0,
   },
 ]);
+const cams = ref([...demoCams]);
 
 /* ── 예지보전 KPI (cams 기반 집계) ── */
 const pmHealthAvg = computed(() => {
-  const live = cams.filter((c) => c.healthStatus !== "OFFLINE")
+  const live = cams.value.filter((c) => c.healthStatus !== "OFFLINE" && c.healthScore != null)
   if (!live.length) return 0
   return (live.reduce((s, c) => s + c.healthScore, 0) / live.length).toFixed(1)
 })
-const pmPredictedCount = computed(() => cams.filter((c) => c.predictedRisk > 0).length)
-const pmCriticalCount = computed(() => cams.filter((c) => c.healthStatus === "CRITICAL").length)
-const pmBaselineLearning = computed(() => cams.filter((c) => c.healthStatus === "BASELINE_LEARNING").length)
-const pmOverdueTickets = ref(1) // SLA 초과 티켓 — 추후 백엔드 연동 시 교체
+const pmSummary = ref(null)
+const pmPredictedCount = computed(() => pmSummary.value?.predictedRisks ?? cams.value.filter((c) => c.predictedRisk > 0).length)
+const pmCriticalCount = computed(() => pmSummary.value?.criticalCameras ?? cams.value.filter((c) => c.healthStatus === "CRITICAL").length)
+const pmBaselineLearning = computed(() => pmSummary.value?.baselineLearningCameras ?? cams.value.filter((c) => c.healthStatus === "BASELINE_LEARNING" || c.healthStatus === "INSUFFICIENT_DATA").length)
+const pmOverdueTickets = computed(() => pmSummary.value?.overdueTickets ?? 0)
 
 // dataSource 필터 (status 탭) — 백엔드 호출 시 query parameter로 전달
 const pmDataSource = ref("REAL")
@@ -3964,6 +3976,139 @@ function pmDataSourceLabel(v) {
 function pmDataSourceTone(v) {
   return v === "FAULT_INJECTED" ? "rd" : v === "MOCK" ? "gy" : "yl"
 }
+const predictiveLoadState = ref("idle")
+const predictiveLoadError = ref("")
+
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === "") return null
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function formatClock(value) {
+  if (!value) return "-"
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return String(value)
+  return d.toLocaleTimeString("ko-KR", {
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+}
+
+function cameraStatusLabel(healthStatus, baselineStatus) {
+  if (baselineStatus === "LEARNING" || healthStatus === "BASELINE_LEARNING" || healthStatus === "INSUFFICIENT_DATA") {
+    return "\uC218\uC9D1 \uC911"
+  }
+  return {
+    NORMAL: "\uC815\uC0C1",
+    DEGRADED: "\uC800\uD558",
+    CRITICAL: "\uC704\uD5D8",
+    OFFLINE: "\uC624\uD504\uB77C\uC778",
+  }[healthStatus] || healthStatus || "-"
+}
+
+function cameraStatusTone(healthStatus, baselineStatus) {
+  if (baselineStatus === "LEARNING" || healthStatus === "BASELINE_LEARNING" || healthStatus === "INSUFFICIENT_DATA") return "wn"
+  if (healthStatus === "NORMAL") return "ok"
+  if (healthStatus === "DEGRADED") return "wn"
+  if (healthStatus === "CRITICAL" || healthStatus === "OFFLINE") return "no"
+  return "gy"
+}
+
+function toOpsCamera(row) {
+  const healthStatus = row.healthStatus
+  const baselineStatus = row.baselineStatus
+  const healthScore = numberOrNull(row.healthScore)
+  const cameraId = row.cameraId ?? row.id
+  return {
+    cameraId,
+    zoneId: row.zoneId,
+    name: row.cameraName || `CAM-${cameraId}`,
+    loc: row.zoneId ? `Zone ${row.zoneId}` : "-",
+    st: cameraStatusLabel(healthStatus, baselineStatus),
+    stTone: cameraStatusTone(healthStatus, baselineStatus),
+    lat: "-",
+    ts: formatClock(row.latestSampledAt),
+    id: cameraId ? `CAM-${cameraId}` : "-",
+    healthScore,
+    healthStatus,
+    baselineStatus,
+    predictedRisk: Number(row.predictedRiskCount || 0),
+    activeAnomalyCount: Number(row.activeAnomalyCount || 0),
+    baselineSamples: 0,
+    baselineRequired: 4,
+    dataSource: row.dataSource,
+  }
+}
+
+function policyDefaults(policy) {
+  const unitByType = {
+    FPS_DEGRADATION: "fps",
+    LATENCY_DEGRADATION: "ms",
+    FRAME_DROP_DEGRADATION: "%",
+    BLUR_DEGRADATION: "",
+    OCR_QUALITY_DEGRADATION: "",
+    RESOURCE_SATURATION: "%",
+    NETWORK_INSTABILITY: "ms",
+  }
+  const maxByUnit = { "%": 100, ms: 10000, fps: 1000 }
+  const unit = unitByType[policy.anomalyType] ?? ""
+  const config = policy.config || {}
+  return {
+    ...policy,
+    warningThreshold: numberOrNull(policy.warningThreshold) ?? 0,
+    criticalThreshold: numberOrNull(policy.criticalThreshold) ?? 0,
+    warningConsecutiveWindows: Number(policy.warningConsecutiveWindows || 1),
+    criticalConsecutiveWindows: Number(policy.criticalConsecutiveWindows || 1),
+    minimumSampleCount: Number(policy.minimumSampleCount || config.minimumSampleCount || 0),
+    predictionHorizonMinutes: Number(policy.predictionHorizonMinutes || config.predictionHorizonMinutes || 0),
+    zScoreWindowMinutes: Number(config.zScoreWindowMinutes || 30),
+    ewmaAlpha: Number(config.ewmaAlpha || 0.3),
+    minimumTrendConfidence: Number(config.minimumTrendConfidence || 0.6),
+    unit,
+    step: unit === "ms" ? 50 : unit === "fps" ? 0.5 : 0.05,
+    min: 0,
+    max: maxByUnit[unit] || 1000,
+  }
+}
+
+async function loadPredictiveDashboard() {
+  predictiveLoadState.value = "loading"
+  predictiveLoadError.value = ""
+  try {
+    const [summary, cameraPage, policyPage] = await Promise.all([
+      getSummary({ dataSource: pmDataSource.value }),
+      listCameras({ dataSource: pmDataSource.value, page: 0, size: 100, sort: camSort.value }),
+      listPolicies(),
+    ])
+
+    pmSummary.value = summary || null
+    cams.value = Array.isArray(cameraPage?.content)
+      ? cameraPage.content.map(toOpsCamera)
+      : []
+    if (Array.isArray(policyPage?.content)) {
+      pmPolicies.value = policyPage.content.map(policyDefaults)
+    } else if (Array.isArray(policyPage)) {
+      pmPolicies.value = policyPage.map(policyDefaults)
+    }
+    predictiveLoadState.value = "ok"
+  } catch (err) {
+    predictiveLoadState.value = "error"
+    predictiveLoadError.value = err?.normalized?.message || err?.message || "\uC608\uC9C0\uBCF4\uC804 \uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4."
+    console.warn("[predictive dashboard load failed]", predictiveLoadError.value)
+  }
+}
+
+watch(pmDataSource, () => {
+  loadPredictiveDashboard()
+})
+
+onMounted(() => {
+  loadPredictiveDashboard()
+})
+
 const pmSloOk = computed(() => pmHealthAvg.value >= 75)
 function pmScoreTone(score) {
   if (score == null) return "gy"

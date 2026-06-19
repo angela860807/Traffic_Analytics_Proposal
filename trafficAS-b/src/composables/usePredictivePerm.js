@@ -19,6 +19,12 @@ const ROLE = Object.freeze({
   ADMIN: 'ADMIN',
 })
 
+function normalizeRole(rawRole) {
+  if (!rawRole) return ROLE.USER
+  const firstRole = Array.isArray(rawRole) ? rawRole[0] : String(rawRole).split(',')[0]
+  return firstRole.replace(/^ROLE_/, '') || ROLE.USER
+}
+
 // MAINTAINER 허용 상태 전이 (요구사항 정의서 7-2)
 const MAINTAINER_ALLOWED_TRANSITIONS = Object.freeze({
   ASSIGNED:    ['IN_PROGRESS'],
@@ -37,7 +43,7 @@ export function usePredictivePerm() {
 
   const role = computed(() => {
     const u = currentUser.value || {}
-    return u.predictiveRole || u.role || (Array.isArray(u.roles) ? u.roles[0] : null) || ROLE.USER
+    return normalizeRole(u.predictiveRole || u.role || (Array.isArray(u.roles) ? u.roles[0] : null))
   })
 
   const isOperator = computed(() => role.value === ROLE.OPERATOR)
@@ -99,8 +105,8 @@ export function usePredictivePerm() {
 // 라우터 가드용 — 역할 기반 진입 차단
 export function hasPredictiveAccess(user) {
   if (!user) return false
-  const role = user.predictiveRole
+  const role = normalizeRole(user.predictiveRole
     || user.role
-    || (Array.isArray(user.roles) ? user.roles[0] : null)
+    || (Array.isArray(user.roles) ? user.roles[0] : null))
   return role === ROLE.OPERATOR || role === ROLE.MAINTAINER || role === ROLE.ADMIN
 }

@@ -792,3 +792,232 @@ OPEN -> ASSIGNED -> IN_PROGRESS -> RESOLVED -> CLOSED
 다음 컨텍스트 인계 파일:
 
 - `docs/phase2-predictive-maintenance/next_context_todo_2026-06-18.md`
+
+### 2026-06-19 `/api/v1/predictive/summary` 500 - PostgreSQL nullable parameter
+
+증상:
+
+- `GET /api/v1/predictive/summary?dataSource=REAL` 호출 시 500
+- Spring 로그에 `BadSqlGrammarException`, PostgreSQL `could not determine data type of parameter $4`
+- 테이블은 `camera_health_samples`, `anomaly_events`, `model_prediction_logs`, `maintenance_tickets` 모두 존재
+
+원인:
+
+- summary가 내부에서 카메라 상태 목록을 `zoneId=null`로 조회함
+- `PredictiveDashboardQueryService.getCameraStatuses`의 SQL이 `(:zoneId IS NULL OR c.zone_id = :zoneId)` 형태라 PostgreSQL이 null 바인딩 파라미터 타입을 추론하지 못함
+
+조치:
+
+- SQL의 null 검사를 `zoneId` 파라미터에 직접 걸지 않고 `zoneFilterDisabled` Boolean 파라미터로 분리
+- 변경 파일: `backend/traffic/src/main/java/com/example/traffic/service/PredictiveDashboardQueryService.java`
+
+추가 500:
+
+- 위 수정 후 `calculateHealthScore`에서 `NullPointerException` 발생
+- `fps`, `latency`, `ocr` 등 일부 지표가 `null`일 수 있는데 `List.of(...)`가 null 원소를 허용하지 않음
+- `Stream.of(...)`로 바꿔 null 지표를 필터링한 뒤 유효 지표가 4개 미만이면 기존 계약대로 `healthScore=null`, `healthStatus=INSUFFICIENT_DATA`가 되게 수정
+- summary에서 `INSUFFICIENT_DATA` 카메라가 어떤 집계에도 포함되지 않던 문제를 `baselineLearningCameras`에 포함하도록 수정
+- 현재 summary 계약에는 `insufficientDataCameras` 별도 필드가 없으므로, 학습/데이터 부족 상태는 운영상 `baselineLearningCameras`로 묶어 표현
+
+확인:
+
+```powershell
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/summary?dataSource=REAL" `
+  -Headers $headers
+```
+
+### 2026-06-19 시연/테스트 기준 정리
+
+이전 프로젝트:
+
+- CCTV 영상에서 차량 bbox 탐지
+- 차량 이동 거리/시간으로 속도 계산
+- 제한속도 초과 여부를 과속 이벤트로 탐지
+
+이번 프로젝트:
+
+- 차량 개별 탐지가 아니라 운영 중인 CCTV/AI 파이프라인의 상태를 감시
+- FPS, 프레임 드롭, 지연시간, blur, OCR 실패율, CPU/메모리, 네트워크 RTT 등 운영 지표를 수집
+- 지표 부족/저하/위험 상태를 카메라 단위 health status로 보여줌
+- 이상 이벤트와 정비 티켓을 생성/조회/상태 변경하는 운영 흐름을 시연
+
+시연 흐름:
+
+1. `/admin/ops` 진입
+2. summary 카드에서 전체 카메라, 데이터 부족/학습 중, 열린 이상, 예측 위험, 지연 티켓 확인
+3. 카메라 목록에서 `NORMAL`, `DEGRADED`, `CRITICAL`, `INSUFFICIENT_DATA` 상태 확인
+4. 특정 카메라의 health history/traffic context 추이 확인
+5. anomaly event 목록에서 OPEN/ACKNOWLEDGED/RESOLVED/DISMISSED 상태 흐름 확인
+6. maintenance ticket 목록에서 OPEN/ASSIGNED/IN_PROGRESS/RESOLVED/CLOSED 상태 흐름 확인
+7. policy 목록에서 threshold, window, enabled 상태 확인
+
+프론트 확인 이슈:
+
+- `/admin/ops` 설정 탭에서 ADMIN이어도 정책 임계값 입력이 비활성화될 수 있음
+- 원인: `OpsView.vue` 템플릿이 `canEditPolicy`를 사용하지만 script에서 `usePredictivePerm()` 반환값을 꺼내오지 않음
+- 조치: `canEditPolicy` destructuring 추가, `usePredictivePerm` role 판정을 `ROLE_ADMIN`/`ADMIN` 모두 인식하도록 정규화
+
+터미널 API 확인 순서:
+
+```powershell
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/summary?dataSource=REAL" `
+  -Headers $headers
+
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/cameras?dataSource=REAL&page=0&size=20&sort=cameraName,asc" `
+  -Headers $headers
+
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/anomaly-events?dataSource=REAL&page=0&size=20&sort=firstDetectedAt,desc" `
+  -Headers $headers
+
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/maintenance-tickets?page=0&size=20&sort=createdAt,desc" `
+  -Headers $headers
+
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/policies" `
+  -Headers $headers
+```
+
+### 2026-06-19 프론트 1차 병합/확인 추가 기록
+
+프론트 1차 병합 보정:
+
+- `trafficAS-b/src/router/index.js`
+  - `/admin/ops`는 `OPERATOR`, `MAINTAINER`, `ADMIN` 접근 허용
+  - 다른 `/admin/**` 경로는 기존처럼 `ADMIN` 중심 보호 유지
+- `trafficAS-b/src/composables/useAuth.js`
+  - JWT `auth` claim을 comma-separated roles로 파싱
+  - `ROLE_` 접두어를 제거해 `ROLE_ADMIN`과 `ADMIN`을 같은 role로 취급
+- `trafficAS-b/src/composables/usePredictivePerm.js`
+  - predictive role 판정 정규화
+  - policy 수정은 `ADMIN`만 가능
+- `trafficAS-b/src/views/admin/OpsView.vue`
+  - `canEditPolicy`를 실제 템플릿 권한에 연결
+- `trafficAS-b/src/components/dashboard/DataState.vue`
+  - loading/error/empty/ok 공통 상태 컴포넌트 추가
+
+사용자 확인 결과:
+
+- `GET /api/v1/predictive/summary?dataSource=REAL` 정상 응답
+- `totalCameras=1`, `baselineLearningCameras=1`
+- `/admin/ops` 설정 탭에서 정책 임계값 수정 가능 확인
+
+남은 프론트 주의점:
+
+- `/admin/ops` 화면은 아직 anomaly/ticket 영역에 데모 데이터와 실제 API 호출이 섞여 있음
+- anomaly-events/maintenance-tickets 화면 데이터를 `predictiveApi.js` 실제 호출 결과로 교체해야 함
+- anomaly/ticket 처리 버튼은 실제 mutation API 연결과 성공 후 재조회가 필요함
+
+2026-06-19 추가 진행:
+
+- `/admin/ops` summary KPI를 `GET /api/v1/predictive/summary` 결과 우선으로 표시
+- `/admin/ops` cameras 목록을 `GET /api/v1/predictive/cameras` 결과 기반으로 표시
+- `/admin/ops` policies 목록과 정책 저장 후 재조회를 실제 API 결과 기반으로 표시
+- 기존 화면 모델을 유지하기 위해 API 응답을 `OpsView` 내부 UI 모델로 변환
+
+### 2026-06-19 터미널 확인 결과 한글 표시
+
+API 계약 필드는 프론트/백엔드 계약이므로 영어 camelCase를 유지한다.
+대신 PowerShell 확인 단계에서 `Select-Object` 계산 속성으로 한글 컬럼명을 붙여 사람이 읽기 좋게 표시한다.
+
+summary:
+
+```powershell
+$summary = Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/summary?dataSource=REAL" `
+  -Headers $headers
+
+$summary | Select-Object `
+  @{Name='전체 카메라';Expression={$_.totalCameras}},
+  @{Name='정상';Expression={$_.normalCameras}},
+  @{Name='저하';Expression={$_.degradedCameras}},
+  @{Name='위험';Expression={$_.criticalCameras}},
+  @{Name='오프라인';Expression={$_.offlineCameras}},
+  @{Name='학습/데이터부족';Expression={$_.baselineLearningCameras}},
+  @{Name='열린 이상';Expression={$_.openAnomalies}},
+  @{Name='예측 위험';Expression={$_.predictedRisks}},
+  @{Name='지연 티켓';Expression={$_.overdueTickets}},
+  @{Name='생성 시각';Expression={$_.generatedAt}}
+```
+
+cameras:
+
+```powershell
+$cameraPage = Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/cameras?dataSource=REAL&page=0&size=20&sort=cameraName,asc" `
+  -Headers $headers
+
+$cameraPage.content | Select-Object `
+  @{Name='카메라ID';Expression={$_.cameraId}},
+  @{Name='카메라명';Expression={$_.cameraName}},
+  @{Name='구역ID';Expression={$_.zoneId}},
+  @{Name='상태';Expression={$_.healthStatus}},
+  @{Name='기준선';Expression={$_.baselineStatus}},
+  @{Name='Health';Expression={$_.healthScore}},
+  @{Name='활성 이상';Expression={$_.activeAnomalyCount}},
+  @{Name='예측 위험';Expression={$_.predictedRiskCount}},
+  @{Name='최근 샘플';Expression={$_.latestSampledAt}}
+```
+
+anomaly events:
+
+```powershell
+$eventPage = Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/anomaly-events?dataSource=REAL&page=0&size=20&sort=firstDetectedAt,desc" `
+  -Headers $headers
+
+$eventPage.content | Select-Object `
+  @{Name='이벤트ID';Expression={$_.id}},
+  @{Name='카메라ID';Expression={$_.cameraId}},
+  @{Name='카메라명';Expression={$_.cameraName}},
+  @{Name='이상유형';Expression={$_.anomalyType}},
+  @{Name='심각도';Expression={$_.severity}},
+  @{Name='상태';Expression={$_.status}},
+  @{Name='탐지방식';Expression={$_.detectionMethod}},
+  @{Name='점수';Expression={$_.anomalyScore}},
+  @{Name='최초탐지';Expression={$_.firstDetectedAt}},
+  @{Name='최근탐지';Expression={$_.lastDetectedAt}}
+```
+
+maintenance tickets:
+
+```powershell
+$ticketPage = Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/maintenance-tickets?page=0&size=20&sort=createdAt,desc" `
+  -Headers $headers
+
+$ticketPage.content | Select-Object `
+  @{Name='티켓ID';Expression={$_.id}},
+  @{Name='티켓번호';Expression={$_.ticketNumber}},
+  @{Name='이벤트ID';Expression={$_.anomalyEventId}},
+  @{Name='카메라ID';Expression={$_.cameraId}},
+  @{Name='우선순위';Expression={$_.priority}},
+  @{Name='상태';Expression={$_.status}},
+  @{Name='담당자';Expression={$_.assignee.name}},
+  @{Name='확인지연';Expression={$_.ackOverdue}},
+  @{Name='착수지연';Expression={$_.startOverdue}},
+  @{Name='생성시각';Expression={$_.createdAt}}
+```
+
+policies:
+
+```powershell
+$policies = Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/policies" `
+  -Headers $headers
+
+$policies | Select-Object `
+  @{Name='정책코드';Expression={$_.policyCode}},
+  @{Name='이상유형';Expression={$_.anomalyType}},
+  @{Name='탐지방식';Expression={$_.detectionMethod}},
+  @{Name='경고임계';Expression={$_.warningThreshold}},
+  @{Name='위험임계';Expression={$_.criticalThreshold}},
+  @{Name='경고윈도';Expression={$_.warningConsecutiveWindows}},
+  @{Name='위험윈도';Expression={$_.criticalConsecutiveWindows}},
+  @{Name='활성';Expression={$_.enabled}},
+  @{Name='수정시각';Expression={$_.updatedAt}}
+```

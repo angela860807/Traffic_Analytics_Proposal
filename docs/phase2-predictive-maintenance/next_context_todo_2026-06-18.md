@@ -1,5 +1,84 @@
 # Next Context TODO - Predictive Maintenance Merge
 
+## 2026-06-19 현행화 요약
+
+현재 확인된 완료 범위:
+
+- Spring 운영 API 10개 구현 완료
+  - `GET /api/v1/predictive/anomaly-events`
+  - `GET /api/v1/predictive/anomaly-events/{eventId}`
+  - `POST /api/v1/predictive/anomaly-events/{eventId}/acknowledge`
+  - `POST /api/v1/predictive/anomaly-events/{eventId}/resolve`
+  - `POST /api/v1/predictive/anomaly-events/{eventId}/dismiss`
+  - `GET /api/v1/predictive/maintenance-tickets`
+  - `POST /api/v1/predictive/maintenance-tickets`
+  - `POST /api/v1/predictive/maintenance-tickets/{ticketId}/assign`
+  - `POST /api/v1/predictive/maintenance-tickets/{ticketId}/status`
+  - `PATCH /api/v1/predictive/policies/{policyCode}`
+- `GET /api/v1/predictive/summary?dataSource=REAL` 500 수정 완료
+  - PostgreSQL nullable `zoneId` 타입 추론 문제 해결
+  - `calculateHealthScore` null metric NPE 해결
+  - `INSUFFICIENT_DATA` 카메라를 `baselineLearningCameras` 집계에 포함
+- 사용자 확인 결과:
+  - summary 응답 정상
+  - `totalCameras=1`, `baselineLearningCameras=1`
+  - 프론트 `/admin/ops` 설정 탭에서 ADMIN 정책 임계값 수정 가능 확인
+- 프론트 1차 병합 보정 완료
+  - `/admin/ops` 라우터 권한: `OPERATOR`, `MAINTAINER`, `ADMIN` 진입 허용
+  - JWT role 파싱: `ROLE_ADMIN` 같은 접두어 role 정규화
+  - 정책 수정 권한: `canEditPolicy` 연결
+  - 공통 `DataState.vue` 추가
+- `/admin/ops` 실제 API 1차 바인딩 완료
+  - summary KPI는 `GET /api/v1/predictive/summary` 우선 사용
+  - cameras 목록은 `GET /api/v1/predictive/cameras` 결과를 기존 화면 모델로 변환
+  - policies 목록/수정 후 재조회는 `GET /api/v1/predictive/policies` 결과를 UI 기본값과 병합
+- 터미널 테스트 한글 표시 방식 정리 완료
+  - API 필드는 계약 유지상 영어 camelCase 유지
+  - PowerShell `Select-Object @{Name='한글명';Expression={...}}` 방식으로 표시만 한글화
+
+현행 기준 남은 작업:
+
+1. `/admin/ops` anomaly/ticket 실제 API 데이터 바인딩
+   - anomaly-events, maintenance-tickets를 `predictiveApi.js` 호출 결과로 교체
+   - loading/empty/error 상태는 `DataState.vue`로 통일
+   - pagination/sort/filter는 route query와 동기화
+
+2. anomaly/ticket mutation 프론트 연결
+   - acknowledge/resolve/dismiss 버튼을 실제 API에 연결
+   - maintenance ticket 생성/배정/상태 변경을 실제 API에 연결
+   - 성공 후 목록/detail 재조회
+   - 409/403/400 에러 메시지 표시
+
+3. 실제 시연 데이터 준비
+   - REAL 데이터는 현재 카메라 1대가 데이터 부족/기준선 학습 상태로만 확인됨
+   - 이상 이벤트, evidence, prediction log, maintenance ticket이 생기는 샘플 ingest 경로 확인 필요
+   - FastAPI -> Spring evaluation -> anomaly event/ticket 생성까지 Docker compose E2E 확인 필요
+
+4. Event/Ticket lifecycle 고도화
+   - 정상 3회 연속 감지 후 `RECOVERED` 자동 전환
+   - `RECOVERED` 후 재발 시 recurrence 증가 및 `OPEN` 복귀
+   - WARNING 지속/반복 기반 P2 티켓 자동 생성
+   - MTTA/MTTR 계산을 summary에 반영
+
+5. Baseline/TrafficContext 고도화
+   - 계약서의 요일/30분 시간대 bucket 기준 baseline 정교화
+   - `camera_links` 기반 인접 카메라 교차검증 데이터 채우기
+   - `Direction.BOTH` 집계 정책 확정
+   - 빈 window에 `INSUFFICIENT` row를 만들지 여부 결정
+
+6. 테스트 보강
+   - Spring operations API service/controller 테스트
+   - Rule/degradation orchestration 테스트
+   - SHADOW 후보가 event/ticket을 만들지 않는 테스트
+   - TrafficContext aggregation 통합 테스트
+   - Frontend predictive API/client/route guard/OpsView mutation 테스트
+
+7. Demo profile 정리
+   - `application-demo.yml`
+   - `ddl-auto=validate`
+   - seed 재실행 없이 migration 기반 기동
+   - demo 시연 전 DB volume 초기화/유지 정책 결정
+
 작성일: 2026-06-18
 
 ## 1. 현재 병합 상태

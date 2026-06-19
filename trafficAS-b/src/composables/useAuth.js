@@ -30,6 +30,12 @@ function parseJwtPayload(token) {
   }
 }
 
+function normalizeRole(rawRole) {
+  if (!rawRole) return 'USER'
+  const firstRole = Array.isArray(rawRole) ? rawRole[0] : String(rawRole).split(',')[0]
+  return firstRole.replace(/^ROLE_/, '') || 'USER'
+}
+
 async function readApiBody(res) {
   const text = await res.text()
   if (!text) return {}
@@ -118,8 +124,9 @@ export function useAuth() {
 
     const token = body.data?.accessToken
     const payload = parseJwtPayload(token)
-    const role = payload.auth === 'ROLE_ADMIN' ? 'ADMIN' : 'USER'
-    const user = { email: payload.sub || email, role }
+    const roles = payload.auth ? String(payload.auth).split(',').map(normalizeRole) : []
+    const role = roles[0] || 'USER'
+    const user = { email: payload.sub || email, role, roles }
 
     localStorage.setItem('tas_access_token', token)
     localStorage.setItem('tas_refresh_token', body.data?.refreshToken || '')
