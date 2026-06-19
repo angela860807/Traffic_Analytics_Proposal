@@ -1,0 +1,41 @@
+﻿{
+  "cameraId": 1,
+  "evaluatedAt": "2026-06-18T12:30:00+09:00",
+  "recentHealthSamples": [
+    { "sampledAt": "2026-06-18T12:16:00+09:00", "fpsAvg": 20.0, "qualityStatus": "COMPLETE", "isImputed": false, "isLateSample": false },
+    { "sampledAt": "2026-06-18T12:17:00+09:00", "fpsAvg": 19.0, "qualityStatus": "COMPLETE", "isImputed": false, "isLateSample": false },
+    { "sampledAt": "2026-06-18T12:18:00+09:00", "fpsAvg": 18.0, "qualityStatus": "COMPLETE", "isImputed": false, "isLateSample": false },
+    { "sampledAt": "2026-06-18T12:19:00+09:00", "fpsAvg": 17.0, "qualityStatus": "COMPLETE", "isImputed": false, "isLateSample": false },
+    { "sampledAt": "2026-06-18T12:20:00+09:00", "fpsAvg": 16.0, "qualityStatus": "COMPLETE", "isImputed": false, "isLateSample": false },
+    { "sampledAt": "2026-06-18T12:21:00+09:00", "fpsAvg": 15.0, "qualityStatus": "COMPLETE", "isImputed": false, "isLateSample": false },
+    { "sampledAt": "2026-06-18T12:22:00+09:00", "fpsAvg": 14.0, "qualityStatus": "COMPLETE", "isImputed": false, "isLateSample": false },
+    { "sampledAt": "2026-06-18T12:23:00+09:00", "fpsAvg": 13.0, "qualityStatus": "COMPLETE", "isImputed": false, "isLateSample": false },
+    { "sampledAt": "2026-06-18T12:24:00+09:00", "fpsAvg": 12.0, "qualityStatus": "COMPLETE", "isImputed": false, "isLateSample": false },
+    { "sampledAt": "2026-06-18T12:25:00+09:00", "fpsAvg": 11.0, "qualityStatus": "COMPLETE", "isImputed": false, "isLateSample": false },
+    { "sampledAt": "2026-06-18T12:26:00+09:00", "fpsAvg": 10.0, "qualityStatus": "COMPLETE", "isImputed": false, "isLateSample": false },
+    { "sampledAt": "2026-06-18T12:27:00+09:00", "fpsAvg": 9.0, "qualityStatus": "COMPLETE", "isImputed": false, "isLateSample": false },
+    { "sampledAt": "2026-06-18T12:28:00+09:00", "fpsAvg": 8.0, "qualityStatus": "COMPLETE", "isImputed": false, "isLateSample": false },
+    { "sampledAt": "2026-06-18T12:29:00+09:00", "fpsAvg": 7.0, "qualityStatus": "COMPLETE", "isImputed": false, "isLateSample": false },
+    { "sampledAt": "2026-06-18T12:30:00+09:00", "fpsAvg": 7.5, "frameDropRate": 0.12, "latencyP95Ms": 800, "blurScoreAvg": 0.2, "ocrFailRate": 0.1, "ocrAttemptCount": 40, "cpuUsagePct": 72, "memoryUsagePct": 65, "networkRttMs": 70, "qualityStatus": "COMPLETE", "isImputed": false, "isLateSample": false }
+  ],
+  "baseline": {
+    "source": "SIMULATED",
+    "from": "2026-06-17T12:30:00+09:00",
+    "to": "2026-06-18T12:29:00+09:00",
+    "metrics": {
+      "fpsAvg": {
+        "median": 28.0,
+        "mad": 1.0,
+        "sampleCount": 42
+      }
+    }
+  },
+  "policy": {
+    "policyCode": "CAMERA_TREND_PROJECTION_V1",
+    "windowMinutes": 15,
+    "minimumValidSamples": 12,
+    "ewmaAlpha": 0.3,
+    "minimumTrendConfidence": 0.6,
+    "predictionHorizonMinutes": 10
+  }
+}

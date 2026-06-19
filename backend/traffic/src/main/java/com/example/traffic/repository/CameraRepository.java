@@ -11,4 +11,6 @@ public interface CameraRepository extends JpaRepository<Camera, Long> {
 
     // 특정 구역에 설치된 모든 카메라 조회[cite: 2]
     List<Camera> findByZoneZoneId(Long zoneId);
+
+    List<Camera> findByIsActiveTrueOrderByCameraIdAsc();
 }

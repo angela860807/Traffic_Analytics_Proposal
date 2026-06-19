@@ -25,8 +25,20 @@ EVALUATED_AT = "2026-06-14T12:05:00+09:00"
 class FakeContract(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    camera_id: int
-    evaluated_at: Any
+    sample: Any | None = None
+    consecutive_windows: dict[str, int] = {}
+    baselines: dict[str, Any] = {}
+    trends: dict[str, list[Any]] = {}
+    prediction_horizon_minutes: int | None = None
+    camera_id: int | None = None
+    sampled_at: Any | None = None
+    sequence: list[Any] = []
+
+
+class FakeStruct:
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
 
 def make_rule_request() -> RuleEvaluationRequest:
@@ -46,7 +58,8 @@ def make_rule_request() -> RuleEvaluationRequest:
                     "policyCode": "FPS_DEGRADATION_RULE_V1",
                     "warningThreshold": 10,
                     "criticalThreshold": 5,
-                    "consecutiveWindows": 3,
+                    "warningConsecutiveWindows": 3,
+                    "criticalConsecutiveWindows": 3,
                 }
             ],
         }
@@ -95,6 +108,9 @@ def build_fake_module(*, baseline_status: str = "READY") -> ModuleType:
     module.RuleDetectionInput = FakeContract
     module.DegradationDetectionInput = FakeContract
     module.ModelPredictionInput = FakeContract
+    module.CameraSample = FakeStruct
+    module.BaselineMetric = FakeStruct
+    module.TrendPoint = FakeStruct
     module.received = []
 
     def detect_rules(request):
@@ -105,7 +121,7 @@ def build_fake_module(*, baseline_status: str = "READY") -> ModuleType:
                 "version": "1.1.0",
                 "method": "RULE",
             },
-            "evaluatedAt": request.evaluated_at,
+            "evaluatedAt": request.sample.sampled_at,
             "candidates": [],
         }
 
@@ -117,7 +133,7 @@ def build_fake_module(*, baseline_status: str = "READY") -> ModuleType:
                 "version": "1.0.0",
                 "method": "TREND_PROJECTION",
             },
-            "evaluatedAt": request.evaluated_at,
+            "evaluatedAt": request.sample.sampled_at,
             "baselineStatus": baseline_status,
             "candidates": [],
         }

@@ -1,0 +1,11 @@
+{
+  "precision": 0.7228,
+  "recall": 0.8509,
+  "f1": 0.7816,
+  "roc_auc": 0.9746,
+  "false_alarm_count": 61,
+  "normal_seq_count": 60451,
+  "fault_seq_count": 12931,
+  "warning_threshold": 0.410734,
+  "critical_threshold": 0.462065
+}

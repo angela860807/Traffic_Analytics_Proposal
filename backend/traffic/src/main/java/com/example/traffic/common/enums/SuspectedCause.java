@@ -1,0 +1,13 @@
+package com.example.traffic.common.enums;
+
+public enum SuspectedCause {
+    CAMERA_POWER_OR_NETWORK,
+    CAMERA_LENS_OR_FOCUS,
+    LOW_ILLUMINATION,
+    AI_PROCESSING_OVERLOAD,
+    OCR_PIPELINE_DEGRADATION,
+    NETWORK_CONGESTION,
+    EXTERNAL_TRAFFIC_CHANGE,
+    INSUFFICIENT_DATA,
+    UNKNOWN
+}

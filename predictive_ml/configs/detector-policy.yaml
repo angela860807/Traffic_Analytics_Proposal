@@ -1,0 +1,76 @@
+detectors:
+  camera-rule:
+    version: "1.1.0"
+    operatingMode: ACTIVE
+    policies:
+      CAMERA_OFFLINE:
+        metric: last_frame_age_seconds
+        warning: 60
+        critical: 180
+        direction: HIGHER_IS_WORSE
+        consecutiveWindows: 1
+      FPS_DEGRADATION:
+        metric: fps_avg
+        warning: 10
+        critical: 5
+        direction: LOWER_IS_WORSE
+        consecutiveWindows: 3
+      FRAME_DROP_DEGRADATION:
+        metric: frame_drop_rate
+        warning: 0.30
+        critical: 0.60
+        direction: HIGHER_IS_WORSE
+        consecutiveWindows: 3
+      LATENCY_DEGRADATION:
+        metric: latency_p95_ms
+        warning: 2000
+        critical: 5000
+        direction: HIGHER_IS_WORSE
+        consecutiveWindows: 3
+      BLUR_DEGRADATION:
+        metric: blur_score_avg
+        warning: 0.75
+        critical: 0.90
+        direction: HIGHER_IS_WORSE
+        consecutiveWindows: 3
+      OCR_QUALITY_DEGRADATION:
+        metric: ocr_fail_rate
+        warning: 0.70
+        critical: 0.90
+        direction: HIGHER_IS_WORSE
+        consecutiveWindows: 3
+        minimumOcrAttempts: 20
+      RESOURCE_SATURATION:
+        metrics: [cpu_usage_pct, memory_usage_pct]
+        warning: 85
+        critical: 95
+        direction: HIGHER_IS_WORSE
+        consecutiveWindows: 3
+      NETWORK_INSTABILITY:
+        metric: network_rtt_ms
+        warning: 500
+        critical: 1000
+        direction: HIGHER_IS_WORSE
+        consecutiveWindows: 3
+
+  camera-robust-zscore:
+    version: "1.0.0"
+    operatingMode: ACTIVE
+    warningZ: 3.5
+    criticalZ: 5.0
+    minimumSampleCount: 30
+    madScale: 1.4826
+
+  camera-trend-projection:
+    version: "1.0.0"
+    operatingMode: ACTIVE
+    windowMinutes: 15
+    minimumValidPoints: 12
+    ewmaAlpha: 0.3
+    predictionHorizonMinutes: 10
+    minimumConfidence: 0.60
+
+  camera-lstm-autoencoder:
+    version: "1.0.0"
+    operatingMode: SHADOW
+    artifactVersion: v6_timepattern_precursor_thr999

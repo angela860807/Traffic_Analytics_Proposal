@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import AwareDatetime, Field
 
@@ -30,9 +30,24 @@ TargetType = Literal["CAMERA"]
 
 class RulePolicy(CameraHealthSchema):
     policy_code: str = Field(alias="policyCode", min_length=1, max_length=100)
-    warning_threshold: float = Field(alias="warningThreshold")
-    critical_threshold: float = Field(alias="criticalThreshold")
-    consecutive_windows: int = Field(alias="consecutiveWindows", gt=0)
+    warning_threshold: float | None = Field(
+        default=None,
+        alias="warningThreshold",
+    )
+    critical_threshold: float | None = Field(
+        default=None,
+        alias="criticalThreshold",
+    )
+    warning_consecutive_windows: int | None = Field(
+        default=None,
+        alias="warningConsecutiveWindows",
+        gt=0,
+    )
+    critical_consecutive_windows: int | None = Field(
+        default=None,
+        alias="criticalConsecutiveWindows",
+        gt=0,
+    )
 
 
 class RuleEvaluationRequest(CameraHealthSchema):
@@ -124,7 +139,7 @@ class MetricEvidence(CameraHealthSchema):
     metric_score: float | None = Field(default=None, alias="metricScore")
     unit: str | None = Field(default=None, max_length=30)
     sampled_at: AwareDatetime = Field(alias="sampledAt")
-    context: dict[str, bool | int | float | str | None] = Field(
+    context: dict[str, Any] = Field(
         default_factory=dict
     )
 

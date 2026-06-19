@@ -7,6 +7,8 @@ import org.springframework.http.HttpStatus;
 @Getter
 public enum UserRole {
     USER("일반사용자"),
+    OPERATOR("운영자"),
+    MAINTAINER("정비담당자"),
     ADMIN("관리자");
 
     private final String description;

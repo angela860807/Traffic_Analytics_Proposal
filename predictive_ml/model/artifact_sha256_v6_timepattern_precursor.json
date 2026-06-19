@@ -1,0 +1,10 @@
+{
+  "artifact_version": "v6_timepattern_precursor_thr999",
+  "sha256": {
+    "lstm_ae_v6_timepattern_precursor_thr999.pt": "DD509981B5C7207E147CFE56A7BEF1F649C316A7CA2DAA2A79E585789980675D",
+    "scaler_v6_timepattern_precursor.pkl": "AA4FBF4783720DDD690C75BE0B8E0779247EF0AD812F4AD7AB19A3EC20885D7C",
+    "threshold_v6_timepattern_precursor_thr999.json": "A47111532F7AD92845866A130E9E10857E600E5D362B92C02B47009E2C0D2822",
+    "feature_schema_v6_timepattern_precursor.json": "ED22003678DAA2B6F29C83CABA574138B0A74F31A90164C0833BFB3618C5220C",
+    "training_manifest_v6_timepattern_precursor.json": "9C252B56BF2F6152BBC2D8FEB5837425275565F45A85B16C222488BD4D2D2109"
+  }
+}

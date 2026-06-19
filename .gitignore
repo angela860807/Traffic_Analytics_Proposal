@@ -1,4 +1,4 @@
-# Dependencies
+﻿# Dependencies
 **/node_modules/
 
 # Build outputs
@@ -110,3 +110,5 @@ FastAPIdocuments/
 
 # Claude Code local settings
 **/.claude/
+
+

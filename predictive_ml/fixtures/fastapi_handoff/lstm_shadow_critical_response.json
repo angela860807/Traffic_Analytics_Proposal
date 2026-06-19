@@ -1,0 +1,44 @@
+﻿{
+  "detector": {
+    "name": "camera-lstm-autoencoder",
+    "version": "1.0.0",
+    "method": "LSTM_AUTOENCODER"
+  },
+  "evaluatedAt": "2026-06-18T10:29:00+09:00",
+  "baselineStatus": "READY",
+  "status": "CRITICAL",
+  "candidates": [],
+  "shadowCandidates": [
+    {
+      "targetType": "CAMERA",
+      "cameraId": 1,
+      "detectionMethod": "LSTM_AUTOENCODER",
+      "operatingMode": "SHADOW",
+      "detectorName": "camera-lstm-autoencoder",
+      "detectorVersion": "1.0.0",
+      "anomalyScore": 1.0,
+      "warningThreshold": 0.410734,
+      "criticalThreshold": 0.462065,
+      "predictedAnomaly": true,
+      "predictedSeverity": "CRITICAL",
+      "inputWindowFrom": "2026-06-18T10:00:00+09:00",
+      "inputWindowTo": "2026-06-18T10:29:00+09:00",
+      "featureSchemaVersion": "camera-health-sequence-v1",
+      "topFeatures": [
+        {
+          "featureName": "frameDropRate",
+          "featureValue": 0.676164
+        },
+        {
+          "featureName": "latencyP95Ms",
+          "featureValue": 0.23343
+        },
+        {
+          "featureName": "fpsAvg",
+          "featureValue": 0.051553
+        }
+      ],
+      "skippedReason": null
+    }
+  ]
+}

@@ -48,6 +48,17 @@ public class SecurityConfig {
                         // FastAPI internal ingestion endpoint. Controller checks X-Internal-Api-Key.
                         .requestMatchers(HttpMethod.POST, "/api/v1/detection-logs").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/speed-violations").permitAll()
+                        .requestMatchers("/internal/v1/**").permitAll()
+
+                        // Predictive maintenance permissions
+                        .requestMatchers(HttpMethod.POST, "/api/v1/predictive/anomaly-events/*/acknowledge").hasAnyRole("OPERATOR", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/predictive/anomaly-events/*/resolve").hasAnyRole("OPERATOR", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/predictive/anomaly-events/*/dismiss").hasAnyRole("OPERATOR", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/predictive/maintenance-tickets").hasAnyRole("OPERATOR", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/predictive/maintenance-tickets/*/assign").hasAnyRole("OPERATOR", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/predictive/maintenance-tickets/*/status").hasAnyRole("OPERATOR", "MAINTAINER", "ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/predictive/policies/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/predictive/**").hasAnyRole("OPERATOR", "MAINTAINER", "ADMIN")
 
                         // TODO(frontend-integration): Temporary permitAll for Vue first-pass integration.
                         // Remove this GET rule after JWT login is wired from Vue and protect it with authenticated().

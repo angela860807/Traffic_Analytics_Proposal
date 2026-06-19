@@ -1,0 +1,12 @@
+package com.example.traffic.common.enums;
+
+public enum AnomalyType {
+    CAMERA_OFFLINE,
+    FPS_DEGRADATION,
+    FRAME_DROP_DEGRADATION,
+    LATENCY_DEGRADATION,
+    BLUR_DEGRADATION,
+    OCR_QUALITY_DEGRADATION,
+    RESOURCE_SATURATION,
+    NETWORK_INSTABILITY
+}

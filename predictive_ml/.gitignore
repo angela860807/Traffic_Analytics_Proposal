@@ -1,0 +1,40 @@
+﻿# 가상환경
+tas-pm-env/
+
+# 대용량 데이터 파일
+data/normal_samples.csv
+data/fault_samples.csv
+data/all_samples.csv
+data/normal_samples2.csv
+data/fault_samples2.csv
+data/all_samples2.csv
+data/normal_samples3.csv
+data/fault_samples3.csv
+data/all_samples3.csv
+
+# 실험용 모델 파일 (thr95 버전)
+model/lstm_ae_thr95.pt
+model/scaler_thr95.pkl
+model/threshold_thr95.json
+model/metrics_thr95.json
+
+# 실험용 모델 파일 (v3 thr97 버전)
+model/lstm_ae_v3.pt
+model/metrics_v3.json
+model/threshold_v3.json
+
+# Python 캐시
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# OS 파일
+.DS_Store
+Thumbs.db
+
+# 실험용 모델 파일 (v2 ep25 버전)
+model/lstm_ae_v2_ep25.pt
+model/scaler_v2_ep25.pkl
+model/threshold_v2_ep25.json
+model/metrics_v2_ep25.json

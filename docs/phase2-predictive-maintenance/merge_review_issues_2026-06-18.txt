@@ -1,0 +1,304 @@
+TAS 2차 DB / Spring Boot / FastAPI 병합 검수 주요 이슈
+작성일: 2026-06-18
+검수 범위:
+- 계약서: docs/phase2-predictive-maintenance/02_ERD_설계서_revised (1).md
+- 계약서: docs/phase2-predictive-maintenance/03_API_계약서_ver2 (1).md
+- 구현: backend/traffic, fastapi-server, predictive_ml, db
+
+결론
+현재 상태는 병합 보류가 맞다.
+DB migration은 계약에 비교적 가깝게 작성되어 있으나, Spring Boot 예지보전 API와 핵심 업무 흐름이 아직 연결되지 않았고, FastAPI와 Spring Boot, FastAPI와 predictive_ml 사이의 실제 요청/응답 계약도 일부 어긋나 있다.
+따라서 지금 병합하면 실제 시연 테스트 이전 단계에서 내부 API 404, validation 실패, AI adapter 변환 실패가 발생할 가능성이 높다.
+
+
+1. DB 파트
+
+상태
+- 007_predictive_maintenance_schema.sql, 008_predictive_seed_policies.sql은 ERD 계약의 주요 테이블, 제약조건, seed 정책을 대체로 반영하고 있다.
+- PostgreSQL 16, BIGSERIAL, VARCHAR + CHECK enum, JSONB, partial unique index 등 주요 설계 원칙은 반영되어 있다.
+
+주요 이슈
+- 자동 migration runner가 없다.
+  - 계약서도 psql 수동 적용을 전제로 하지만, docker compose만으로는 007/008 migration이 자동 적용되지 않는다.
+  - 시연 환경에서 DB가 빈 상태면 Spring Boot가 ddl-auto=update로 테이블을 만들 수는 있으나, CHECK 제약, partial unique index, seed policy, detector version 계약이 보장되지 않는다.
+
+- 시연/공용 profile 계약이 미충족이다.
+  - 계약: 팀 공용/시연 profile은 ddl-auto=validate, spring.sql.init.mode=never.
+  - 현재 backend/traffic/src/main/resources/application.yml:
+    - spring.sql.init.mode=always
+    - spring.jpa.hibernate.ddl-auto=update
+  - 이 상태는 "migration SQL 기준으로 검증된 schema"가 아니라 Hibernate 자동 변경에 의존하는 형태다.
+
+- DB 적용 절차가 병합 체크리스트로 고정되어야 한다.
+  - 최소 적용 순서:
+    1. 001~006 기존 migration 확인
+    2. 007_predictive_maintenance_schema.sql 적용
+    3. 008_predictive_seed_policies.sql 적용
+    4. demo_seed.sql 적용 여부 결정
+    5. data_quality_checks.sql 실행
+    6. Spring ddl-auto=validate profile로 기동 검증
+
+병합 전 필요 작업
+- demo/shared용 Spring profile 추가 또는 분리.
+- ddl-auto=validate, sql.init.mode=never 적용 profile 준비.
+- docker compose 환경에서 007/008 적용 절차 문서화 또는 init job 추가.
+- Spring JPA entity와 007 schema validation 결과 확인.
+
+
+2. Spring Boot 파트
+
+상태
+- 예지보전용 Entity, DTO, Repository 일부는 존재한다.
+- FastAPI 호출 client, SHADOW 후보 guard/service 일부는 존재한다.
+- SecurityConfig에는 /api/v1/predictive/** 권한 규칙과 /internal/v1/** permit rule이 들어가 있다.
+
+주요 이슈
+- P0: 예지보전 Controller가 없다.
+  - 계약서의 외부 API:
+    - GET /api/v1/predictive/summary
+    - GET /api/v1/predictive/cameras
+    - GET /api/v1/predictive/cameras/{cameraId}/health-history
+    - GET /api/v1/predictive/traffic-context
+    - GET /api/v1/predictive/anomaly-events
+    - GET /api/v1/predictive/anomaly-events/{eventId}
+    - POST /api/v1/predictive/anomaly-events/{eventId}/acknowledge
+    - POST /api/v1/predictive/anomaly-events/{eventId}/resolve
+    - POST /api/v1/predictive/anomaly-events/{eventId}/dismiss
+    - GET /api/v1/predictive/maintenance-tickets
+    - POST /api/v1/predictive/maintenance-tickets
+    - POST /api/v1/predictive/maintenance-tickets/{ticketId}/assign
+    - POST /api/v1/predictive/maintenance-tickets/{ticketId}/status
+    - GET /api/v1/predictive/policies
+    - PATCH /api/v1/predictive/policies/{policyCode}
+  - 현재 controller 패키지에는 위 endpoint를 노출하는 @RequestMapping이 보이지 않는다.
+  - 결과: Frontend가 계약 API를 호출하면 404가 난다.
+
+- P0: FastAPI -> Spring Boot 수집 API가 없다.
+  - 계약: POST /internal/v1/camera-health-samples
+  - FastAPI docker compose와 BackendHealthClient는 이 endpoint로 상태 샘플을 전송한다.
+  - 현재 Spring Boot에는 CameraHealthSampleCreateRequest, CameraHealthSampleSaveResponse DTO만 있고 실제 controller/service endpoint가 보이지 않는다.
+  - 결과: FastAPI 상태 샘플 전송이 404로 실패한다.
+
+- P1: 상태 샘플 upsert가 구현되어 있지 않다.
+  - 계약: PostgreSQL ON CONFLICT 기반 멱등 저장.
+  - 현재 CameraHealthSampleRepository는 JpaRepository 빈 인터페이스다.
+  - JPA save()로 upsert를 흉내 내면 race condition과 unique 충돌 처리가 계약과 다르게 동작할 수 있다.
+
+- P1: 교통 맥락 5분 집계 scheduler가 없다.
+  - 계약: vehicle_flow_events, detection_analysis_results, speed_violations를 traffic_context_samples로 5분 집계.
+  - 현재 TrafficContextSampleRepository는 빈 인터페이스이고 관련 scheduler가 보이지 않는다.
+  - 결과: 교통 맥락 이력 API와 CCTV 이상 교차검증 근거가 만들어지지 않는다.
+
+- P1: FastAPI 탐지 orchestration이 연결되지 않았다.
+  - PredictiveDetectionClient는 있으나, 상태 샘플 저장 후 Rule 평가 호출, 5분 기준선/추세 평가 호출, 결과 후보를 AnomalyEvent로 저장하는 흐름이 보이지 않는다.
+  - SHADOW 후보 저장 서비스는 있으나 실제 호출 흐름과 event/ticket 처리와의 통합이 부족하다.
+
+- P1: 이벤트/티켓 핵심 업무 흐름이 미완성이다.
+  - 계약:
+    - active event 중복 방지
+    - 심각도 상향
+    - 정상 3회 연속 RECOVERED
+    - 30분 내 재발 OPEN 복귀
+    - CRITICAL 또는 지속 WARNING 티켓 자동 생성
+    - 티켓 번호 sequence 발급
+    - history append-only 기록
+  - 일부 state transition service는 있으나, 전체 event/ticket lifecycle service와 controller가 보이지 않는다.
+
+- P1: Spring 오류 응답 계약이 다르다.
+  - 계약: timestamp, status, code, message, requestId, fieldErrors.
+  - 현재 ErrorResponse는 code, message만 가진다.
+  - FastAPI는 계약형 오류 응답에 맞춰져 있어 서비스별 오류 응답 형태가 달라진다.
+
+- P1: 내부 API key 처리 방식이 불완전할 수 있다.
+  - SecurityConfig는 /internal/v1/** 를 permitAll로 열어두고 "Controller checks X-Internal-Api-Key" 주석을 둔다.
+  - 하지만 예지보전 internal controller가 없으므로 검증 로직도 확인할 수 없다.
+
+- P2: Spring 예지보전 테스트가 없다.
+  - 계약상 최소 테스트:
+    1. 이벤트 중복 방지/심각도 상향/티켓 상태 전이
+    2. SHADOW 결과가 이벤트/티켓 생성하지 않음
+    3. migration 환경 + FastAPI mock 기반 상태 샘플 저장/이벤트 생성 인계 스모크
+  - 현재 backend 테스트는 기존 detection/speed 중심이고 predictive 테스트는 보이지 않는다.
+
+병합 전 필요 작업
+- Predictive internal ingestion controller 구현.
+- Predictive external API controller 구현.
+- CameraHealthSample native upsert 구현.
+- TrafficContext 5분 집계 구현.
+- FastAPI 호출 orchestration 구현.
+- AnomalyEvent, Evidence, MaintenanceTicket lifecycle service 구현.
+- ErrorResponse 계약 정렬.
+- Spring predictive 최소 테스트 추가.
+
+
+3. FastAPI 파트
+
+상태
+- /internal/v1/anomaly-detection/camera-health/evaluate endpoint는 존재한다.
+- /internal/v1/anomaly-detection/camera-degradation/evaluate endpoint는 존재한다.
+- /internal/v1/anomaly-detection/health endpoint는 존재한다.
+- 내부 API key 검증, requestId middleware, body size 제한, metric endpoint가 구현되어 있다.
+- 카메라 상태 샘플 수집/전송 큐도 존재한다.
+
+주요 이슈
+- P0: Rule 평가 요청 정책 필드명이 Spring/API 계약과 다르다.
+  - 계약과 Spring DTO:
+    - warningConsecutiveWindows
+    - criticalConsecutiveWindows
+  - FastAPI schema:
+    - consecutiveWindows
+  - 결과: Spring이 계약대로 보내면 FastAPI validation 실패 가능성이 높다.
+
+- P0: FastAPI adapter와 실제 predictive_ml 입력 계약이 구조적으로 다르다.
+  - FastAPI는 RuleEvaluationRequest 전체를 predictive_ml.RuleDetectionInput으로 넘긴다.
+  - 실제 predictive_ml RuleDetectionInput은 sample, consecutive_windows 구조다.
+  - DegradationDetectionInput도 실제 계약은 sample, baselines, trends, prediction_horizon_minutes 구조인데 FastAPI는 recentHealthSamples, baseline, trafficContext, policy 전체를 그대로 넘긴다.
+  - 결과: 실제 predictive_ml 패키지 연동 시 adapter 변환 단계에서 실패할 수 있다.
+
+- P1: FastAPI 테스트가 실제 predictive_ml 계약 불일치를 잡지 못한다.
+  - test_predictive_adapter.py는 FakeContract를 써서 extra field를 허용한다.
+  - 실제 predictive_ml dataclass를 사용하는 통합 테스트가 부족하다.
+
+- P1: 상태 샘플 전송은 구현되어 있으나 Spring endpoint 부재로 병합 시 실패한다.
+  - docker-compose에서 CAMERA_HEALTH_DELIVERY_ENABLED=true.
+  - FastAPI는 /internal/v1/camera-health-samples로 전송한다.
+  - Spring이 endpoint를 제공하지 않으면 재시도 후 실패 metric만 쌓인다.
+
+- P1: LSTM AutoEncoder SHADOW 운영 조건이 시연 기준으로 애매하다.
+  - Docker compose는 PREDICTIVE_ARTIFACT_REQUIRED=false.
+  - 모델 artifact가 없으면 shadow inference를 건너뛰거나 health가 DEGRADED/NOT_CONFIGURED 계열로 나올 수 있다.
+  - 계약상 "SHADOW 결과 저장 및 화면 표시"까지 요구하려면 artifact 포함/검증 경로를 확정해야 한다.
+
+병합 전 필요 작업
+- RulePolicy schema를 ver2 계약 기준으로 수정.
+- FastAPI DTO -> predictive_ml dataclass 변환 mapper를 명시적으로 구현.
+- 실제 predictive_ml 패키지를 사용하는 adapter 통합 테스트 추가.
+- Spring /internal/v1/camera-health-samples endpoint 구현 후 전송 스모크 테스트.
+- SHADOW artifact 필요 여부와 demo 환경 정책 결정.
+
+
+4. AI / predictive_ml 파트
+
+상태
+- predictive_ml 패키지는 Rule, degradation, LSTM shadow 관련 공개 함수와 contracts.py를 제공한다.
+- detector manifest도 존재한다.
+
+주요 이슈
+- P0: FastAPI가 기대하는 입력 구조와 predictive_ml contracts.py가 맞지 않는다.
+  - 현재 predictive_ml RuleDetectionInput:
+    - sample: CameraSample
+    - consecutive_windows: dict[str, int]
+  - API 계약/FastAPI 요청:
+    - cameraId
+    - evaluatedAt
+    - samples[]
+    - policies[]
+  - 둘 사이의 adapter mapping이 필요하다.
+
+- P1: detector threshold/policy를 어디에서 신뢰할지 불명확하다.
+  - API 계약은 Spring이 정책을 보내는 구조다.
+  - predictive_ml rule_detector는 내부 RULE_THRESHOLDS, RULE_CONSECUTIVE_WINDOWS를 사용한다.
+  - Spring policy 값이 실제 detector 계산에 반영되지 않으면 DB 정책 수정 API가 의미를 잃는다.
+
+- P1: 교통 맥락 교차검증은 manifest에는 있으나 실제 event 생성 방지/근거 반영 흐름까지 연결되었는지 확인이 필요하다.
+  - 계약상 교통 맥락만으로 AnomalyEvent를 만들면 안 된다.
+  - 현재 Spring event 처리 흐름이 미구현이라 최종 보장이 없다.
+
+병합 전 필요 작업
+- FastAPI adapter mapping 기준을 확정한다.
+- Spring policy 값을 predictive_ml 평가에 반영할지, AI 내부 policy를 기준으로 할지 결정한다.
+- 실제 predictive_ml 기반 FastAPI smoke test를 추가한다.
+
+
+5. Docker / 실행 환경 파트
+
+상태
+- postgres, spring-backend, fastapi-server, frontend 서비스가 정의되어 있다.
+- FastAPI healthcheck는 내부 API key를 붙여 /internal/v1/anomaly-detection/health를 호출한다.
+
+주요 이슈
+- P1: DB migration 자동 적용이 없다.
+  - postgres volume만 있고 007/008 SQL을 자동 실행하는 init script/job이 없다.
+  - 신규 volume에서는 Spring ddl-auto=update로 일부 테이블이 생길 수 있지만 DB 계약과 seed가 보장되지 않는다.
+
+- P1: FastAPI 상태 샘플 전송이 켜져 있는데 Spring 수신 endpoint가 없다.
+  - docker-compose CAMERA_HEALTH_DELIVERY_ENABLED=true.
+  - Spring endpoint 부재 시 fastapi-server 로그에 전송 실패가 반복될 수 있다.
+
+- P1: predictive_ml wheel/vendor 설치 방식은 있으나 vendor가 비어 있으면 실제 컨테이너에서 predictive_ml import가 실패할 수 있다.
+  - fastapi-server/Dockerfile은 fastapi-server/vendor/*.whl이 있을 때만 설치한다.
+  - requirements.txt에는 tas-predictive-ml 또는 editable 경로가 없다.
+
+- P2: Spring datasource가 postgres superuser를 사용한다.
+  - 계약/작업 TODO는 traffic_app 전용 계정 사용과 superuser 금지를 언급한다.
+  - 현재 docker-compose는 POSTGRES_USER=postgres, Spring도 postgres 계정 사용.
+
+병합 전 필요 작업
+- DB migration 적용 절차를 docker compose 실행 전 필수 단계로 고정하거나 init job 추가.
+- predictive_ml wheel 생성 후 fastapi-server/vendor에 포함하거나 Dockerfile에서 로컬 package install.
+- Spring demo profile 환경변수 추가.
+- DB 계정 분리 여부 결정.
+
+
+6. Frontend 연동 관점
+
+상태
+- 이번 검수의 중심은 DB/Spring/FastAPI였으나, API 계약상 Frontend는 Spring Boot만 호출해야 한다.
+
+주요 이슈
+- P0: Spring /api/v1/predictive/** endpoint가 없으므로 Frontend 예지보전 화면은 실제 API로 붙을 수 없다.
+- P1: 오류 응답 형태가 Spring/FastAPI 간 다르면 Frontend 공통 에러 처리도 분기된다.
+- P1: Health Score, anomaly event detail, ticket status 변경 API가 없으므로 시연 UI는 mock 또는 미연결 상태가 될 가능성이 높다.
+
+병합 전 필요 작업
+- Spring public API부터 구현하고 Swagger/샘플 응답으로 Frontend 계약을 고정.
+- Frontend가 FastAPI를 직접 호출하지 않도록 API client 점검.
+
+
+7. 테스트 / 병합 준비 체크
+
+현재 통과 가능성이 있는 것
+- FastAPI predictive endpoint 단위/스모크 일부.
+- 기존 Spring detection/speed integration 테스트 일부.
+
+현재 부족한 것
+- Spring predictive controller 테스트.
+- Spring internal camera health sample save 테스트.
+- Spring-FastAPI Rule evaluation contract 테스트.
+- 실제 predictive_ml package를 사용하는 FastAPI adapter 테스트.
+- DB migration + Spring ddl-auto=validate 검증.
+- docker compose 기반 end-to-end smoke test.
+
+병합 전 최소 체크리스트
+1. Spring /internal/v1/camera-health-samples 구현.
+2. Spring /api/v1/predictive/** 핵심 조회/변경 API 구현.
+3. FastAPI RulePolicy 필드명을 ver2 계약에 맞춤.
+4. FastAPI adapter를 실제 predictive_ml contract에 맞게 mapping.
+5. 007/008 migration 적용 후 Spring validate profile 기동 확인.
+6. FastAPI -> Spring 상태 샘플 전송 1건 성공 확인.
+7. Spring -> FastAPI Rule 평가 1건 성공 확인.
+8. SHADOW 결과가 model_prediction_logs에 저장되고 AnomalyEvent/MaintenanceTicket을 만들지 않는지 확인.
+9. 교통 맥락만으로 정비 이벤트가 생성되지 않는지 확인.
+10. 최소 자동 테스트 추가 후 병합.
+
+
+8. 우선순위 요약
+
+P0 - 병합 차단
+- Spring 예지보전 public/internal controller 부재.
+- FastAPI Rule 정책 필드명과 Spring/API 계약 불일치.
+- FastAPI adapter와 실제 predictive_ml 입력 계약 불일치.
+
+P1 - 시연 차단 가능성 높음
+- Spring 상태 샘플 upsert, 교통 맥락 집계, 탐지 orchestration 미구현.
+- Spring event/ticket lifecycle 미구현.
+- DB profile이 계약과 다름.
+- migration 자동 적용 또는 검증 절차 부재.
+- predictive_ml wheel/vendor 배포 경로 불확실.
+- Spring 오류 응답 계약 불일치.
+
+P2 - 정리 필요
+- DB 전용 계정 미분리.
+- Spring predictive 테스트 부족.
+- Docker healthcheck는 FastAPI만 확인하고 Spring/DB migration 상태는 분리 검증하지 않음.
+
