@@ -1021,3 +1021,166 @@ $policies | Select-Object `
   @{Name='활성';Expression={$_.enabled}},
   @{Name='수정시각';Expression={$_.updatedAt}}
 ```
+
+### 2026-06-19 demo health sample import 409 / cameras 403
+
+#### `import_health_samples.ps1`가 409 Conflict
+
+원인:
+
+- `camera_health_samples`는 `(camera_id, sampled_at)`와 `idempotency_key`가 모두 unique다.
+- 기존 저장 SQL은 `(camera_id, sampled_at)` 충돌만 upsert 처리했다.
+- 같은 CSV를 다시 import하면 동일 `idempotency_key`가 먼저 충돌해서 `DataIntegrityViolationException -> 409`가 발생할 수 있다.
+- 이후 새 timestamp와 새 idempotency key를 만들어도 409가 계속 발생했다.
+- Spring 로그 확인 결과 최종 원인은 `created_at` not-null 제약 위반이었다.
+
+로그 근거:
+
+```text
+Data Integrity Error: ERROR: null value in column "created_at" of relation "camera_health_samples" violates not-null constraint
+```
+
+조치:
+
+- `CameraHealthSampleIngestionService.save()`는 먼저 `idempotency_key` 또는 `(camera_id, sampled_at)`가 일치하는 기존 row를 update한다.
+- 기존 row가 없을 때만 insert한다.
+- 같은 샘플 재전송은 동일 요청의 재시도로 보고 기존 row를 update하고 `created=false`로 응답하게 했다.
+- 이 방식은 `camera_health_samples`의 두 unique 제약, `uq_camera_health_samples_camera_sampled`와 `uq_camera_health_samples_idempotency`를 모두 피한다.
+- `tools/predictive_demo/import_health_samples.ps1`는 서버가 아직 이전 빌드여도 409 row를 `Skipped duplicate`로 표시하고 다음 row를 계속 처리하게 했다.
+- 409가 계속 날 경우 원인 확인을 위해 응답 body를 `Error` 컬럼에 표시한다.
+- demo import 스크립트 기본값은 CSV의 `sampled_at`을 그대로 쓰지 않고 실행 시점 기준 5분 간격 timestamp와 새 `RunId` 기반 idempotency key를 만든다.
+- 기존 CSV timestamp를 그대로 검증하고 싶을 때만 `-PreserveCsvTimestamps` 옵션을 사용한다.
+- 로컬 DB가 migration DDL이 아니라 Hibernate `ddl-auto:update`로 만들어진 경우 `camera_health_samples.created_at`에 DB default가 없을 수 있다.
+- raw SQL insert에 `created_at`을 명시하지 않으면 `created_at not null` 제약으로 409가 발생할 수 있으므로 `CameraHealthSampleIngestionService.save()` insert 컬럼에 `created_at`을 추가했다.
+- 이미 떠 있는 compose DB에서는 아래 임시 DDL로 즉시 unblock했다.
+
+```powershell
+docker exec traffic-postgres psql -U postgres -d traffic -c "ALTER TABLE camera_health_samples ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;"
+```
+
+DB 확인:
+
+```powershell
+docker exec traffic-postgres psql -U postgres -d traffic -c "SELECT column_name, is_nullable, column_default FROM information_schema.columns WHERE table_name='camera_health_samples' AND column_name='created_at';"
+```
+
+확인 결과:
+
+- `import_health_samples.ps1` 재실행 시 `SampleId=39..42`, `Status=Imported`, `Created=True`.
+- `GET /api/v1/predictive/cameras`에서 `latestSampledAt=2026-06-19T16:13:50.365754+09:00`, `healthScore=7.5`, `healthStatus=INSUFFICIENT_DATA` 확인.
+- Spring 재빌드 후 추가 주입 시 `SampleId=43..46`, `Status=Imported`, `Created=True` 확인.
+- 최신 확인값: `latestSampledAt=2026-06-19T16:25:25.810593+09:00`, `healthScore=7.5`, `healthStatus=INSUFFICIENT_DATA`.
+
+Spring 코드 변경 후 compose 반영 명령:
+
+```powershell
+docker compose up -d --build spring-backend
+```
+
+주의:
+
+- `docker compose up -d spring-backend`만 실행하면 기존 이미지가 계속 사용될 수 있다.
+- Java 코드 수정 반영이 필요하면 `--build`를 붙인다.
+
+#### `/admin/ops`에서 변화가 잘 안 보이는 경우
+
+원인:
+
+- API 결과는 들어오지만 `카메라 상태` 카드 주변 숫자(`24/25`, `전체 25`, `정상 23`)가 하드코딩이라 실제 변화가 덜 보였다.
+- `INSUFFICIENT_DATA`는 backend health status지만 화면에서는 기준선 학습/수집 중 상태로 표현해야 한다.
+- Docker frontend 컨테이너를 보고 있으면 Vue 코드 수정 후 frontend 이미지도 다시 build해야 한다.
+- API 호출 실패 시 기존 `demoCams` fallback이 화면에 남아 실제 API 실패와 하드코딩 화면을 구분하기 어려웠다.
+- `INSUFFICIENT_DATA` 상태에서 `healthScore=7.5`가 있어도 Health 칸이 기준선 배지 `0/4`로 표시되어 발표자가 혼동할 수 있었다.
+
+조치:
+
+- `/admin/ops` 첫 화면 `카메라 상태` 카드의 전체/정상/수집 중/위험 숫자를 실제 API 집계값으로 표시.
+- `/admin/ops > 카메라 운영 현황`의 전체 모니터링 수, 정상 수, 표시 수를 실제 API 값으로 표시.
+- `INSUFFICIENT_DATA`도 기준선 학습 배지 대상에 포함.
+- API 호출 실패 시 `pmSummary=null`, `cams=[]`로 초기화해 demo/hardcoded 값이 남지 않게 처리.
+- API 호출 실패 시 상단에 빨간 오류 배너(`pm-load-error`) 표시.
+- Health 칸은 `healthScore`가 있으면 우선 점수(`7.5`)를 표시하고, 점수가 없을 때만 기준선 학습 배지를 표시.
+
+화면 확인 위치:
+
+- `/admin/ops` 진입 후 첫 화면 하단 `카메라 상태` 카드.
+- `Entry Camera 1` 행에서 `상태=수집 중`, `Health=7.5`, `최근 응답=방금 주입한 시각` 확인.
+- `전체 보기` 클릭 후 `카메라 운영 현황` 탭에서도 같은 행 확인.
+
+frontend 코드 변경 후 compose 반영 명령:
+
+```powershell
+docker compose up -d --build frontend
+```
+
+브라우저 확인:
+
+- `Ctrl + F5` 강제 새로고침.
+- 이전 번들이 남아 있으면 `카메라 상태` 카드가 계속 하드코딩처럼 보일 수 있다.
+- 최신 화면 기대값은 `평균 Health Score=7.5`, `전체 1`, `정상 0`, `수집 중 1`, `위험 0`, `Entry Camera 1`, `Health 7.5`.
+
+#### `GET /api/v1/predictive/cameras`가 403 Forbidden
+
+원인 후보:
+
+- API 계약상 `GET /api/v1/predictive/**`는 `OPERATOR`, `MAINTAINER`, `ADMIN` role JWT가 필요하다.
+- PowerShell 세션이 바뀌었거나 `$headers`가 비어 있으면 Spring Security에서 권한 부족으로 403이 날 수 있다.
+- 프론트의 로컬 fallback 계정(`ops/1234` 등)은 백엔드 JWT를 만들지 않으므로 터미널 API 테스트에는 사용할 수 없다.
+- 브라우저에서 `admin / 1234`, `ops / 1234` 등 프론트 로컬 계정으로 로그인하면 `tas_access_token=local-...`이 저장된다.
+- `local-...` 토큰은 Spring JWT가 아니므로 `/api/v1/predictive/**` 호출이 403으로 실패한다.
+- 이 경우 `/admin/ops` 콘솔에 `[predictive dashboard load failed] Request failed with status code 403`이 표시된다.
+
+권장 확인 순서:
+
+```powershell
+$login = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:8080/api/auth/login" `
+  -ContentType "application/json" `
+  -Body (@{
+    email = "operator@tas.com"
+    password = "tas1234"
+  } | ConvertTo-Json)
+
+$headers = @{
+  Authorization = "Bearer $($login.data.accessToken)"
+}
+
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/summary?dataSource=REAL" `
+  -Headers $headers
+
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/cameras?dataSource=REAL&page=0&size=20&sort=healthScore,asc" `
+  -Headers $headers
+```
+
+대체 계정:
+
+- `maintainer@tas.com / tas1234`
+- `admin@email.com / 1234`
+
+주의:
+
+- 위 시연 계정은 `db/seed/demo_seed.sql` 또는 `data.sql`이 DB에 반영되어 있어야 한다.
+- `operator@tas.com` 로그인이 실패하면 먼저 DB에 시연 seed가 들어갔는지 확인한다.
+- 브라우저 시연은 `admin@email.com / 1234`로 로그인한다.
+- `admin / 1234`는 프론트 로컬 fallback 계정이라 predictive API 시연에 사용하지 않는다.
+
+브라우저 localStorage 초기화:
+
+```javascript
+localStorage.removeItem("tas_access_token")
+localStorage.removeItem("tas_refresh_token")
+localStorage.removeItem("tas_user")
+location.href = "/login"
+```
+
+JWT 확인:
+
+```javascript
+localStorage.getItem("tas_access_token")
+```
+
+정상 JWT는 `eyJ...eyJ...`처럼 점(`.`)이 2개 있는 긴 문자열이다.
+`local-...`이면 프론트 로컬 계정이므로 다시 초기화 후 `admin@email.com / 1234`로 로그인한다.

@@ -1,0 +1,168 @@
+예지보전 시연 준비 자료 정리
+작성일: 2026-06-19
+
+1. 이번 프로젝트를 한 문장으로 설명
+
+- 기존 프로젝트: CCTV 영상에서 차량을 탐지하고 속도를 계산해 과속을 잡는 시스템.
+- 이번 프로젝트: CCTV/AI 분석 시스템이 정상적으로 작동하는지 감시하고, 고장/성능 저하를 미리 감지해 정비로 연결하는 시스템.
+
+2. 시연 핵심 메시지
+
+- 이번 시연은 "차량을 잘 잡는 장면"보다 "차량을 잡아야 하는 CCTV/AI 시스템이 정상인지 감시하는 장면"이 핵심이다.
+- FPS 저하, 프레임 드롭, 영상 흐림, 네트워크 지연, 리소스 과부하가 생기면 카메라 health 상태가 나빠진다.
+- 운영자는 /admin/ops 대시보드에서 카메라 상태, 이상 이벤트, 정비 티켓, 탐지 정책을 확인한다.
+
+3. 필요한 자료
+
+- 정상 CCTV 녹화 영상 1개
+  - 이전 과속 탐지 시연에 사용한 영상 재사용 가능.
+  - YOLO/OCR이 어느 정도 동작하는 영상이면 좋음.
+
+- 저하/장애 주입 영상
+  - 정상 영상을 복사해서 일부러 품질을 낮춘 버전.
+  - blur 버전: 영상 흐림 처리.
+  - low FPS 버전: 프레임 일부 제거.
+  - 끊김 버전: 중간 검은 화면 또는 프레임 드롭 구간 삽입.
+
+- 정상 기준선 mock data
+  - 평소 정상 상태를 나타내는 샘플 데이터.
+  - 예: FPS 24, latency 500ms, frame drop 1%, OCR 실패율 5%.
+  - 실제 14일 데이터를 모으기 어렵다면 데모용 seed/mock 데이터로 대체.
+
+- 저하 상태 mock data
+  - blur 증가, FPS 하락, latency 증가, network RTT 증가 샘플.
+  - 특정 시간 구간에 값이 나빠지도록 구성.
+
+- 시연용 DB 데이터
+  - camera 1~3대.
+  - camera_health_samples 정상/저하 샘플.
+  - anomaly_events 1~2건.
+  - anomaly_event_evidence 몇 건.
+  - maintenance_tickets 1건 이상.
+  - anomaly_policies 목록.
+
+4. 추천 시연 시나리오
+
+- 0~2분: 정상 영상 구간.
+  - FPS, OCR, latency가 안정적이라고 설명.
+
+- 2~4분: blur 증가 구간.
+  - 영상 품질 저하로 health score가 낮아지는 상황 설명.
+
+- 4~6분: FPS 하락/프레임 드롭 구간.
+  - 카메라 또는 처리 파이프라인 성능 저하 설명.
+
+- 6분 이후: 이상 이벤트와 정비 티켓 표시.
+  - 운영자가 대시보드에서 이상을 확인하고 정비 조치로 연결하는 흐름 설명.
+
+5. 화면에서 보여줄 것
+
+- /admin/ops > 장비 현황
+  - 전체 카메라 수.
+  - 기준선 학습 중/데이터 부족 카메라.
+  - 위험 카메라.
+  - 악화 예측.
+  - SLA 초과 티켓.
+
+- /admin/ops > 카메라
+  - 카메라별 health 상태.
+  - NORMAL / DEGRADED / CRITICAL / INSUFFICIENT_DATA 또는 수집 중 상태.
+  - 특정 카메라 클릭 후 상세 상태 확인.
+
+- /admin/ops > 장애·이상 관리
+  - 이상 이벤트.
+  - 원인 후보.
+  - 관측값/기준값/임계값 비교.
+  - 연결된 정비 티켓.
+  - resolve / dismiss / 담당자 배정 흐름.
+
+- /admin/ops > 설정
+  - FPS, latency, frame drop 등 탐지 정책 임계값.
+  - ADMIN이 임계값을 수정할 수 있음을 보여줌.
+
+6. 발표 문장 예시
+
+"이전 프로젝트는 CCTV 영상에서 차량을 탐지하고 과속을 잡는 시스템이었습니다.
+이번 프로젝트는 그 CCTV와 AI 분석 파이프라인이 안정적으로 작동하는지 감시합니다.
+영상 흐림, FPS 저하, 프레임 드롭, 네트워크 지연 같은 운영 지표를 수집하고,
+이상이 감지되면 운영 대시보드에 표시한 뒤 정비 티켓으로 연결합니다."
+
+7. 리스크와 대응
+
+- 실제 실시간 라즈베리파이 시연이 어려우면 녹화 영상 기반으로 진행한다.
+- 완전 가짜 데이터만 쓰면 설득력이 약하므로, 실제 CCTV 영상에서 정상/저하 구간을 만든다.
+- 저하 영상과 mock health sample을 연결하면 "실제 영상 기반 장애 주입 시연"으로 설명할 수 있다.
+- 발표 전에는 DB에 anomaly event와 maintenance ticket이 미리 생성되어 있는지 확인한다.
+
+8. 현재 로컬 준비 상태
+
+- 원본 영상 위치:
+  - test-media/videos/sample.mp4
+  - test-media/videos/sample2.mp4
+  - test-media/videos/sample3.mp4
+
+- sample.mp4 기준 영상 정보:
+  - 1920x1080
+  - 30fps
+  - 약 4분 55초
+
+- 생성된 예지보전 시연 클립 위치:
+  - test-media/videos/predictive-demo/sample_normal.mp4
+  - test-media/videos/predictive-demo/sample_blur.mp4
+  - test-media/videos/predictive-demo/sample_low_fps.mp4
+  - test-media/videos/predictive-demo/sample_dropout.mp4
+
+- 시연성을 위해 저하 효과를 눈에 띄게 처리함:
+  - sample_blur.mp4: 전체 blur 처리.
+  - sample_low_fps.mp4: 화면 멈칫거림/stutter + 검은 줄 노이즈.
+  - sample_dropout.mp4: 검은 화면 구간.
+  - OCR 실패 클립은 영상 편집 품질이 낮아 시연 자료에서 제외함. OCR 실패율은 health sample 지표 컬럼으로만 유지한다.
+  - 기존 GUI의 OCR/속도 overlay와 겹치지 않도록 영상 자체에는 분류 글자를 넣지 않는다.
+
+- 생성된 mock health sample CSV:
+  - test-media/smoke-runs/predictive-demo/camera-health-samples.csv
+
+9. 시연 클립/CSV 재생성 명령
+
+```powershell
+python tools/predictive_demo/generate_demo_assets.py `
+  --source test-media/videos/sample.mp4 `
+  --duration-sec 20
+```
+
+10. mock health sample을 Spring에 주입하는 명령
+
+Spring이 실행 중이어야 한다.
+
+```powershell
+.\tools\predictive_demo\import_health_samples.ps1 `
+  -CsvPath test-media\smoke-runs\predictive-demo\camera-health-samples.csv `
+  -BaseUrl http://localhost:8080 `
+  -InternalApiKey traffic-ai-internal-key-2026
+```
+
+주입 후 확인:
+
+```powershell
+$login = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:8080/api/auth/login" `
+  -ContentType "application/json" `
+  -Body (@{
+    email = "operator@tas.com"
+    password = "tas1234"
+  } | ConvertTo-Json)
+
+$headers = @{
+  Authorization = "Bearer $($login.data.accessToken)"
+}
+
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/cameras?dataSource=REAL&page=0&size=20&sort=healthScore,asc" `
+  -Headers $headers
+```
+
+참고:
+- `import_health_samples.ps1`에서 409가 나면 같은 CSV를 이미 넣은 중복 실행일 수 있다.
+- 최신 스크립트는 중복 row를 `Skipped duplicate`로 표시하고 계속 진행한다.
+- `cameras` 조회가 403이면 `$headers`가 비었거나 백엔드 JWT role이 `OPERATOR`, `MAINTAINER`, `ADMIN`이 아닌 경우다.

@@ -243,6 +243,41 @@ docker exec traffic-postgres psql -U postgres -d traffic -c "select camera_id, s
 4. 이벤트 상세/티켓 API를 먼저 붙이고 frontend 연결로 넘어가기.
 5. 마지막에 demo profile과 실제 시연 테스트를 수행.
 
+## 4-1. 2026-06-19 현재 검증 완료 상태
+
+완료:
+
+- `test-media/videos/predictive-demo`의 4개 시연 영상(normal/blur/low_fps/dropout)을 기존 GUI로 1회씩 실행.
+- `tools/predictive_demo/import_health_samples.ps1`로 4개 상태 샘플을 Spring internal API에 주입.
+- `camera_health_samples.created_at` default 누락으로 인한 409를 확인하고 DB default 및 Spring insert 컬럼 보강.
+- `GET /api/v1/predictive/cameras`에서 `healthScore=7.5`, `healthStatus=INSUFFICIENT_DATA`, `latestSampledAt` 표시 확인.
+- `GET /api/v1/predictive/summary`에서 `totalCameras=1`, `baselineLearningCameras=1` 확인.
+- `/admin/ops`에서 API 실패 시 demo fallback이 남지 않도록 수정.
+- `/admin/ops` 카메라 상태 카드와 카메라 운영 현황 숫자를 실제 API 값으로 표시.
+- `INSUFFICIENT_DATA`도 수집 중/기준선 학습 상태로 표시.
+- Health 점수가 있으면 `0/4` 배지보다 `7.5` 점수를 우선 표시.
+- frontend build 성공.
+
+시연 확인 기대값:
+
+- `/admin/ops` 첫 화면 KPI: 평균 Health Score `7.5`.
+- `카메라 상태`: 전체 `1`, 정상 `0`, 수집 중 `1`, 위험 `0`.
+- `Entry Camera 1`: 상태 `수집 중`, Health `7.5`, 최근 응답 시각 표시.
+
+주의:
+
+- 브라우저에서 `admin / 1234`, `ops / 1234`로 로그인하면 local fallback 계정이라 predictive API가 403으로 실패한다.
+- 시연 로그인은 `admin@email.com / 1234`를 사용한다.
+- frontend/Spring 코드 수정 후 Docker 화면 반영에는 각각 `docker compose up -d --build frontend`, `docker compose up -d --build spring-backend`가 필요하다.
+
+다음 우선 작업:
+
+1. `/admin/ops` anomaly-events 목록을 실제 API 결과로 바인딩.
+2. maintenance-tickets 목록을 실제 API 결과로 바인딩.
+3. anomaly acknowledge/resolve/dismiss, ticket assign/status 버튼을 실제 mutation API에 연결.
+4. FastAPI predictive 평가 결과가 anomaly/ticket 자동 생성까지 이어지는 E2E 시나리오 검증.
+5. 발표용 시나리오 문장과 클릭 순서 고정.
+
 ## 5. 참고 문서
 
 - `DOCS/phase2-predictive-maintenance/01_요구사항_정의서.md`

@@ -126,6 +126,10 @@
             {{ pmDataSourceLabel(pmDataSource) }} 모드 — 실제 운영 데이터 아님
           </span>
         </div>
+        <div v-if="predictiveLoadState === 'error'" class="pm-load-error">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <span>{{ predictiveLoadError }}</span>
+        </div>
 
         <!-- ============ 예지보전 인사이트 스트립 ============ -->
         <section class="pm-strip">
@@ -360,15 +364,15 @@
             <div class="card cam-card">
               <div class="ch">
                 <h3>
-                  카메라 상태 <span class="ch-kpi gr">24/25 <em>96.0%</em></span>
+                  카메라 상태 <span class="ch-kpi" :class="pmCriticalCount > 0 ? 'rd' : 'gr'">{{ pmNormalCount }}/{{ pmTotalCameras }} <em>{{ pmNormalRate }}%</em></span>
                 </h3>
                 <a class="ch-link" @click="tab = 'cams'">전체 보기 ›</a>
               </div>
               <div class="cam-filter">
-                <span class="cf on">전체 25</span>
-                <span class="cf gr">정상 23</span>
-                <span class="cf yl">지연 1</span>
-                <span class="cf rd">장애 2</span>
+                <span class="cf on">전체 {{ pmTotalCameras }}</span>
+                <span class="cf gr">정상 {{ pmNormalCount }}</span>
+                <span class="cf yl">수집 중 {{ pmBaselineLearning }}</span>
+                <span class="cf rd">위험 {{ pmCriticalCount }}</span>
                 <div class="cf-r">
                   <input placeholder="카메라명 검색" /><select>
                     <option>전체 위치</option>
@@ -407,10 +411,10 @@
                       <span class="stat" :class="c.stTone">{{ c.st }}</span>
                     </td>
                     <td class="num mono">
-                      <span v-if="c.healthStatus === 'BASELINE_LEARNING'" class="pm-baseline" title="기준선 학습 중">
+                      <span v-if="c.healthScore != null" class="pm-hs" :class="pmScoreTone(c.healthScore)">{{ c.healthScore.toFixed(1) }}</span>
+                      <span v-else-if="isBaselineLearningCamera(c)" class="pm-baseline" title="기준선 학습 중">
                         <i class="bi bi-cpu"></i> {{ c.baselineSamples }}/{{ c.baselineRequired }}
                       </span>
-                      <span v-else-if="c.healthScore != null" class="pm-hs" :class="pmScoreTone(c.healthScore)">{{ c.healthScore.toFixed(1) }}</span>
                       <span v-else class="pm-hs gy">—</span>
                     </td>
                     <td class="mono">{{ c.lat }}</td>
@@ -419,7 +423,7 @@
                 </tbody>
               </table>
               <div class="cam-foot">
-                <span>총 25개</span>
+                <span>총 {{ pmTotalCameras }}개</span>
                 <div class="pg-row">
                   <button><i class="bi bi-chevron-double-left"></i></button>
                   <button><i class="bi bi-chevron-left"></i></button>
@@ -439,7 +443,7 @@
         <div class="pnl-head">
           <h3>
             카메라 운영 현황
-            <span class="ch-kpi">전체 25대 모니터링</span>
+            <span class="ch-kpi">전체 {{ pmTotalCameras }}대 모니터링</span>
           </h3>
           <div class="pnl-tools">
             <select v-model="camSort" class="pnl-sort" :title="'정렬 (현재: ' + camSortLabel + ')'">
@@ -469,13 +473,13 @@
         <div class="pnl-summary nd-kpi nd-kpi-9">
           <div class="ps-box">
             <div class="ps-l">전체</div>
-            <div class="ps-v">25</div>
+            <div class="ps-v">{{ pmTotalCameras }}</div>
             <div class="ps-sub">운영 카메라</div>
           </div>
           <div class="ps-box gr">
             <div class="ps-l">정상</div>
-            <div class="ps-v">23</div>
-            <div class="ps-sub">92.0%</div>
+            <div class="ps-v">{{ pmNormalCount }}</div>
+            <div class="ps-sub">{{ pmNormalRate }}%</div>
           </div>
           <div class="ps-box yl">
             <div class="ps-l">지연</div>
@@ -563,10 +567,10 @@
                   <span class="stat" :class="c.stTone">{{ c.st }}</span>
                 </td>
                 <td class="num mono">
-                  <span v-if="c.healthStatus === 'BASELINE_LEARNING'" class="pm-baseline" title="기준선 학습 중">
+                  <span v-if="c.healthScore != null" class="pm-hs" :class="pmScoreTone(c.healthScore)">{{ c.healthScore.toFixed(1) }}</span>
+                  <span v-else-if="isBaselineLearningCamera(c)" class="pm-baseline" title="기준선 학습 중">
                     <i class="bi bi-cpu"></i> {{ c.baselineSamples }}/{{ c.baselineRequired }}
                   </span>
-                  <span v-else-if="c.healthScore != null" class="pm-hs" :class="pmScoreTone(c.healthScore)">{{ c.healthScore.toFixed(1) }}</span>
                   <span v-else class="pm-hs gy">—</span>
                 </td>
                 <td class="mono">{{ c.lat }}<span v-if="c.lat !== '—'">ms</span></td>
@@ -614,7 +618,7 @@
             </tbody>
           </table>
           <div class="pnl-foot">
-            <span>표시 {{ filteredCams.length }} / {{ cams.length }} (전체 25)</span>
+            <span>표시 {{ filteredCams.length }} / {{ cams.length }} (전체 {{ pmTotalCameras }})</span>
             <div class="pg-row">
               <button>‹</button>
               <button class="on">1</button><button>2</button><button>3</button>
@@ -3967,6 +3971,12 @@ const pmPredictedCount = computed(() => pmSummary.value?.predictedRisks ?? cams.
 const pmCriticalCount = computed(() => pmSummary.value?.criticalCameras ?? cams.value.filter((c) => c.healthStatus === "CRITICAL").length)
 const pmBaselineLearning = computed(() => pmSummary.value?.baselineLearningCameras ?? cams.value.filter((c) => c.healthStatus === "BASELINE_LEARNING" || c.healthStatus === "INSUFFICIENT_DATA").length)
 const pmOverdueTickets = computed(() => pmSummary.value?.overdueTickets ?? 0)
+const pmTotalCameras = computed(() => pmSummary.value?.totalCameras ?? cams.value.length)
+const pmNormalCount = computed(() => pmSummary.value?.normalCameras ?? cams.value.filter((c) => c.healthStatus === "NORMAL").length)
+const pmNormalRate = computed(() => {
+  if (!pmTotalCameras.value) return "0.0"
+  return ((pmNormalCount.value / pmTotalCameras.value) * 100).toFixed(1)
+})
 
 // dataSource 필터 (status 탭) — 백엔드 호출 시 query parameter로 전달
 const pmDataSource = ref("REAL")
@@ -4015,6 +4025,12 @@ function cameraStatusTone(healthStatus, baselineStatus) {
   if (healthStatus === "DEGRADED") return "wn"
   if (healthStatus === "CRITICAL" || healthStatus === "OFFLINE") return "no"
   return "gy"
+}
+
+function isBaselineLearningCamera(cam) {
+  return cam?.baselineStatus === "LEARNING"
+    || cam?.healthStatus === "BASELINE_LEARNING"
+    || cam?.healthStatus === "INSUFFICIENT_DATA"
 }
 
 function toOpsCamera(row) {
@@ -4095,6 +4111,8 @@ async function loadPredictiveDashboard() {
     }
     predictiveLoadState.value = "ok"
   } catch (err) {
+    pmSummary.value = null
+    cams.value = []
     predictiveLoadState.value = "error"
     predictiveLoadError.value = err?.normalized?.message || err?.message || "\uC608\uC9C0\uBCF4\uC804 \uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4."
     console.warn("[predictive dashboard load failed]", predictiveLoadError.value)
@@ -5097,6 +5115,13 @@ const servers = Object.freeze([
 .ops-shell .pm-ds-bdg.yl { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
 .ops-shell .pm-ds-bdg.rd { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
 .ops-shell .pm-ds-bdg.gy { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+.ops-shell .pm-load-error {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 12px; padding: 10px 12px;
+  border: 1px solid #fecaca; border-radius: 8px;
+  background: #fef2f2; color: #b91c1c;
+  font-size: 12.5px; font-weight: 700;
+}
 
 /* 활성 이상 통계 지표 4박스 (z-score / slope / confidence / detector) */
 .ops-shell .pm-stats-row {

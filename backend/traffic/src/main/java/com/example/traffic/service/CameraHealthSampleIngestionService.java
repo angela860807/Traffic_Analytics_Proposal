@@ -62,9 +62,42 @@ public class CameraHealthSampleIngestionService {
                 .addValue("qualityStatus", request.getQualityStatus().name())
                 .addValue("isImputed", request.isImputed())
                 .addValue("isLateSample", lateSample)
-                .addValue("idempotencyKey", request.getIdempotencyKey());
+                .addValue("idempotencyKey", request.getIdempotencyKey())
+                .addValue("createdAt", LocalDateTime.now(PredictiveTimeUtils.SERVICE_ZONE));
 
-        Map<String, Object> row = jdbcTemplate.queryForMap("""
+        var existingRows = jdbcTemplate.queryForList("""
+                UPDATE camera_health_samples
+                SET
+                    camera_id = :cameraId,
+                    processor_code = :processorCode,
+                    sampled_at = :sampledAt,
+                    sample_window_seconds = :sampleWindowSeconds,
+                    fps_avg = :fpsAvg,
+                    frame_drop_rate = :frameDropRate,
+                    latency_p95_ms = :latencyP95Ms,
+                    blur_score_avg = :blurScoreAvg,
+                    brightness_score_avg = :brightnessScoreAvg,
+                    detection_count = :detectionCount,
+                    ocr_attempt_count = :ocrAttemptCount,
+                    ocr_failure_count = :ocrFailureCount,
+                    ocr_fail_rate = :ocrFailRate,
+                    cpu_usage_pct = :cpuUsagePct,
+                    memory_usage_pct = :memoryUsagePct,
+                    disk_usage_pct = :diskUsagePct,
+                    network_rtt_ms = :networkRttMs,
+                    last_frame_at = :lastFrameAt,
+                    data_source = :dataSource,
+                    quality_status = :qualityStatus,
+                    is_imputed = :isImputed,
+                    is_late_sample = :isLateSample,
+                    idempotency_key = :idempotencyKey
+                WHERE idempotency_key = :idempotencyKey
+                   OR (camera_id = :cameraId AND sampled_at = :sampledAt)
+                RETURNING id, FALSE AS created
+                """, params);
+
+        Map<String, Object> row = existingRows.isEmpty()
+                ? jdbcTemplate.queryForMap("""
                 INSERT INTO camera_health_samples (
                     camera_id,
                     processor_code,
@@ -88,7 +121,8 @@ public class CameraHealthSampleIngestionService {
                     quality_status,
                     is_imputed,
                     is_late_sample,
-                    idempotency_key
+                    idempotency_key,
+                    created_at
                 )
                 VALUES (
                     :cameraId,
@@ -113,33 +147,12 @@ public class CameraHealthSampleIngestionService {
                     :qualityStatus,
                     :isImputed,
                     :isLateSample,
-                    :idempotencyKey
+                    :idempotencyKey,
+                    :createdAt
                 )
-                ON CONFLICT (camera_id, sampled_at)
-                DO UPDATE SET
-                    processor_code = EXCLUDED.processor_code,
-                    sample_window_seconds = EXCLUDED.sample_window_seconds,
-                    fps_avg = EXCLUDED.fps_avg,
-                    frame_drop_rate = EXCLUDED.frame_drop_rate,
-                    latency_p95_ms = EXCLUDED.latency_p95_ms,
-                    blur_score_avg = EXCLUDED.blur_score_avg,
-                    brightness_score_avg = EXCLUDED.brightness_score_avg,
-                    detection_count = EXCLUDED.detection_count,
-                    ocr_attempt_count = EXCLUDED.ocr_attempt_count,
-                    ocr_failure_count = EXCLUDED.ocr_failure_count,
-                    ocr_fail_rate = EXCLUDED.ocr_fail_rate,
-                    cpu_usage_pct = EXCLUDED.cpu_usage_pct,
-                    memory_usage_pct = EXCLUDED.memory_usage_pct,
-                    disk_usage_pct = EXCLUDED.disk_usage_pct,
-                    network_rtt_ms = EXCLUDED.network_rtt_ms,
-                    last_frame_at = EXCLUDED.last_frame_at,
-                    data_source = EXCLUDED.data_source,
-                    quality_status = EXCLUDED.quality_status,
-                    is_imputed = EXCLUDED.is_imputed,
-                    is_late_sample = EXCLUDED.is_late_sample,
-                    idempotency_key = EXCLUDED.idempotency_key
                 RETURNING id, (xmax = 0) AS created
-                """, params);
+                """, params)
+                : existingRows.get(0);
 
         return CameraHealthSampleSaveResponse.builder()
                 .sampleId(((Number) row.get("id")).longValue())
