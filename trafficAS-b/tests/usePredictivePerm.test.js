@@ -10,6 +10,7 @@ vi.mock("@/composables/useAuth", () => ({
 let usePerm;
 let hasPredictiveAccess;
 beforeEach(async () => {
+  localStorage.clear();
   const mod = await import("@/composables/usePredictivePerm");
   usePerm = mod.usePredictivePerm;
   hasPredictiveAccess = mod.hasPredictiveAccess;
@@ -108,7 +109,8 @@ describe("usePredictivePerm — canTransitionTicket (티켓 상태 전이)", () 
 });
 
 describe("hasPredictiveAccess — 라우터 가드", () => {
-  it("OPERATOR / MAINTAINER / ADMIN 허용", () => {
+  it("backend JWT가 있으면 OPERATOR / MAINTAINER / ADMIN 허용", () => {
+    localStorage.setItem("tas_access_token", "header.payload.signature");
     expect(hasPredictiveAccess({ role: "OPERATOR" })).toBe(true);
     expect(hasPredictiveAccess({ role: "MAINTAINER" })).toBe(true);
     expect(hasPredictiveAccess({ role: "ADMIN" })).toBe(true);
@@ -121,11 +123,18 @@ describe("hasPredictiveAccess — 라우터 가드", () => {
   });
 
   it("roles 배열 형태 지원 (백엔드 JWT 호환)", () => {
+    localStorage.setItem("tas_access_token", "header.payload.signature");
     expect(hasPredictiveAccess({ roles: ["MAINTAINER"] })).toBe(true);
     expect(hasPredictiveAccess({ roles: ["USER"] })).toBe(false);
   });
 
   it("predictiveRole 키가 있으면 우선", () => {
+    localStorage.setItem("tas_access_token", "header.payload.signature");
     expect(hasPredictiveAccess({ predictiveRole: "ADMIN", role: "USER" })).toBe(true);
+  });
+
+  it("local fallback 토큰은 predictive 라우터 접근을 차단", () => {
+    localStorage.setItem("tas_access_token", "local-123");
+    expect(hasPredictiveAccess({ role: "ADMIN" })).toBe(false);
   });
 });

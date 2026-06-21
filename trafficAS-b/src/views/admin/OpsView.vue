@@ -158,7 +158,7 @@
             <i class="bi bi-stopwatch"></i>
             <div class="pm-kpi-b">
               <div class="pm-kpi-v">{{ pmOverdueTickets }}<small>건</small></div>
-              <div class="pm-kpi-l">SLA 초과 <span class="pm-sub">조치 지연 티켓</span></div>
+              <div class="pm-kpi-l">대응 지연 <span class="pm-sub">조치 지연 정비 건</span></div>
             </div>
           </div>
           <div class="pm-kpi bl">
@@ -1266,13 +1266,13 @@
         <div class="pnl-head">
           <h3>
             장애·이상 관리
-            <span class="ch-kpi rd">장애 3 · 이상 {{ pmAnomalyCount }} · SLA 초과 {{ pmSlaOverdueCount }}</span>
+            <span class="ch-kpi rd">열린 이상 {{ pmOpenAnomalyCount }} · 미해결 정비 {{ pmUnresolvedTicketCount }} · 대응 지연 {{ pmSlaOverdueCount }}</span>
           </h3>
           <div class="pnl-tools">
             <button
               class="pnl-act"
               :disabled="!canCreateTicket"
-              :title="canCreateTicket ? '' : '수동 티켓 생성 권한 없음 (OPERATOR/ADMIN)'"
+              :title="canCreateTicket ? '' : '수동 정비 건 생성 권한 없음 (OPERATOR/ADMIN)'"
             >
               <i class="bi bi-plus-circle"></i> 장애 신규 등록
             </button>
@@ -1283,19 +1283,19 @@
         <!-- KPI 8박스 (예지 통합: 악화 예측 / SLA 초과 강조) -->
         <div class="pnl-summary nd-kpi nd-kpi-8">
           <div class="ps-box rd">
-            <div class="ps-l">진행 중</div>
-            <div class="ps-v">1</div>
-            <div class="ps-sub">CAM-M-002</div>
+            <div class="ps-l">열린 이상</div>
+            <div class="ps-v">{{ pmOpenAnomalyCount }}</div>
+            <div class="ps-sub">조치 필요 이벤트</div>
           </div>
           <div class="ps-box yl">
-            <div class="ps-l">처리 중</div>
-            <div class="ps-v">2</div>
-            <div class="ps-sub">담당자 배정</div>
+            <div class="ps-l">미해결 정비</div>
+            <div class="ps-v">{{ pmUnresolvedTicketCount }}</div>
+            <div class="ps-sub">배정/진행 포함</div>
           </div>
           <div class="ps-box gr">
-            <div class="ps-l">금일 복구</div>
-            <div class="ps-v">5</div>
-            <div class="ps-sub">자동 3, 수동 2</div>
+            <div class="ps-l">완료 정비</div>
+            <div class="ps-v">{{ pmResolvedTicketCount }}</div>
+            <div class="ps-sub">해결/종결 완료</div>
           </div>
           <div class="ps-box pm-alert" :class="{ alert: pmPredictedCount2 > 0 }">
             <div class="ps-l"><i class="bi bi-graph-up-arrow"></i> 악화 예측</div>
@@ -1303,7 +1303,7 @@
             <div class="ps-sub">임계 도달 예상</div>
           </div>
           <div class="ps-box pm">
-            <div class="ps-l"><i class="bi bi-bullseye"></i> 활성 이상</div>
+            <div class="ps-l"><i class="bi bi-bullseye"></i> 전체 이상</div>
             <div class="ps-v">{{ pmAnomalyCount }}<span>건</span></div>
             <div class="ps-sub">예지 탐지</div>
           </div>
@@ -1318,32 +1318,61 @@
             <div class="ps-sub">평균 복구</div>
           </div>
           <div class="ps-box pm-alert" :class="{ alert: pmSlaOverdueCount > 0 }">
-            <div class="ps-l"><i class="bi bi-stopwatch"></i> SLA 초과</div>
+            <div class="ps-l"><i class="bi bi-stopwatch"></i> 대응 지연</div>
             <div class="ps-v">{{ pmSlaOverdueCount }}<span>건</span></div>
-            <div class="ps-sub">조치 지연 티켓</div>
+            <div class="ps-sub">조치 지연 정비 건</div>
           </div>
         </div>
 
-        <!-- ===== 활성 이상 이벤트 (예지 탐지) — 진행 중 장애 위에 배치 ===== -->
+        <!-- ===== 우선 조치 이상 상세 (예지 탐지) ===== -->
         <div class="nd-block" v-if="activeAnomaly">
           <div class="nd-h">
             <h4>
-              <i class="bi bi-bullseye"></i> 활성 이상 이벤트
+              <i class="bi bi-bullseye"></i> 우선 조치 이상 상세
               <span class="pm-pred-bdg" v-if="activeAnomaly.detectionMethod === 'TREND_PROJECTION'">
                 <i class="bi bi-graph-up-arrow"></i> 악화 예측
               </span>
             </h4>
-            <span class="nd-h-cnt">{{ activeAnomaly.id }} · {{ activeAnomaly.dev }}</span>
+            <span class="nd-h-cnt">
+              {{ activeAnomaly.id }} · {{ activeAnomaly.dev }} · 이상 {{ activeAnomaly.st }} · 정비 {{ ticketStatusLabel(activeAnomaly.ticketStatus) }}
+            </span>
           </div>
 
           <div class="pm-anom-card">
+            <div
+              v-if="String(activeAnomaly.eventId) === String(selectedAnomalyEventId)"
+              class="pm-selected-context"
+            >
+              <i class="bi bi-arrow-up-circle-fill"></i>
+              <span>목록에서 선택한 이상</span>
+              <strong>{{ activeAnomaly.id }} · {{ activeAnomaly.dev }} · {{ anomalyTypeLabelKo(activeAnomaly.anomalyType) }}</strong>
+              <em>연관 조치 지표: {{ evidenceMetricSummary(activeAnomaly.evidence) }}</em>
+            </div>
+
             <!-- 헤더: 유형 / 심각도 / 탐지 방식 / SLA -->
             <div class="pm-anom-head">
               <div class="pm-anom-titles">
-                <span class="sev-bdg" :class="activeAnomaly.tone">{{ activeAnomaly.sev }}</span>
-                <strong>{{ anomalyTypeLabelKo(activeAnomaly.anomalyType) }}</strong>
-                <span class="dm-bdg">{{ detectionMethodLabelKo(activeAnomaly.detectionMethod) }}</span>
-                <span class="pri-bdg" :class="pmPriorityTone(activeAnomaly.priority)">{{ activeAnomaly.priority }}</span>
+                <div class="pm-anom-title-line">
+                  <span class="sev-bdg" :class="activeAnomaly.tone">
+                    <em>위험도</em>
+                    <strong>{{ activeAnomaly.sev }}</strong>
+                  </span>
+                  <strong>{{ anomalyTypeLabelKo(activeAnomaly.anomalyType) }}</strong>
+                </div>
+                <div class="pm-anom-badges">
+                  <span class="pm-meta-chip" :class="activeAnomaly.stTone">
+                    <em>이상 상태</em><strong>{{ activeAnomaly.st }}</strong>
+                  </span>
+                  <span class="pm-meta-chip" :class="ticketStatusTone(activeAnomaly.ticketStatus)">
+                    <em>정비 상태</em><strong>{{ ticketStatusLabel(activeAnomaly.ticketStatus) }}</strong>
+                  </span>
+                  <span class="pm-meta-chip bl">
+                    <em>탐지 방식</em><strong>{{ detectionMethodLabelKo(activeAnomaly.detectionMethod) }}</strong>
+                  </span>
+                  <span class="pm-meta-chip" :class="pmPriorityTone(activeAnomaly.priority)">
+                    <em>우선순위</em><strong>{{ activeAnomaly.priority }}</strong>
+                  </span>
+                </div>
               </div>
               <div class="pm-anom-time" v-if="activeAnomaly.projectedAt">
                 <i class="bi bi-clock-history"></i>
@@ -1354,7 +1383,7 @@
             <!-- 통계 지표 + detector 정보 -->
             <div class="pm-stats-row" v-if="activeAnomaly.trend || activeAnomaly.detector">
               <div v-if="activeAnomaly.trend?.robustZScore != null" class="pm-stat">
-                <div class="pm-stat-l">Robust Z-score</div>
+                <div class="pm-stat-l">기준선 편차 점수</div>
                 <div class="pm-stat-v" :class="zScoreTone(activeAnomaly.trend.robustZScore)">
                   {{ activeAnomaly.trend.robustZScore.toFixed(2) }}
                 </div>
@@ -1376,34 +1405,70 @@
               </div>
               <div v-if="activeAnomaly.detector" class="pm-stat pm-stat-det">
                 <div class="pm-stat-l">탐지기</div>
-                <div class="pm-stat-v pm-stat-det-name">{{ activeAnomaly.detector.name }}</div>
+                <div class="pm-stat-v pm-stat-det-name">{{ detectorLabelKo(activeAnomaly.detector.name) }}</div>
                 <div class="pm-stat-s">
-                  v{{ activeAnomaly.detector.version }} · {{ activeAnomaly.detector.policyCode }}
+                  v{{ activeAnomaly.detector.version }} · {{ policyLabelKo(activeAnomaly.detector.policyCode) }}
                 </div>
               </div>
             </div>
 
-            <!-- 관측값 / 기준값 / 임계값 비교 표 -->
-            <table class="pm-evidence-tbl">
-              <thead>
-                <tr>
-                  <th>지표</th>
-                  <th class="num">관측값</th>
-                  <th class="num">기준선 (median)</th>
-                  <th class="num">임계값</th>
-                  <th>판정</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="e in activeAnomaly.evidence" :key="e.metric">
-                  <td>{{ e.metric }}</td>
-                  <td class="num mono"><strong :class="evTone(e)">{{ e.observed }}{{ e.unit }}</strong></td>
-                  <td class="num mono">{{ e.baseline }}{{ e.unit }}</td>
-                  <td class="num mono rd-txt">{{ e.threshold }}{{ e.unit }}</td>
-                  <td><span class="ev-jd" :class="evTone(e)">{{ evJudge(e) }}</span></td>
-                </tr>
-              </tbody>
-            </table>
+            <!-- 조치 기준: 운영자가 바로 이해할 수 있도록 지표명/단위/판정을 한글화 -->
+            <div class="pm-evidence-panel">
+              <div class="pm-evidence-panel-h">
+                <div>
+                  <strong>조치 판단 지표</strong>
+                  <span>현재 관측값이 조치 기준을 넘은 항목입니다.</span>
+                </div>
+                <span class="pm-evidence-count">{{ evidenceRows(activeAnomaly.evidence).length }}개 지표</span>
+              </div>
+              <div class="pm-evidence-grid">
+                <div
+                  v-for="e in evidenceRows(activeAnomaly.evidence)"
+                  :key="e.key"
+                  class="pm-evidence-row"
+                  :class="evTone(e)"
+                >
+                  <div class="pm-ev-main">
+                    <div class="pm-ev-title">
+                      <strong>{{ metricLabelKo(e.metric) }}</strong>
+                      <span v-if="e.count > 1">{{ e.count }}회 연속 감지</span>
+                    </div>
+                    <div class="pm-ev-scope">
+                      <span>대상 장비</span>
+                      <strong>{{ activeAnomaly.dev }}</strong>
+                      <em>{{ metricDeviceScope(e.metric) }}</em>
+                    </div>
+                    <div class="pm-ev-help">{{ metricHelpText(e.metric) }}</div>
+                    <div class="pm-ev-action">
+                      <strong>권장 조치</strong>
+                      <span>{{ metricActionText(e.metric) }}</span>
+                    </div>
+                  </div>
+                  <div class="pm-ev-values">
+                    <div class="pm-ev-value current" :class="evTone(e)">
+                      <span>현재</span>
+                      <strong>{{ formatEvidenceValue(e.observed, e.unit) }}</strong>
+                    </div>
+                    <div class="pm-ev-value">
+                      <span>정상 범위</span>
+                      <strong>{{ formatNormalReference(e) }}</strong>
+                    </div>
+                    <div class="pm-ev-value threshold">
+                      <span>조치 기준</span>
+                      <strong>{{ formatEvidenceValue(e.threshold, e.unit) }}</strong>
+                    </div>
+                    <div class="pm-ev-value judge" :class="evTone(e)">
+                      <span>판정</span>
+                      <strong>
+                        <i :class="evTone(e) === 'rd' ? 'bi bi-exclamation-octagon-fill' : 'bi bi-check-circle-fill'"></i>
+                        {{ evJudge(e) }}
+                      </strong>
+                      <em>{{ evRiskText(e) }}</em>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <!-- 교통 맥락 교차검증 -->
             <div class="pm-traffic" v-if="activeAnomaly.trafficContext">
@@ -1439,13 +1504,13 @@
               <div class="pm-cause-blk">
                 <div class="pm-cause-h">원인 후보 <em>(탐지 시스템 추정)</em></div>
                 <ul class="pm-cause-list">
-                  <li v-for="(c, i) in activeAnomaly.suspectedCauses" :key="i">{{ c }}</li>
+                  <li v-for="(c, i) in activeAnomaly.suspectedCauses" :key="i">{{ causeLabelKo(c) }}</li>
                 </ul>
               </div>
               <div class="pm-cause-blk confirmed">
                 <div class="pm-cause-h">확정 원인 <em>(운영자 입력)</em></div>
                 <div v-if="activeAnomaly.confirmedCause" class="pm-confirmed">
-                  ✓ {{ activeAnomaly.confirmedCause }}
+                  ✓ {{ causeLabelKo(activeAnomaly.confirmedCause) }}
                 </div>
                 <div v-else class="pm-confirmed-empty">
                   <i class="bi bi-pencil-square"></i> 미확정 — 해결(resolve) 시 입력 필요
@@ -1453,12 +1518,12 @@
               </div>
             </div>
 
-            <!-- SHADOW (LSTM AutoEncoder) — 비교 모델, 운영 판정에 사용 X -->
+            <!-- 비교 모델 — 운영 판정에 직접 사용하지 않는 참고 정보 -->
             <div class="pm-shadow" v-if="activeAnomaly.shadowModel">
               <div class="pm-shadow-h">
                 <i class="bi bi-cpu"></i>
                 <strong>비교 모델</strong>
-                <span class="shadow-bdg">SHADOW · {{ activeAnomaly.shadowModel.name }} v{{ activeAnomaly.shadowModel.version }}</span>
+                <span class="shadow-bdg">참고 모델 · {{ detectorLabelKo(activeAnomaly.shadowModel.name) }} v{{ activeAnomaly.shadowModel.version }}</span>
                 <span class="pm-shadow-note">운영 이벤트 생성에 사용되지 않음 (비교·평가용)</span>
               </div>
               <div class="pm-shadow-body">
@@ -1468,17 +1533,17 @@
                     {{ activeAnomaly.shadowModel.score.toFixed(2) }}
                   </div>
                   <div class="pm-ss-thr">
-                    임계 W {{ activeAnomaly.shadowModel.warningThreshold }} · C {{ activeAnomaly.shadowModel.criticalThreshold }}
+                    임계 경고 {{ activeAnomaly.shadowModel.warningThreshold }} · 심각 {{ activeAnomaly.shadowModel.criticalThreshold }}
                   </div>
                   <div class="pm-ss-pred">
-                    예측 심각도: <strong :class="shadowPredTone(activeAnomaly.shadowModel)">{{ activeAnomaly.shadowModel.predictedSeverity }}</strong>
+                    예측 심각도: <strong :class="shadowPredTone(activeAnomaly.shadowModel)">{{ severityLabel(activeAnomaly.shadowModel.predictedSeverity) }}</strong>
                   </div>
                 </div>
                 <div class="pm-shadow-feats">
-                  <div class="pm-sf-l">기여 feature <em>(재구성 오차 평균 상위 — 원인 확정값 아님)</em></div>
+                  <div class="pm-sf-l">영향 지표 <em>(재구성 오차 평균 상위 — 원인 확정값 아님)</em></div>
                   <div class="pm-sf-rows">
                     <div v-for="f in activeAnomaly.shadowModel.topFeatures" :key="f.name" class="pm-sf-row">
-                      <span class="pm-sf-n">{{ f.name }}</span>
+                      <span class="pm-sf-n">{{ metricLabelKo(f.name) }}</span>
                       <div class="pm-sf-bar">
                         <div class="pm-sf-fill" :style="{ width: (f.value * 100) + '%' }"></div>
                       </div>
@@ -1489,59 +1554,20 @@
               </div>
             </div>
 
-            <!-- 연결된 정비 티켓 -->
-            <div class="pm-linked-ticket" v-if="linkedTicket(activeAnomaly)">
-              <i class="bi bi-link-45deg"></i>
-              <span class="pm-linked-l">연결된 정비 티켓</span>
-              <strong>{{ linkedTicket(activeAnomaly).id }}</strong>
-              <span class="pri-bdg" :class="pmPriorityTone(linkedTicket(activeAnomaly).priority)">{{ linkedTicket(activeAnomaly).priority }}</span>
-              <span class="stat" :class="linkedTicket(activeAnomaly).stTone">{{ ticketStatusLabel(linkedTicket(activeAnomaly).ticketStatus) }}</span>
-              <span class="pm-linked-sla mono">SLA {{ formatSlaRemaining(linkedTicket(activeAnomaly).slaRemainingMin) }}</span>
-            </div>
-            <div class="pm-linked-ticket none" v-else>
+            <div class="pm-detail-guide">
               <i class="bi bi-info-circle"></i>
-              연결된 정비 티켓 없음 — 해결 시 자동 생성됩니다
-            </div>
-
-            <!-- 액션: 권한 매트릭스 기반 노출 -->
-            <div class="pm-anom-acts" role="group" aria-label="이상 이벤트 처리">
-              <button
-                class="pnl-act"
-                :disabled="!canResolveAnomaly"
-                :aria-disabled="!canResolveAnomaly"
-                :title="canResolveAnomaly ? '' : 'OPERATOR/ADMIN만 해결 처리 가능'"
-                @click="openAnomalyResolve(activeAnomaly)"
-              >
-                <i class="bi bi-check2-circle" aria-hidden="true"></i> 해결(resolve)
-              </button>
-              <button
-                class="pnl-act"
-                :disabled="!canResolveAnomaly"
-                :aria-disabled="!canResolveAnomaly"
-                :title="canResolveAnomaly ? '' : 'OPERATOR/ADMIN만 오탐 종료 가능'"
-                @click="openAnomalyDismiss(activeAnomaly)"
-              >
-                <i class="bi bi-x-circle" aria-hidden="true"></i> 오탐 종료(dismiss)
-              </button>
-              <button
-                class="pnl-act"
-                :disabled="!canAssignTicket"
-                :aria-disabled="!canAssignTicket"
-                :title="canAssignTicket ? '' : 'OPERATOR/ADMIN만 담당자 배정 가능'"
-                @click="openAssignModal(activeAnomaly)"
-              >
-                <i class="bi bi-person-plus" aria-hidden="true"></i> 담당자 배정
-              </button>
+              <span>이 영역은 원인과 조치 근거 확인용입니다.</span>
+              <strong>배정, 작업 시작, 해결, 종결 처리는 아래 현황표에서 진행하세요.</strong>
             </div>
           </div>
         </div>
 
 
-        <!-- 전체 장애·이상 목록 -->
+        <!-- 이상 이벤트 및 정비 건 현황 -->
         <div class="nd-block">
           <div class="nd-h">
-            <h4>전체 장애·이상 목록</h4>
-            <span class="nd-h-cnt">{{ filteredFaults.length }} / {{ faults.length }}건 ({{ pmAnomalyCount }} 예지 탐지 포함)</span>
+            <h4>이상 이벤트 및 정비 건 현황</h4>
+            <span class="nd-h-cnt">{{ filteredFaults.length }} / {{ faults.length }}건 · 상태는 이상/정비를 분리 표시</span>
           </div>
 
           <!-- 필터 -->
@@ -1559,13 +1585,13 @@
             </select>
             <select v-model="faultFilter.detectionMethod">
               <option value="">탐지 방식 전체</option>
-              <option value="RULE">룰</option>
+              <option value="RULE">정책 룰</option>
               <option value="TREND_PROJECTION">추세 예측</option>
-              <option value="ROBUST_Z_SCORE">z-score</option>
+              <option value="ROBUST_Z_SCORE">기준선 편차</option>
               <option value="CROSS_VALIDATION">교차 검증</option>
             </select>
             <select v-model="faultFilter.status">
-              <option value="">상태 전체</option>
+              <option value="">정비 상태 전체</option>
               <option value="OPEN">대기</option>
               <option value="ASSIGNED">배정</option>
               <option value="IN_PROGRESS">진행 중</option>
@@ -1574,7 +1600,7 @@
             </select>
             <label class="pm-fault-flag">
               <input type="checkbox" v-model="faultFilter.slaOverdueOnly" />
-              SLA 초과만
+              대응 지연만
             </label>
             <button class="pnl-act sm" @click="resetFaultFilter">
               <i class="bi bi-arrow-counterclockwise"></i> 초기화
@@ -1592,13 +1618,18 @@
                 <th>심각도</th>
                 <th>탐지</th>
                 <th>담당자</th>
-                <th>SLA 잔여</th>
-                <th>상태</th>
+                <th>대응 제한시간</th>
+                <th>이상 상태</th>
+                <th>정비 상태</th>
                 <th>작업</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="f in filteredFaults" :key="f.id">
+              <tr
+                v-for="f in filteredFaults"
+                :key="f.id"
+                :class="{ selected: String(f.eventId) === String(selectedAnomalyEventId) }"
+              >
                 <td class="mono">
                   {{ f.id }}
                   <span v-if="f.kind === 'anomaly'" class="pm-kind-bdg" title="예지보전 탐지">PM</span>
@@ -1637,7 +1668,17 @@
                 <td>
                   <span class="stat" :class="f.stTone">{{ f.st }}</span>
                 </td>
+                <td>
+                  <span class="stat" :class="ticketStatusTone(f.ticketStatus)">
+                    {{ f.ticketId ? ticketStatusLabel(f.ticketStatus) : "미발행" }}
+                  </span>
+                </td>
                 <td class="pm-fault-acts">
+                  <button
+                    v-if="canAssignTicket && f.ticketId && f.ticketStatus === 'OPEN'"
+                    class="pnl-act sm"
+                    @click="openAssignModal(f)"
+                  >배정</button>
                   <button
                     v-if="canTransitionTicket(f.ticketStatus, 'IN_PROGRESS')"
                     class="pnl-act sm"
@@ -1654,7 +1695,7 @@
                     @click="openTicketTransition(f, 'CLOSED')"
                     title="OPERATOR/ADMIN만 처리 가능"
                   >최종 종결</button>
-                  <button class="pnl-act sm">상세</button>
+                  <button class="pnl-act sm" @click="selectAnomalyDetail(f)">상세</button>
                 </td>
               </tr>
             </tbody>
@@ -1755,8 +1796,8 @@
                     v-for="c in anomalyModal.anom.suspectedCauses || []"
                     :key="c"
                     :value="c"
-                  >{{ c }}</option>
-                  <option value="기타">기타 (입력 필요)</option>
+                  >{{ causeLabelKo(c) }}</option>
+                  <option value="UNKNOWN">기타/미상</option>
                 </select>
               </div>
               <div class="pm-ticket-note">
@@ -1795,27 +1836,27 @@
         </div>
       </div>
 
-      <!-- ============ 티켓 상태 전이 모달 (RESOLVED 시 메모 필수) ============ -->
+      <!-- ============ 정비 상태 전이 모달 (RESOLVED 시 메모 필수) ============ -->
       <div
         v-if="ticketModal"
         class="cam-modal-bg"
         @click="closeTicketModal"
         role="dialog"
         aria-modal="true"
-        aria-label="티켓 상태 변경"
+        aria-label="정비 상태 변경"
       >
         <div class="cam-modal pm-ticket-modal pm-ticket-modal-wide" @click.stop>
           <div class="cm-h">
             <div class="cm-title">
               <i class="bi bi-clipboard-check" aria-hidden="true"></i>
-              <span>티켓 상태 변경</span>
+              <span>정비 상태 변경</span>
               <span class="stat" :class="ticketModal.fault.tone">{{ ticketModal.fault.sev }}</span>
             </div>
             <button class="cm-x" @click="closeTicketModal" aria-label="닫기"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
           </div>
           <div class="pm-ticket-body">
             <div class="cm-row">
-              <span>티켓 ID</span><strong>{{ ticketModal.fault.id }}</strong>
+              <span>정비 건 ID</span><strong>{{ ticketModal.fault.id }}</strong>
             </div>
             <div class="cm-row">
               <span>현재 상태</span><strong>{{ ticketStatusLabel(ticketModal.fault.ticketStatus) }}</strong>
@@ -2003,10 +2044,10 @@
                 </div>
               </div>
 
-              <!-- 정책 방식별 추가 입력 (Rule / z-score / 추세) -->
+              <!-- 정책 방식별 추가 입력 -->
               <div v-if="p.detectionMethod === 'ROBUST_Z_SCORE'" class="pm-policy-extra">
                 <div class="pm-field">
-                  <label>z-score 윈도(분)</label>
+                  <label>기준선 비교 윈도(분)</label>
                   <input type="number" v-model.number="p.zScoreWindowMinutes" :disabled="!canEditPolicy" min="5" max="120" />
                   <span class="pm-field-unit">분</span>
                 </div>
@@ -2018,7 +2059,7 @@
               </div>
               <div v-else-if="p.detectionMethod === 'TREND_PROJECTION'" class="pm-policy-extra">
                 <div class="pm-field">
-                  <label>예측 horizon</label>
+                  <label>예측 기간</label>
                   <input type="number" v-model.number="p.predictionHorizonMinutes" :disabled="!canEditPolicy" min="5" max="60" />
                   <span class="pm-field-unit">분</span>
                 </div>
@@ -3251,11 +3292,26 @@ const demoFaults = Object.freeze([
   },
 ]);
 const faults = ref([]);
+const selectedAnomalyEventId = ref(null)
 
 // 집계 (헤더/KPI용)
 const pmAnomalyCount   = computed(() => faults.value.filter((f) => f.kind === "anomaly").length)
 const pmPredictedCount2 = computed(() => faults.value.filter((f) => f.detectionMethod === "TREND_PROJECTION").length)
 const pmSlaOverdueCount = computed(() => faults.value.filter((f) => f.slaOverdue).length)
+const pmOpenAnomalyCount = computed(() =>
+  faults.value.filter((f) => f.kind === "anomaly" && !["RESOLVED", "DISMISSED"].includes(f.anomalyStatus)).length,
+)
+const pmTicketRows = computed(() => faults.value.filter((f) => f.ticketId))
+const pmUnresolvedTicketCount = computed(() =>
+  new Set(pmTicketRows.value
+    .filter((f) => !["RESOLVED", "CLOSED"].includes(f.ticketStatus))
+    .map((f) => f.ticketId)).size,
+)
+const pmResolvedTicketCount = computed(() =>
+  new Set(pmTicketRows.value
+    .filter((f) => ["RESOLVED", "CLOSED"].includes(f.ticketStatus))
+    .map((f) => f.ticketId)).size,
+)
 
 // MTTA (Mean Time To Acknowledge) — 데모 더미값
 const pmMtta = ref(7.4)
@@ -3309,10 +3365,25 @@ const pmPriorityLabel = (p) => p || "—"
 // 가장 우선 처리해야 할 활성 이상 (TREND_PROJECTION 우선, 그 다음 CRITICAL)
 const activeAnomaly = computed(() => {
   const list = faults.value.filter((f) => f.kind === "anomaly")
-  return list.find((f) => f.detectionMethod === "TREND_PROJECTION") || list[0] || null
+  const selected = list.find((f) => String(f.eventId) === String(selectedAnomalyEventId.value))
+  if (selected) return selected
+  const open = list.filter((f) => !["RESOLVED", "DISMISSED"].includes(f.anomalyStatus))
+  return open.find((f) => f.tone === "no" || f.tone === "rd")
+    || open[0]
+    || list.find((f) => f.detectionMethod === "TREND_PROJECTION")
+    || list[0]
+    || null
 })
 
-// 이상 이벤트에 연결된 정비 티켓 (현재 mock: 같은 장비의 fault kind 항목)
+function selectAnomalyDetail(fault) {
+  if (!fault?.eventId) return
+  selectedAnomalyEventId.value = fault.eventId
+  nextTick(() => {
+    document.querySelector(".pm-anom-card")?.scrollIntoView({ behavior: "smooth", block: "start" })
+  })
+}
+
+// 이상 이벤트에 연결된 정비 건 (현재 mock: 같은 장비의 fault kind 항목)
 function linkedTicket(anom) {
   if (!anom) return null
   if (anom.ticketId) return anom
@@ -3364,7 +3435,7 @@ function confTone(c) {
   return "rd"
 }
 
-// 티켓 변경 이력 (현재 상태에 맞춰 발생한 단계까지의 history 생성)
+// 정비 건 변경 이력 (현재 상태에 맞춰 발생한 단계까지의 history 생성)
 // 실제 백엔드 연동 시 GET /tickets/{id}/history 로 교체
 function ticketHistory(fault) {
   if (!fault) return []
@@ -3375,7 +3446,7 @@ function ticketHistory(fault) {
 
   // 발생 (항상)
   events.push({
-    action: "티켓 생성",
+    action: "정비 건 생성",
     kind: "create",
     at: `${baseTime}`,
     by: fault.detectionMethod === "TREND_PROJECTION" ? "예지 시스템" : "장애 자동 감지",
@@ -3454,13 +3525,54 @@ function anomalyTypeLabelKo(t) {
 }
 function detectionMethodLabelKo(m) {
   const map = {
-    RULE: "룰",
-    ROBUST_Z_SCORE: "z-score",
+    RULE: "정책 룰",
+    ROBUST_Z_SCORE: "기준선 편차",
     TREND_PROJECTION: "추세 예측",
     CROSS_VALIDATION: "교차 검증",
-    LSTM_AUTOENCODER: "LSTM",
+    LSTM_AUTOENCODER: "비교 모델",
   }
   return map[m] || m || "—"
+}
+function detectorLabelKo(name) {
+  const map = {
+    "camera-rule": "카메라 상태 룰 탐지",
+    "camera-robust-zscore": "기준선 편차 탐지",
+    "camera-trend-projection": "악화 추세 예측",
+    "camera-context-cross-validator": "교통 맥락 교차검증",
+    "camera-lstm-autoencoder": "비교 모델",
+    "shadow-model": "비교 모델",
+  }
+  return map[name] || name || "—"
+}
+function policyLabelKo(code) {
+  const map = {
+    CAMERA_OFFLINE_RULE_V1: "카메라 오프라인 정책",
+    FPS_DEGRADATION_RULE_V1: "FPS 저하 정책",
+    FRAME_DROP_DEGRADATION_RULE_V1: "프레임 손실 정책",
+    LATENCY_DEGRADATION_RULE_V1: "응답 지연 정책",
+    BLUR_DEGRADATION_RULE_V1: "영상 흐림 정책",
+    OCR_QUALITY_DEGRADATION_RULE_V1: "OCR 품질 저하 정책",
+    RESOURCE_SATURATION_RULE_V1: "리소스 과부하 정책",
+    NETWORK_INSTABILITY_RULE_V1: "네트워크 불안정 정책",
+    CAMERA_TREND_PROJECTION_V1: "악화 추세 예측 정책",
+    CAMERA_ROBUST_ZSCORE_V1: "기준선 편차 정책",
+    TRAFFIC_CONTEXT_VALIDATION_V1: "교통 맥락 검증 정책",
+  }
+  return map[code] || code || "—"
+}
+function causeLabelKo(c) {
+  const map = {
+    CAMERA_POWER_OR_NETWORK: "카메라 전원/네트워크",
+    CAMERA_LENS_OR_FOCUS: "렌즈/초점 문제",
+    LOW_ILLUMINATION: "조도 부족",
+    AI_PROCESSING_OVERLOAD: "AI 처리 과부하",
+    OCR_PIPELINE_DEGRADATION: "OCR 파이프라인 저하",
+    NETWORK_CONGESTION: "네트워크 혼잡",
+    EXTERNAL_TRAFFIC_CHANGE: "외부 교통 변화",
+    INSUFFICIENT_DATA: "데이터 부족",
+    UNKNOWN: "미상",
+  }
+  return map[c] || c || "—"
 }
 function ticketStatusLabel(s) {
   const map = {
@@ -3473,13 +3585,149 @@ function ticketStatusLabel(s) {
   return map[s] || s || "—"
 }
 
-// 관측값 판정 — 관측이 임계를 넘었는가 (방향은 metric별로 다르지만 여기선 단순 비교)
+function metricLabelKo(metric) {
+  const key = String(metric || "").toLowerCase()
+  const map = {
+    fps_avg: "처리 FPS",
+    frame_drop_rate: "프레임 손실률",
+    latency_p95_ms: "응답 지연시간",
+    blur_score_avg: "영상 흐림 정도",
+    brightness_score_avg: "영상 밝기 품질",
+    detection_count: "탐지 건수",
+    ocr_fail_rate: "OCR 실패율",
+    ocr_attempt_count: "OCR 시도 건수",
+    ocr_failure_count: "OCR 실패 건수",
+    cpu_usage_pct: "CPU 사용률",
+    memory_usage_pct: "메모리 사용률",
+    disk_usage_pct: "디스크 사용률",
+    network_rtt_ms: "네트워크 왕복 지연",
+  }
+  return map[key] || metric || "—"
+}
+function metricHelpText(metric) {
+  const key = String(metric || "").toLowerCase()
+  if (key.includes("fps")) return "영상 처리 속도가 낮아지면 실시간 감지 누락 가능성이 커집니다."
+  if (key.includes("frame_drop")) return "프레임 손실이 많으면 차량 흐름과 번호판 인식 품질이 떨어집니다."
+  if (key.includes("latency")) return "응답 지연이 커지면 관제 화면과 실제 현장 상태 사이의 차이가 커집니다."
+  if (key.includes("blur")) return "영상이 흐리면 객체 감지와 OCR 정확도가 함께 낮아질 수 있습니다."
+  if (key.includes("brightness")) return "밝기 품질이 낮으면 야간 또는 역광 구간 인식률이 떨어집니다."
+  if (key.includes("ocr")) return "OCR 실패율 증가는 번호판 인식 파이프라인 점검 신호입니다."
+  if (key.includes("cpu")) return "CPU 사용률이 높으면 분석 서버의 처리 지연이 발생할 수 있습니다."
+  if (key.includes("memory")) return "메모리 사용률이 높으면 장시간 운영 중 장애 위험이 커집니다."
+  if (key.includes("disk")) return "디스크 사용률이 높으면 영상 저장과 로그 기록이 중단될 수 있습니다."
+  if (key.includes("network")) return "네트워크 지연은 카메라 연결 품질 또는 전송망 문제를 의심해야 합니다."
+  return "현재 지표가 평소 기준 또는 정책 기준에서 벗어났는지 확인합니다."
+}
+function metricDeviceScope(metric) {
+  const key = String(metric || "").toLowerCase()
+  if (key.includes("cpu") || key.includes("memory") || key.includes("disk")) return "장비 영역: 카메라/엣지 분석 장비 리소스"
+  if (key.includes("network") || key.includes("latency")) return "장비 영역: 카메라 연결망"
+  if (key.includes("fps") || key.includes("frame_drop")) return "장비 영역: 영상 처리 파이프라인"
+  if (key.includes("blur") || key.includes("brightness")) return "장비 영역: 카메라 렌즈/영상 입력"
+  if (key.includes("ocr")) return "장비 영역: 번호판 인식 파이프라인"
+  return "장비 영역: 카메라 상태 지표"
+}
+function metricActionText(metric) {
+  const key = String(metric || "").toLowerCase()
+  if (key.includes("cpu")) return "AI 분석 프로세스 부하, 컨테이너 CPU 제한, 동시 스트림 수를 우선 확인합니다."
+  if (key.includes("memory")) return "메모리 누수 또는 장시간 실행 프로세스를 확인하고 필요 시 서비스 재시작/리소스 증설을 검토합니다."
+  if (key.includes("disk")) return "영상 저장 공간과 로그 적재량을 확인하고 보관 주기 또는 디스크 용량을 조정합니다."
+  if (key.includes("network")) return "카메라 회선, 스위치 포트, 패킷 손실과 왕복 지연을 확인합니다."
+  if (key.includes("latency")) return "카메라 연결 지연과 백엔드 처리 지연을 분리해 확인합니다."
+  if (key.includes("fps")) return "카메라 스트림 FPS 설정, 디코딩 부하, 분석 서버 처리량을 확인합니다."
+  if (key.includes("frame_drop")) return "카메라 스트림 손실, 네트워크 품질, 프레임 버퍼 상태를 확인합니다."
+  if (key.includes("blur")) return "렌즈 오염, 초점 이탈, 흔들림과 조도 상태를 현장 점검합니다."
+  if (key.includes("brightness")) return "역광/야간 조명 상태와 카메라 노출 설정을 확인합니다."
+  if (key.includes("ocr")) return "번호판 인식 모델 입력 품질, OCR 실패 로그, 전처리 설정을 확인합니다."
+  return "해당 카메라의 최근 상태 샘플과 정비 이력을 확인합니다."
+}
+function unitLabelKo(unit) {
+  const key = String(unit || "").toLowerCase()
+  if (key === "pct" || key === "percent" || key === "%") return "%"
+  if (key === "ratio" || key === "rate") return "%"
+  if (key === "ms") return "밀리초"
+  if (key === "fps") return "프레임/초"
+  if (key === "score") return "%"
+  if (key === "count") return "건"
+  return unit || ""
+}
+function normalizedEvidenceNumber(value, unit) {
+  const n = numberOrNull(value)
+  if (n == null) return null
+  const key = String(unit || "").toLowerCase()
+  if (key === "ratio" || key === "rate") return n * 100
+  if (key === "score") return n <= 1 ? n * 100 : n
+  return n
+}
+function formatEvidenceValue(value, unit, emptyText = "-") {
+  const n = normalizedEvidenceNumber(value, unit)
+  if (n == null) return emptyText
+  const text = Number.isInteger(n) ? String(n) : n.toFixed(1)
+  const suffix = unitLabelKo(unit)
+  return suffix ? `${text}${suffix === "%" ? "" : " "}${suffix}` : text
+}
+function isLowerWorseMetric(metric) {
+  return String(metric || "").toLowerCase().includes("fps")
+}
+function formatNormalReference(e) {
+  const baseline = numberOrNull(e?.baseline)
+  if (baseline != null) return formatEvidenceValue(baseline, e.unit)
+
+  const threshold = numberOrNull(e?.threshold)
+  if (threshold == null) return "-"
+  const value = formatEvidenceValue(threshold, e.unit)
+  return isLowerWorseMetric(e.metric) ? `${value} 이상` : `${value} 이하`
+}
+function evidenceRows(items = []) {
+  const rows = new Map()
+  for (const item of items || []) {
+    const key = [
+      item.metric,
+      item.observed,
+      item.baseline,
+      item.threshold,
+      item.unit,
+    ].join("|")
+    if (rows.has(key)) {
+      rows.get(key).count += 1
+    } else {
+      rows.set(key, { ...item, key, count: 1 })
+    }
+  }
+  return Array.from(rows.values())
+}
+function evidenceMetricSummary(items = []) {
+  const labels = [...new Set(evidenceRows(items).map((e) => metricLabelKo(e.metric)))]
+  return labels.length ? labels.join(", ") : "조치 지표 없음"
+}
+// 관측값 판정 — fps 계열은 낮을수록 나쁘고, 나머지는 높을수록 나쁘다.
 function evJudge(e) {
-  if (e.metric === "FPS") return e.observed < e.threshold ? "임계 초과" : "정상"
-  return e.observed > e.threshold ? "임계 초과" : "정상"
+  const observed = numberOrNull(e.observed)
+  const threshold = numberOrNull(e.threshold)
+  if (observed == null || threshold == null) return "확인 필요"
+  if (isLowerWorseMetric(e.metric)) {
+    return observed < threshold ? "조치 필요" : "정상"
+  }
+  return observed > threshold ? "조치 필요" : "정상"
 }
 function evTone(e) {
-  return evJudge(e) === "임계 초과" ? "rd" : "gr"
+  return evJudge(e) === "조치 필요" ? "rd" : "gr"
+}
+function evRiskText(e) {
+  const observed = normalizedEvidenceNumber(e.observed, e.unit)
+  const threshold = normalizedEvidenceNumber(e.threshold, e.unit)
+  if (observed == null || threshold == null) return "조치 기준 확인 필요"
+
+  const diff = isLowerWorseMetric(e.metric) ? threshold - observed : observed - threshold
+  if (diff <= 0) return "조치 기준 이내"
+
+  const unit = String(e.unit || "").toLowerCase()
+  if (unit === "pct" || unit === "percent" || unit === "%" || unit === "ratio" || unit === "rate") return `조치 기준보다 ${diff.toFixed(0)}%p 초과`
+  if (unit === "ms") return `조치 기준보다 ${diff.toFixed(0)}밀리초 초과`
+  if (unit === "fps") return `조치 기준보다 ${diff.toFixed(1)}프레임/초 부족`
+  if (unit === "score") return `조치 기준보다 ${diff.toFixed(0)}%p 초과`
+  if (unit === "count") return `조치 기준보다 ${diff.toFixed(0)}건 초과`
+  return `조치 기준보다 ${diff.toFixed(1)} 초과`
 }
 
 // SHADOW 점수 색상 (위험 ≥ critical, 경고 ≥ warning, 그 외 정상)
@@ -3494,18 +3742,18 @@ function shadowPredTone(s) {
   return s.predictedSeverity === "CRITICAL" ? "rd-txt" : "yl-txt"
 }
 
-// SLA 잔여 시간 표시
+// 대응 제한시간 표시
 function formatSlaRemaining(min) {
   if (min == null) return "—"
   if (min < 0) {
     const abs = Math.abs(min)
-    return abs >= 60 ? `${(abs / 60).toFixed(1)}시간 초과` : `${abs}분 초과`
+    return abs >= 60 ? `${(abs / 60).toFixed(1)}시간 지연` : `${abs}분 지연`
   }
   if (min < 60) return `${min}분 남음`
   return `${(min / 60).toFixed(1)}시간 남음`
 }
 
-// ─── 티켓 상태 전이 modal ───
+// ─── 정비 상태 전이 modal ───
 const ticketModal = ref(null)
 function openTicketTransition(fault, toStatus) {
   ticketModal.value = { fault, toStatus, note: "", error: "" }
@@ -3530,10 +3778,8 @@ const anomalyModal = ref(null)
 
 // ─── 담당자 배정 모달 ───
 const assignees = [
-  { id: 7,  name: "김기사",  role: "MAINTAINER" },
-  { id: 8,  name: "이엔지",  role: "MAINTAINER" },
-  { id: 9,  name: "박엔지",  role: "MAINTAINER" },
-  { id: 12, name: "정매니저", role: "OPERATOR" },
+  { id: 2, name: "관리자", role: "ADMIN" },
+  { id: 1, name: "이용자", role: "USER" },
 ]
 const assignModal = ref(null)
 function legacyOpenAssignModalBase(target) {
@@ -3623,7 +3869,7 @@ async function submitTicketTransition() {
   }
   const ticketId = ticketIdFor(fault)
   if (!ticketId) {
-    ticketModal.value.error = "연결된 정비 티켓이 없습니다. anomaly/ticket 생성 후 다시 시도해 주세요."
+    ticketModal.value.error = "연결된 정비 건이 없습니다. 이상 이벤트 생성 후 다시 시도해 주세요."
     return
   }
   try {
@@ -3631,12 +3877,12 @@ async function submitTicketTransition() {
     await loadPredictiveOperations()
     closeTicketModal()
   } catch (err) {
-    ticketModal.value.error = err?.normalized?.message || err?.message || "티켓 상태 변경에 실패했습니다."
+    ticketModal.value.error = err?.normalized?.message || err?.message || "정비 상태 변경에 실패했습니다."
   }
 }
 
 function openAssignModal(target) {
-  assignModal.value = { target: linkedTicket(target) || target, assigneeId: "", note: "", error: "" }
+  assignModal.value = { target: linkedTicket(target) || target, assigneeId: assignees[0]?.id || "", note: "", error: "" }
 }
 
 async function submitAssignModal() {
@@ -3647,7 +3893,7 @@ async function submitAssignModal() {
   }
   const ticketId = ticketIdFor(assignModal.value.target)
   if (!ticketId) {
-    assignModal.value.error = "연결된 정비 티켓이 없습니다. anomaly/ticket 생성 후 다시 시도해 주세요."
+    assignModal.value.error = "연결된 정비 건이 없습니다. 이상 이벤트 생성 후 다시 시도해 주세요."
     return
   }
   try {
@@ -4240,8 +4486,8 @@ function severityTone(severity) {
 }
 
 function severityLabel(severity) {
-  if (severity === "CRITICAL") return "CRIT"
-  if (severity === "WARNING") return "WARN"
+  if (severity === "CRITICAL") return "심각"
+  if (severity === "WARNING") return "경고"
   return severity || "-"
 }
 
@@ -4269,15 +4515,17 @@ function ticketStatusTone(status) {
 
 function scoreText(score) {
   const n = numberOrNull(score)
-  return n == null ? "" : ` · score ${n.toFixed(2)}`
+  if (n == null) return ""
+  const percent = n <= 1 ? n * 100 : n
+  return ` · 이상 정도 ${percent.toFixed(0)}%`
 }
 
 function toEvidence(row) {
   return {
     metric: row.metricName || "-",
-    observed: numberOrNull(row.observedValue) ?? 0,
-    baseline: numberOrNull(row.baselineValue) ?? 0,
-    threshold: numberOrNull(row.thresholdValue) ?? 0,
+    observed: numberOrNull(row.observedValue),
+    baseline: numberOrNull(row.baselineValue),
+    threshold: numberOrNull(row.thresholdValue),
     unit: row.unit || "",
   }
 }
@@ -4318,6 +4566,7 @@ function toOpsAnomaly(summary, detail, ticket) {
     tone: severityTone(event.severity),
     who: ticket?.assignee?.name || "-",
     elapsed: formatElapsedFrom(event.firstDetectedAt),
+    anomalyStatus: event.status,
     st: anomalyStatusLabel(event.status),
     stTone: anomalyStatusTone(event.status),
     ticketStatus,
@@ -4335,7 +4584,7 @@ function toOpsAnomaly(summary, detail, ticket) {
     suspectedCauses: Array.isArray(event.suspectedCauses) && event.suspectedCauses.length
       ? event.suspectedCauses
       : ["UNKNOWN"],
-    confirmedCause: null,
+    confirmedCause: event.confirmedCause || null,
     detector,
     trend: event.trend
       ? {
@@ -4858,40 +5107,136 @@ const servers = Object.freeze([
   background: linear-gradient(90deg, #ea580c, transparent);
   border-radius: 2px 2px 0 0;
 }
+.ops-shell .pm-selected-context {
+  display: grid;
+  grid-template-columns: auto auto minmax(220px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 10px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #0c1f40;
+}
+.ops-shell .pm-selected-context i {
+  color: #2563eb;
+  font-size: 16px;
+}
+.ops-shell .pm-selected-context span {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 850;
+}
+.ops-shell .pm-selected-context strong {
+  font-size: 14px;
+  font-weight: 850;
+}
+.ops-shell .pm-selected-context em {
+  justify-self: end;
+  font-style: normal;
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+@media (max-width: 1200px) {
+  .ops-shell .pm-selected-context {
+    grid-template-columns: auto 1fr;
+  }
+  .ops-shell .pm-selected-context strong,
+  .ops-shell .pm-selected-context em {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
 .ops-shell .pm-anom-head {
   display: flex; align-items: center; justify-content: space-between;
   flex-wrap: wrap; gap: 12px;
   margin-bottom: 20px;
 }
 .ops-shell .pm-anom-titles {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  font-size: 14px;
+  display: grid;
+  gap: 10px;
+  font-size: 15px;
 }
-.ops-shell .pm-anom-titles > strong {
-  font-size: 16px; color: #0c1f40;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+.ops-shell .pm-anom-title-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ops-shell .pm-anom-title-line > strong {
+  font-size: 20px; color: #0c1f40;
+  font-weight: 850;
+  letter-spacing: 0;
 }
 .ops-shell .sev-bdg {
-  padding: 3px 10px; border-radius: 6px;
-  font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
-  text-transform: uppercase;
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 12px; border-radius: 6px;
+  letter-spacing: 0;
+}
+.ops-shell .sev-bdg em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 850;
+  opacity: 0.78;
+}
+.ops-shell .sev-bdg strong {
+  font-size: 13px;
+  font-weight: 900;
 }
 .ops-shell .sev-bdg.no, .ops-shell .sev-bdg.rd { background: #fef2f2; color: #dc2626; }
 .ops-shell .sev-bdg.wn, .ops-shell .sev-bdg.yl { background: #fffbeb; color: #d97706; }
+.ops-shell .pm-anom-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ops-shell .pm-meta-chip {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+.ops-shell .pm-meta-chip em {
+  font-style: normal;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+}
+.ops-shell .pm-meta-chip strong {
+  color: #0c1f40;
+  font-size: 12.5px;
+  font-weight: 900;
+}
+.ops-shell .pm-meta-chip.no strong,
+.ops-shell .pm-meta-chip.rd strong { color: #dc2626; }
+.ops-shell .pm-meta-chip.wn strong,
+.ops-shell .pm-meta-chip.yl strong { color: #d97706; }
+.ops-shell .pm-meta-chip.ok strong,
+.ops-shell .pm-meta-chip.gr strong { color: #059669; }
+.ops-shell .pm-meta-chip.bl strong { color: #2563eb; }
 .ops-shell .dm-bdg {
-  padding: 3px 10px; border-radius: 6px;
+  padding: 5px 11px; border-radius: 6px;
   background: #eff6ff;
-  color: #2563eb; font-size: 11px; font-weight: 600;
+  color: #2563eb; font-size: 12.5px; font-weight: 750;
   border: 1px solid #dbeafe;
 }
-.ops-shell .dm-bdg.sm { font-size: 10px; padding: 2px 7px; }
+.ops-shell .dm-bdg.sm { font-size: 11.5px; padding: 3px 8px; }
 .ops-shell .pri-bdg {
   display: inline-block;
-  padding: 3px 8px; border-radius: 6px;
+  padding: 5px 9px; border-radius: 6px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px; font-weight: 700;
-  letter-spacing: 0.02em;
+  font-size: 12px; font-weight: 800;
+  letter-spacing: 0;
 }
 .ops-shell .pri-bdg.rd { background: #fef2f2; color: #dc2626; }
 .ops-shell .pri-bdg.yl { background: #fffbeb; color: #d97706; }
@@ -4939,6 +5284,223 @@ const servers = Object.freeze([
 .ops-shell strong.gr { color: #059669; }
 .ops-shell .rd-txt { color: #dc2626; }
 .ops-shell .yl-txt { color: #d97706; }
+
+.ops-shell .pm-evidence-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 18px 18px;
+  margin-bottom: 22px;
+}
+.ops-shell .pm-evidence-panel-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.ops-shell .pm-evidence-panel-h strong {
+  display: block;
+  color: #0c1f40;
+  font-size: 19px;
+  font-weight: 800;
+}
+.ops-shell .pm-evidence-panel-h span {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+}
+.ops-shell .pm-evidence-count {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #eaf1ff;
+  color: #2563eb !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+.ops-shell .pm-evidence-grid {
+  display: grid;
+  gap: 10px;
+}
+.ops-shell .pm-evidence-row {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(680px, 1.7fr);
+  align-items: stretch;
+  gap: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 5px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.ops-shell .pm-evidence-row.rd {
+  border-left-color: #dc2626;
+  background: #fffafa;
+}
+.ops-shell .pm-evidence-row.gr {
+  border-left-color: #059669;
+}
+.ops-shell .pm-ev-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ops-shell .pm-ev-title strong {
+  color: #0c1f40;
+  font-size: 18px;
+  font-weight: 800;
+}
+.ops-shell .pm-ev-title span {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #ea580c;
+  font-size: 11px;
+  font-weight: 800;
+}
+.ops-shell .pm-ev-scope {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.ops-shell .pm-ev-scope span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+.ops-shell .pm-ev-scope strong {
+  color: #0c1f40;
+  font-size: 14px;
+  font-weight: 800;
+}
+.ops-shell .pm-ev-scope em {
+  font-style: normal;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.ops-shell .pm-ev-help {
+  margin-top: 8px;
+  color: #526179;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.ops-shell .pm-ev-action {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.ops-shell .pm-ev-action strong {
+  color: #0c1f40;
+  font-size: 12.5px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.ops-shell .pm-ev-action span {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.ops-shell .pm-ev-values {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.ops-shell .pm-ev-value {
+  min-height: 94px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.ops-shell .pm-ev-value span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.ops-shell .pm-ev-value strong {
+  color: #0c1f40;
+  font-size: 21px;
+  font-weight: 900;
+}
+.ops-shell .pm-ev-value.current.rd {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+.ops-shell .pm-ev-value.current.rd strong {
+  color: #dc2626;
+}
+.ops-shell .pm-ev-value.current.gr {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+}
+.ops-shell .pm-ev-value.threshold strong {
+  color: #dc2626;
+}
+.ops-shell .pm-ev-value.judge strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 20px;
+  font-weight: 900;
+}
+.ops-shell .pm-ev-value.judge i {
+  font-size: 21px;
+}
+.ops-shell .pm-ev-value.judge em {
+  margin-top: 5px;
+  font-style: normal;
+  font-size: 12.5px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+.ops-shell .pm-ev-value.judge.rd {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+.ops-shell .pm-ev-value.judge.rd strong,
+.ops-shell .pm-ev-value.judge.rd em {
+  color: #dc2626;
+}
+.ops-shell .pm-ev-value.judge.gr {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  color: #059669;
+}
+.ops-shell .pm-ev-value.judge.gr strong,
+.ops-shell .pm-ev-value.judge.gr em {
+  color: #059669;
+}
+@media (max-width: 1200px) {
+  .ops-shell .pm-evidence-row {
+    grid-template-columns: 1fr;
+  }
+  .ops-shell .pm-ev-values {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
 
 /* 원인 후보 — 미니멀 카드 */
 .ops-shell .pm-causes {
@@ -5050,6 +5612,31 @@ const servers = Object.freeze([
 .ops-shell .pm-anom-acts {
   display: flex; gap: 6px; flex-wrap: wrap;
 }
+.ops-shell .pm-detail-guide {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+.ops-shell .pm-detail-guide i {
+  color: #2563eb;
+  font-size: 15px;
+}
+.ops-shell .pm-detail-guide span {
+  color: #64748b;
+}
+.ops-shell .pm-detail-guide strong {
+  color: #0c1f40;
+  font-weight: 850;
+}
 
 /* fault 목록 표 확장 */
 .ops-shell .pm-fault-tbl .num { text-align: right; }
@@ -5061,10 +5648,16 @@ const servers = Object.freeze([
   margin-left: 4px; letter-spacing: 0.04em;
 }
 .ops-shell .pm-fault-acts { display: flex; gap: 4px; flex-wrap: wrap; }
+.ops-shell .pm-fault-tbl tr.selected td {
+  background: #eff6ff;
+}
+.ops-shell .pm-fault-tbl tr.selected td:first-child {
+  box-shadow: inset 3px 0 0 #2563eb;
+}
 .ops-shell .pnl-act.sm.gr { background: #059669; color: #fff; }
 .ops-shell .pnl-act.sm.gr:hover { background: #047857; }
 
-/* ============ 티켓 상태 전이 모달 ============ */
+/* ============ 정비 상태 전이 모달 ============ */
 .ops-shell .pm-ticket-modal { max-width: 480px; }
 .ops-shell .pm-ticket-body { padding: 16px 20px; }
 .ops-shell .pm-ticket-note { margin-top: 12px; }
@@ -5492,7 +6085,7 @@ const servers = Object.freeze([
   .ops-shell .pm-policy-extra { grid-template-columns: 1fr; }
 }
 
-/* ====== 연결된 정비 티켓 ====== */
+/* ====== 연결된 정비 건 ====== */
 .ops-shell .pm-linked-ticket {
   display: flex; align-items: center; gap: 8px;
   background: #eef4ff;
@@ -5626,9 +6219,9 @@ const servers = Object.freeze([
   border-left: 2px solid #2563eb;
 }
 
-/* 티켓 변경 이력 timeline (모달 내부) */
+/* 정비 건 변경 이력 timeline (모달 내부) */
 .ops-shell .pm-ticket-modal-wide { max-width: 580px; }
-/* 티켓·이상 모달 본문이 viewport보다 길어지면 내부 스크롤 */
+/* 정비·이상 모달 본문이 viewport보다 길어지면 내부 스크롤 */
 .ops-shell .pm-ticket-modal .pm-ticket-body {
   overflow-y: auto;
   flex: 1;

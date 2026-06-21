@@ -151,7 +151,7 @@ class DetectionLogControllerIntegrationTest {
         long vehicleCountBefore = vehicleRepository.count();
         long flowEventCountBefore = vehicleFlowEventRepository.count();
 
-        mockMvc.perform(post("/api/v1/detection-logs")
+        MvcResult result = mockMvc.perform(post("/api/v1/detection-logs")
                         .header("X-Internal-Api-Key", INTERNAL_API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -169,11 +169,11 @@ class DetectionLogControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.status").value("OCR_FAILED"))
-                .andExpect(jsonPath("$.data.flowEventId").value(nullValue()));
+                .andExpect(jsonPath("$.data.flowEventId").value(nullValue()))
+                .andReturn();
 
-        DetectionLog savedLog = detectionLogRepository.findTop100ByOrderByDetectedAtDesc().stream()
-                .filter(log -> imageUrl.equals(log.getImageUrl()))
-                .findFirst()
+        Integer logId = JsonPath.read(result.getResponse().getContentAsString(), "$.data.logId");
+        DetectionLog savedLog = detectionLogRepository.findById(logId.longValue())
                 .orElseThrow();
         DetectionAnalysisResult savedResult = detectionAnalysisResultRepository
                 .findFirstByDetectionLog_LogIdOrderByAttemptNoDesc(savedLog.getLogId())
