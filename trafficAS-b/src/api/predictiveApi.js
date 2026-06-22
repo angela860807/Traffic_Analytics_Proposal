@@ -186,6 +186,18 @@ export function listMaintenanceTickets({
     .then((r) => r.data)
 }
 
+export function listAssignees({ roles = ['MAINTAINER', 'OPERATOR', 'ADMIN'] } = {}) {
+  return apiClient
+    .get(`${BASE}/assignees`, { params: cleanParams({ roles }) })
+    .then((r) => r.data)
+}
+
+export function listMaintenanceTicketHistories(ticketId) {
+  return apiClient
+    .get(`${BASE}/maintenance-tickets/${ticketId}/histories`)
+    .then((r) => r.data)
+}
+
 // ────────────────────────────────────────────────────────────
 // 3-11. 수동 정비 티켓 생성
 // ────────────────────────────────────────────────────────────

@@ -67,6 +67,18 @@ describe("predictiveApi — URL / payload", () => {
     await api.listMaintenanceTickets({ sort: "priority,desc" });
     expect(mockGet.mock.calls[0][1].params.sort).toBe("priority,desc");
   });
+
+  it("listAssignees는 roles query를 comma string으로 전달", async () => {
+    await api.listAssignees({ roles: ["MAINTAINER", "ADMIN"] });
+    expect(mockGet).toHaveBeenCalledWith("/api/v1/predictive/assignees", {
+      params: { roles: "MAINTAINER,ADMIN" },
+    });
+  });
+
+  it("listMaintenanceTicketHistories는 ticketId를 path에 포함", async () => {
+    await api.listMaintenanceTicketHistories(501);
+    expect(mockGet).toHaveBeenCalledWith("/api/v1/predictive/maintenance-tickets/501/histories");
+  });
 });
 
 describe("predictiveApi — 필수값 검증 (resolve / dismiss / RESOLVED)", () => {

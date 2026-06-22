@@ -1,5 +1,6 @@
 package com.example.traffic.controller;
 
+import com.example.traffic.common.enums.UserRole;
 import com.example.traffic.dto.request.predictive.*;
 import com.example.traffic.dto.response.predictive.*;
 import com.example.traffic.service.PredictiveOperationsService;
@@ -7,6 +8,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -54,6 +57,25 @@ public class PredictiveOperationsController {
     public PageResponse<MaintenanceTicketResponse> getMaintenanceTickets(
             @Valid @ModelAttribute MaintenanceTicketSearchRequest request) {
         return predictiveOperationsService.getMaintenanceTickets(request);
+    }
+
+    @GetMapping("/assignees")
+    public List<PredictiveAssigneeResponse> getAssignees(
+            @RequestParam(required = false) String roles) {
+        List<UserRole> parsedRoles = roles == null || roles.isBlank()
+                ? List.of()
+                : java.util.Arrays.stream(roles.split(","))
+                .map(String::trim)
+                .filter(role -> !role.isBlank())
+                .map(UserRole::of)
+                .toList();
+        return predictiveOperationsService.getAssignees(parsedRoles);
+    }
+
+    @GetMapping("/maintenance-tickets/{ticketId}/histories")
+    public List<MaintenanceTicketHistoryResponse> getMaintenanceTicketHistories(
+            @PathVariable Long ticketId) {
+        return predictiveOperationsService.getMaintenanceTicketHistories(ticketId);
     }
 
     @PostMapping("/maintenance-tickets")

@@ -29,6 +29,11 @@ import java.util.*;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class PredictiveOperationsService {
+    private static final Set<UserRole> ASSIGNABLE_ROLES = EnumSet.of(
+            UserRole.MAINTAINER,
+            UserRole.OPERATOR,
+            UserRole.ADMIN
+    );
 
     private static final Map<String, String> ANOMALY_SORTS = Map.of(
             "firstDetectedAt", "firstDetectedAt",
@@ -150,6 +155,31 @@ public class PredictiveOperationsService {
                 .build();
     }
 
+    public List<PredictiveAssigneeResponse> getAssignees(List<UserRole> requestedRoles) {
+        Set<UserRole> roles = requestedRoles == null || requestedRoles.isEmpty()
+                ? ASSIGNABLE_ROLES
+                : EnumSet.copyOf(requestedRoles);
+        roles.retainAll(ASSIGNABLE_ROLES);
+        if (roles.isEmpty()) {
+            return List.of();
+        }
+        return memberRepository.findByRoleInOrderByRoleAscNameAsc(roles).stream()
+                .map(member -> PredictiveAssigneeResponse.builder()
+                        .memberId(member.getMemberId())
+                        .name(member.getName())
+                        .email(member.getEmail())
+                        .role(member.getRole())
+                        .build())
+                .toList();
+    }
+
+    public List<MaintenanceTicketHistoryResponse> getMaintenanceTicketHistories(Long ticketId) {
+        findMaintenanceTicket(ticketId);
+        return ticketHistoryRepository.findByMaintenanceTicket_IdOrderByChangedAtAscIdAsc(ticketId).stream()
+                .map(this::toTicketHistoryResponse)
+                .toList();
+    }
+
     @Transactional
     public MaintenanceTicketResponse createMaintenanceTicket(
             MaintenanceTicketCreateRequest request,
@@ -185,6 +215,9 @@ public class PredictiveOperationsService {
         MaintenanceTicket ticket = findMaintenanceTicket(ticketId);
         Member assignee = memberRepository.findById(request.getAssigneeId())
                 .orElseThrow(() -> new BusinessException("Assignee not found: " + request.getAssigneeId(), HttpStatus.NOT_FOUND));
+        if (!ASSIGNABLE_ROLES.contains(assignee.getRole())) {
+            throw new BusinessException("Assignee role is not assignable: " + assignee.getRole(), HttpStatus.BAD_REQUEST);
+        }
         MaintenanceStatus fromStatus = ticket.getStatus();
         if (MaintenanceStatus.OPEN.equals(fromStatus)) {
             ticketStateTransitionService.validateTransition(fromStatus, MaintenanceStatus.ASSIGNED, member.getRole(), request.getNote());
@@ -481,6 +514,21 @@ public class PredictiveOperationsService {
                         && ticket.getDueStartAt() != null
                         && now.isAfter(ticket.getDueStartAt()))
                 .createdAt(toOffset(ticket.getCreatedAt()))
+                .build();
+    }
+
+    private MaintenanceTicketHistoryResponse toTicketHistoryResponse(MaintenanceTicketHistory history) {
+        Member changedBy = history.getChangedBy();
+        return MaintenanceTicketHistoryResponse.builder()
+                .id(history.getId())
+                .fromStatus(history.getFromStatus())
+                .toStatus(history.getToStatus())
+                .changedBy(changedBy == null ? null : MaintenanceTicketHistoryResponse.ChangedBy.builder()
+                        .memberId(changedBy.getMemberId())
+                        .name(changedBy.getName())
+                        .build())
+                .note(history.getNote())
+                .changedAt(toOffset(history.getChangedAt()))
                 .build();
     }
 

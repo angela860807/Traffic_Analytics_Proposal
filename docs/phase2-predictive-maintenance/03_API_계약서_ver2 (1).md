@@ -359,6 +359,60 @@ GET /api/v1/predictive/maintenance-tickets?priority=P1&status=OPEN&assigneeId=7&
 }
 ```
 
+### 3-10A. 정비 담당자 후보 목록
+
+```http
+GET /api/v1/predictive/assignees?roles=MAINTAINER,OPERATOR,ADMIN
+```
+
+응답 항목:
+
+```json
+[
+  {
+    "memberId": 2,
+    "name": "관리자",
+    "email": "admin@email.com",
+    "role": "ADMIN"
+  }
+]
+```
+
+정책:
+
+- 기본 후보 role은 `MAINTAINER`, `OPERATOR`, `ADMIN`이다.
+- `USER`는 정비 배정 후보에서 제외한다.
+- 요청 `roles`에 `USER`가 포함되어도 서버는 assign 가능한 role만 반환한다.
+
+### 3-10B. 정비 변경 이력
+
+```http
+GET /api/v1/predictive/maintenance-tickets/501/histories
+```
+
+응답 항목:
+
+```json
+[
+  {
+    "id": 9,
+    "fromStatus": "OPEN",
+    "toStatus": "ASSIGNED",
+    "changedBy": {
+      "memberId": 2,
+      "name": "관리자"
+    },
+    "note": "네트워크 점검 담당 배정",
+    "changedAt": "2026-06-09T14:05:00+09:00"
+  }
+]
+```
+
+정책:
+
+- 정비 상태 변경과 배정 이력은 append-only로 저장한다.
+- 기존 ticket에 history가 없을 수 있으므로 클라이언트는 빈 배열을 허용한다.
+
 ### 3-11. 수동 정비 티켓 생성
 
 ```http
@@ -387,6 +441,8 @@ Content-Type: application/json
 ```
 
 권한: `OPERATOR`, `ADMIN`
+
+배정 대상은 `MAINTAINER`, `OPERATOR`, `ADMIN` role만 허용한다. `USER`를 배정하면 `400 INVALID_REQUEST` 계열 오류를 반환한다.
 
 ### 3-13. 정비 티켓 상태 변경
 
@@ -660,6 +716,33 @@ POST /internal/v1/anomaly-detection/camera-degradation/evaluate
 
 `shadowCandidates`는 비교·평가용으로만 저장하며 `AnomalyEvent`나 `MaintenanceTicket` 생성에 사용하지 않는다.
 `topFeatures`는 모델 기여도나 원인 확정값이 아니라 feature별 평균 재구성 오차가 큰 상위 목록이다.
+
+Lifecycle 자동 회복 확장 계약:
+
+- candidate가 없는 응답은 현재 “이상 후보 없음”만 의미하며, 어떤 기존 `AnomalyEvent`가 정상화됐는지 식별할 수 없다.
+- `OPEN`/`ACKNOWLEDGED` 이벤트를 정상 3회 연속 감지 후 `RECOVERED`로 전환하려면 탐지 응답에 정상 판정 대상이 필요하다.
+- 권장 필드:
+
+```json
+{
+  "normalEvaluations": [
+    {
+      "targetType": "CAMERA",
+      "cameraId": 1,
+      "anomalyType": "FPS_DEGRADATION",
+      "policyCode": "FPS_DEGRADATION_RULE_V1",
+      "consecutiveNormalWindows": 3,
+      "evaluatedAt": "2026-06-09T14:08:00+09:00"
+    }
+  ]
+}
+```
+
+처리 정책:
+
+- `consecutiveNormalWindows >= 3`이면 같은 `cameraId + anomalyType`의 활성 이벤트를 `RECOVERED`로 전환한다.
+- `RECOVERED` 후 30분 내 같은 `cameraId + anomalyType` 후보가 다시 발생하면 `OPEN`으로 복귀하고 `recurrenceCount`를 증가시킨다.
+- 정상 판정 대상이 없는 단순 빈 `candidates` 응답만으로는 자동 회복 처리하지 않는다.
 
 기준선 부족 응답:
 

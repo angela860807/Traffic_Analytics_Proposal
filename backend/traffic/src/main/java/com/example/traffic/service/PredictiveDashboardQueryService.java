@@ -62,12 +62,29 @@ public class PredictiveDashboardQueryService {
                 """, dataSource);
         long overdueTickets = countLong("""
                 SELECT COUNT(*)
-                FROM maintenance_tickets
-                WHERE status IN ('OPEN', 'ASSIGNED')
+                FROM maintenance_tickets mt
+                JOIN anomaly_events ae ON ae.id = mt.anomaly_event_id
+                WHERE ae.data_source = :dataSource
                   AND (
-                    (due_ack_at IS NOT NULL AND due_ack_at < CURRENT_TIMESTAMP)
-                    OR (due_start_at IS NOT NULL AND due_start_at < CURRENT_TIMESTAMP)
+                    (mt.status = 'OPEN' AND mt.due_ack_at IS NOT NULL AND mt.due_ack_at < CURRENT_TIMESTAMP)
+                    OR (mt.status = 'ASSIGNED' AND mt.due_start_at IS NOT NULL AND mt.due_start_at < CURRENT_TIMESTAMP)
                   )
+                """, dataSource);
+        BigDecimal mttaMinutes = averageMinutes("""
+                SELECT AVG(EXTRACT(EPOCH FROM (mt.acknowledged_at - mt.created_at)) / 60.0)
+                FROM maintenance_tickets mt
+                JOIN anomaly_events ae ON ae.id = mt.anomaly_event_id
+                WHERE ae.data_source = :dataSource
+                  AND mt.acknowledged_at IS NOT NULL
+                  AND mt.acknowledged_at >= mt.created_at
+                """, dataSource);
+        BigDecimal mttrMinutes = averageMinutes("""
+                SELECT AVG(EXTRACT(EPOCH FROM (mt.resolved_at - mt.created_at)) / 60.0)
+                FROM maintenance_tickets mt
+                JOIN anomaly_events ae ON ae.id = mt.anomaly_event_id
+                WHERE ae.data_source = :dataSource
+                  AND mt.resolved_at IS NOT NULL
+                  AND mt.resolved_at >= mt.created_at
                 """, dataSource);
 
         return PredictiveSummaryResponse.builder()
@@ -80,8 +97,8 @@ public class PredictiveDashboardQueryService {
                 .openAnomalies(openAnomalies)
                 .predictedRisks(predictedRisks)
                 .overdueTickets(overdueTickets)
-                .mttaMinutes(BigDecimal.ZERO.setScale(1))
-                .mttrMinutes(BigDecimal.ZERO.setScale(1))
+                .mttaMinutes(mttaMinutes)
+                .mttrMinutes(mttrMinutes)
                 .generatedAt(PredictiveTimeUtils.toSeoulOffset(java.time.LocalDateTime.now(PredictiveTimeUtils.SERVICE_ZONE)))
                 .build();
     }
@@ -400,6 +417,13 @@ public class PredictiveDashboardQueryService {
                 .addValue("dataSource", dataSource.name());
         Long value = jdbcTemplate.queryForObject(sql, params, Long.class);
         return value != null ? value : 0;
+    }
+
+    private BigDecimal averageMinutes(String sql, DataSourceType dataSource) {
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("dataSource", dataSource.name());
+        BigDecimal value = jdbcTemplate.queryForObject(sql, params, BigDecimal.class);
+        return value == null ? BigDecimal.ZERO.setScale(1) : value.setScale(1, RoundingMode.HALF_UP);
     }
 
     private void validatePage(int page, int size) {

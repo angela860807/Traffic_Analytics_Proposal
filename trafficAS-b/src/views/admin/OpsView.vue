@@ -1308,14 +1308,14 @@
             <div class="ps-sub">예지 탐지</div>
           </div>
           <div class="ps-box pm">
-            <div class="ps-l"><i class="bi bi-hourglass-split"></i> MTTA</div>
+            <div class="ps-l"><i class="bi bi-hourglass-split"></i> 평균 응답 시간</div>
             <div class="ps-v">{{ pmMtta }}<span>분</span></div>
-            <div class="ps-sub">평균 응답</div>
+            <div class="ps-sub">이상 발생 후 확인까지</div>
           </div>
           <div class="ps-box">
-            <div class="ps-l">MTTR</div>
+            <div class="ps-l">평균 복구 시간</div>
             <div class="ps-v">{{ pmMttr }}<span>분</span></div>
-            <div class="ps-sub">평균 복구</div>
+            <div class="ps-sub">정비 생성 후 해결까지</div>
           </div>
           <div class="ps-box pm-alert" :class="{ alert: pmSlaOverdueCount > 0 }">
             <div class="ps-l"><i class="bi bi-stopwatch"></i> 대응 지연</div>
@@ -1339,14 +1339,17 @@
           </div>
 
           <div class="pm-anom-card">
-            <div
-              v-if="String(activeAnomaly.eventId) === String(selectedAnomalyEventId)"
-              class="pm-selected-context"
-            >
-              <i class="bi bi-arrow-up-circle-fill"></i>
-              <span>목록에서 선택한 이상</span>
-              <strong>{{ activeAnomaly.id }} · {{ activeAnomaly.dev }} · {{ anomalyTypeLabelKo(activeAnomaly.anomalyType) }}</strong>
-              <em>연관 조치 지표: {{ evidenceMetricSummary(activeAnomaly.evidence) }}</em>
+            <div class="pm-anom-primary">
+              <div class="pm-primary-device">
+                <span>문제 장비</span>
+                <strong>{{ activeAnomaly.dev }}</strong>
+                <em>카메라 ID {{ activeAnomaly.cameraId || '-' }}</em>
+              </div>
+              <div class="pm-primary-issue">
+                <span>인지된 문제</span>
+                <strong>{{ anomalyTypeLabelKo(activeAnomaly.anomalyType) }}</strong>
+                <em>{{ primaryActionHint(activeAnomaly) }}</em>
+              </div>
             </div>
 
             <!-- 헤더: 유형 / 심각도 / 탐지 방식 / SLA -->
@@ -1372,6 +1375,11 @@
                   <span class="pm-meta-chip" :class="pmPriorityTone(activeAnomaly.priority)">
                     <em>우선순위</em><strong>{{ activeAnomaly.priority }}</strong>
                   </span>
+                  <span v-if="activeAnomaly.detector" class="pm-meta-chip pm-meta-chip-wide bl">
+                    <em>탐지기</em>
+                    <strong>{{ detectorLabelKo(activeAnomaly.detector.name) }}</strong>
+                    <small>v{{ activeAnomaly.detector.version }} · {{ policyLabelKo(activeAnomaly.detector.policyCode) }}</small>
+                  </span>
                 </div>
               </div>
               <div class="pm-anom-time" v-if="activeAnomaly.projectedAt">
@@ -1380,8 +1388,8 @@
               </div>
             </div>
 
-            <!-- 통계 지표 + detector 정보 -->
-            <div class="pm-stats-row" v-if="activeAnomaly.trend || activeAnomaly.detector">
+            <!-- 통계 지표 -->
+            <div class="pm-stats-row" v-if="activeAnomaly.trend">
               <div v-if="activeAnomaly.trend?.robustZScore != null" class="pm-stat">
                 <div class="pm-stat-l">기준선 편차 점수</div>
                 <div class="pm-stat-v" :class="zScoreTone(activeAnomaly.trend.robustZScore)">
@@ -1403,12 +1411,25 @@
                 </div>
                 <div class="pm-stat-s">{{ activeAnomaly.trend.confidence >= 0.7 ? '높음' : '보통' }}</div>
               </div>
-              <div v-if="activeAnomaly.detector" class="pm-stat pm-stat-det">
-                <div class="pm-stat-l">탐지기</div>
-                <div class="pm-stat-v pm-stat-det-name">{{ detectorLabelKo(activeAnomaly.detector.name) }}</div>
-                <div class="pm-stat-s">
-                  v{{ activeAnomaly.detector.version }} · {{ policyLabelKo(activeAnomaly.detector.policyCode) }}
-                </div>
+            </div>
+
+            <div class="pm-time-flow">
+              <div class="pm-time-step">
+                <span>기준선 학습</span>
+                <strong>{{ baselineWindowLabel(activeAnomaly.baseline) }}</strong>
+                <em>{{ baselineSampleLabel(activeAnomaly.baseline) }}</em>
+              </div>
+              <div class="pm-time-arrow"></div>
+              <div class="pm-time-step now">
+                <span>최근 관측</span>
+                <strong>{{ latestEvidenceTime(activeAnomaly) }}</strong>
+                <em>{{ evidenceRows(activeAnomaly.evidence).length }}개 지표가 기준 이탈</em>
+              </div>
+              <div class="pm-time-arrow"></div>
+              <div class="pm-time-step forecast">
+                <span>예측/조치 시점</span>
+                <strong>{{ activeAnomaly.projectedAt || activeAnomaly.slaDeadline || '확인 필요' }}</strong>
+                <em>{{ trendFlowLabel(activeAnomaly.trend) }}</em>
               </div>
             </div>
 
@@ -1416,27 +1437,40 @@
             <div class="pm-evidence-panel">
               <div class="pm-evidence-panel-h">
                 <div>
-                  <strong>조치 판단 지표</strong>
-                  <span>현재 관측값이 조치 기준을 넘은 항목입니다.</span>
+                  <strong>시계열 판단 근거 요약</strong>
+                  <span>기준선 대비 최근 관측값이 어떻게 벗어났는지 요약한 시계열 근거입니다.</span>
                 </div>
-                <span class="pm-evidence-count">{{ evidenceRows(activeAnomaly.evidence).length }}개 지표</span>
+                <span class="pm-evidence-count">근거 {{ evidenceRows(activeAnomaly.evidence).length }}개</span>
               </div>
               <div class="pm-evidence-grid">
                 <div
-                  v-for="e in evidenceRows(activeAnomaly.evidence)"
+                  v-for="(e, index) in evidenceRows(activeAnomaly.evidence)"
                   :key="e.key"
                   class="pm-evidence-row"
                   :class="evTone(e)"
                 >
                   <div class="pm-ev-main">
                     <div class="pm-ev-title">
-                      <strong>{{ metricLabelKo(e.metric) }}</strong>
+                      <span>{{ index === 0 ? '핵심 원인' : '보조 근거' }}</span>
+                      <strong>{{ metricProblemTitle(e.metric) }}</strong>
                       <span v-if="e.count > 1">{{ e.count }}회 연속 감지</span>
                     </div>
                     <div class="pm-ev-scope">
-                      <span>대상 장비</span>
-                      <strong>{{ activeAnomaly.dev }}</strong>
+                      <span>문제 지표</span>
+                      <strong>{{ metricLabelKo(e.metric) }}</strong>
                       <em>{{ metricDeviceScope(e.metric) }}</em>
+                    </div>
+                    <div class="pm-ev-timeline">
+                      <div class="pm-ev-time-head">
+                        <span>시계열 흐름</span>
+                        <strong>{{ sampledAtLabel(e, activeAnomaly) }} 관측</strong>
+                        <em>{{ metricDirectionText(e.metric) }}</em>
+                      </div>
+                      <div class="pm-ev-time-summary">
+                        <span><strong>과거 기준</strong><em>{{ formatNormalReference(e) }}</em></span>
+                        <span><strong>최근 관측</strong><em>{{ formatEvidenceValue(e.observed, e.unit) }}</em></span>
+                        <span><strong>조치 기준선</strong><em>{{ formatEvidenceValue(e.threshold, e.unit) }}</em></span>
+                      </div>
                     </div>
                     <div class="pm-ev-help">{{ metricHelpText(e.metric) }}</div>
                     <div class="pm-ev-action">
@@ -1568,6 +1602,16 @@
           <div class="nd-h">
             <h4>이상 이벤트 및 정비 건 현황</h4>
             <span class="nd-h-cnt">{{ filteredFaults.length }} / {{ faults.length }}건 · 상태는 이상/정비를 분리 표시</span>
+          </div>
+
+          <div
+            v-if="selectedAnomaly"
+            class="pm-selected-context"
+          >
+            <i class="bi bi-check-circle-fill"></i>
+            <span>선택한 이상</span>
+            <strong>{{ selectedAnomaly.id }} · {{ selectedAnomaly.dev }} · {{ anomalyTypeLabelKo(selectedAnomaly.anomalyType) }}</strong>
+            <em>상단 상세 카드 반영 · 조치 지표: {{ evidenceMetricSummary(selectedAnomaly.evidence) }}</em>
           </div>
 
           <!-- 필터 -->
@@ -1870,10 +1914,16 @@
             <div class="pm-ticket-timeline">
               <div class="pm-tl-h">
                 <i class="bi bi-clock-history"></i> 변경 이력
-                <span class="pm-tl-cnt">{{ ticketHistory(ticketModal.fault).length }}건</span>
+                <span class="pm-tl-cnt">{{ ticketModal.histories.length }}건</span>
               </div>
               <div class="pm-tl-list">
-                <div v-for="(h, i) in ticketHistory(ticketModal.fault)" :key="i" class="pm-tl-row">
+                <div v-if="ticketModal.historyLoading" class="pm-tl-row">
+                  <div class="pm-tl-dot wn"></div>
+                  <div class="pm-tl-body">
+                    <div class="pm-tl-line"><strong>변경 이력 불러오는 중</strong></div>
+                  </div>
+                </div>
+                <div v-for="(h, i) in ticketModal.histories" :key="h.id || i" class="pm-tl-row">
                   <div class="pm-tl-dot" :class="h.kind"></div>
                   <div class="pm-tl-body">
                     <div class="pm-tl-line">
@@ -2534,6 +2584,8 @@ import {
   resolveAnomaly,
   dismissAnomaly,
   listMaintenanceTickets,
+  listAssignees,
+  listMaintenanceTicketHistories,
   assignMaintenanceTicket,
   changeTicketStatus,
 } from "@/api/predictiveApi";
@@ -3313,15 +3365,21 @@ const pmResolvedTicketCount = computed(() =>
     .map((f) => f.ticketId)).size,
 )
 
-// MTTA (Mean Time To Acknowledge) — 데모 더미값
-const pmMtta = ref(7.4)
-const pmMttr = ref(18)
+const pmMtta = computed(() => {
+  const value = numberOrNull(pmSummary.value?.mttaMinutes)
+  return value == null ? "0.0" : value.toFixed(1)
+})
+const pmMttr = computed(() => {
+  const value = numberOrNull(pmSummary.value?.mttrMinutes)
+  return value == null ? "0.0" : value.toFixed(1)
+})
 
 // ─── fault 필터 (URL query 동기화) ───
 const ALLOWED_KIND = ["", "fault", "anomaly"]
 const ALLOWED_PRI = ["", "P1", "P2", "P3"]
 const ALLOWED_DM = ["", "RULE", "TREND_PROJECTION", "ROBUST_Z_SCORE", "CROSS_VALIDATION", "LSTM_AUTOENCODER"]
 const ALLOWED_TS = ["", "OPEN", "ASSIGNED", "IN_PROGRESS", "RESOLVED", "CLOSED"]
+const ALLOWED_CAM_ST = ["all", "NORMAL", "DEGRADED", "CRITICAL", "OFFLINE", "BASELINE_LEARNING", "INSUFFICIENT_DATA"]
 function pick(arr, v, def = "") { return arr.includes(v) ? v : def }
 
 const faultFilter = ref({
@@ -3363,10 +3421,12 @@ const pmPriorityTone = (p) => p === "P1" ? "rd" : p === "P2" ? "yl" : "gy"
 const pmPriorityLabel = (p) => p || "—"
 
 // 가장 우선 처리해야 할 활성 이상 (TREND_PROJECTION 우선, 그 다음 CRITICAL)
+const selectedAnomaly = computed(() =>
+  faults.value.find((f) => f.kind === "anomaly" && String(f.eventId) === String(selectedAnomalyEventId.value)) || null,
+)
 const activeAnomaly = computed(() => {
   const list = faults.value.filter((f) => f.kind === "anomaly")
-  const selected = list.find((f) => String(f.eventId) === String(selectedAnomalyEventId.value))
-  if (selected) return selected
+  if (selectedAnomaly.value) return selectedAnomaly.value
   const open = list.filter((f) => !["RESOLVED", "DISMISSED"].includes(f.anomalyStatus))
   return open.find((f) => f.tone === "no" || f.tone === "rd")
     || open[0]
@@ -3379,7 +3439,7 @@ function selectAnomalyDetail(fault) {
   if (!fault?.eventId) return
   selectedAnomalyEventId.value = fault.eventId
   nextTick(() => {
-    document.querySelector(".pm-anom-card")?.scrollIntoView({ behavior: "smooth", block: "start" })
+    document.querySelector(".pm-selected-context")?.scrollIntoView({ behavior: "smooth", block: "nearest" })
   })
 }
 
@@ -3604,6 +3664,25 @@ function metricLabelKo(metric) {
   }
   return map[key] || metric || "—"
 }
+function metricProblemTitle(metric) {
+  const key = String(metric || "").toLowerCase()
+  if (key.includes("blur")) return "영상 흐림 증가"
+  if (key.includes("brightness")) return "영상 밝기 품질 저하"
+  if (key.includes("fps")) return "처리 속도 저하"
+  if (key.includes("frame_drop")) return "프레임 손실 증가"
+  if (key.includes("latency")) return "응답 지연 증가"
+  if (key.includes("ocr")) return "번호판 인식 품질 저하"
+  if (key.includes("cpu")) return "CPU 사용률 과다"
+  if (key.includes("memory")) return "메모리 사용률 과다"
+  if (key.includes("disk")) return "디스크 사용률 과다"
+  if (key.includes("network") || key.includes("rtt")) return "네트워크 지연 증가"
+  return `${metricLabelKo(metric)} 이상`
+}
+function primaryActionHint(anomaly) {
+  const firstMetric = evidenceRows(anomaly?.evidence || [])[0]?.metric
+  if (firstMetric) return metricActionText(firstMetric)
+  return `${anomalyTypeLabelKo(anomaly?.anomalyType)} 상태를 확인하고 현장/원격 점검을 진행합니다.`
+}
 function metricHelpText(metric) {
   const key = String(metric || "").toLowerCase()
   if (key.includes("fps")) return "영상 처리 속도가 낮아지면 실시간 감지 누락 가능성이 커집니다."
@@ -3626,6 +3705,9 @@ function metricDeviceScope(metric) {
   if (key.includes("blur") || key.includes("brightness")) return "장비 영역: 카메라 렌즈/영상 입력"
   if (key.includes("ocr")) return "장비 영역: 번호판 인식 파이프라인"
   return "장비 영역: 카메라 상태 지표"
+}
+function metricDirectionText(metric) {
+  return isLowerWorseMetric(metric) ? "낮아질수록 위험" : "높아질수록 위험"
 }
 function metricActionText(metric) {
   const key = String(metric || "").toLowerCase()
@@ -3700,6 +3782,44 @@ function evidenceMetricSummary(items = []) {
   const labels = [...new Set(evidenceRows(items).map((e) => metricLabelKo(e.metric)))]
   return labels.length ? labels.join(", ") : "조치 지표 없음"
 }
+function formatDateTimeShort(value) {
+  if (!value) return "-"
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return String(value)
+  const mm = String(d.getMonth() + 1).padStart(2, "0")
+  const dd = String(d.getDate()).padStart(2, "0")
+  const hh = String(d.getHours()).padStart(2, "0")
+  const mi = String(d.getMinutes()).padStart(2, "0")
+  return `${mm}.${dd} ${hh}:${mi}`
+}
+function baselineWindowLabel(baseline) {
+  if (!baseline?.from || !baseline?.to) return "기준선 정보 없음"
+  return `${formatDateTimeShort(baseline.from)} ~ ${formatDateTimeShort(baseline.to)}`
+}
+function baselineSampleLabel(baseline) {
+  const count = numberOrNull(baseline?.sampleCount)
+  return count == null ? "시계열 기준선" : `시계열 표본 ${count}건`
+}
+function latestEvidenceTime(anomaly) {
+  const sampled = evidenceRows(anomaly?.evidence || [])
+    .map((e) => e.sampledAt)
+    .filter(Boolean)
+    .sort()
+    .at(-1)
+  return sampled ? formatDateTimeShort(sampled) : anomaly?.time || "-"
+}
+function sampledAtLabel(e, anomaly) {
+  return e?.sampledAt ? formatDateTimeShort(e.sampledAt) : anomaly?.time || "-"
+}
+function trendFlowLabel(trend) {
+  if (!trend) return "현재 관측 기준 조치 판단"
+  const parts = []
+  const slope = numberOrNull(trend.slope)
+  const confidence = numberOrNull(trend.confidence)
+  if (slope != null) parts.push(`${slope >= 0 ? "상승" : "하락"} 추세`)
+  if (confidence != null) parts.push(`신뢰도 ${(confidence * 100).toFixed(0)}%`)
+  return parts.length ? parts.join(" · ") : "추세 기반 조치 판단"
+}
 // 관측값 판정 — fps 계열은 낮을수록 나쁘고, 나머지는 높을수록 나쁘다.
 function evJudge(e) {
   const observed = numberOrNull(e.observed)
@@ -3755,8 +3875,43 @@ function formatSlaRemaining(min) {
 
 // ─── 정비 상태 전이 modal ───
 const ticketModal = ref(null)
-function openTicketTransition(fault, toStatus) {
-  ticketModal.value = { fault, toStatus, note: "", error: "" }
+function toTicketHistoryEntry(row) {
+  return {
+    id: row.id,
+    kind: row.toStatus === "CLOSED" || row.toStatus === "RESOLVED" ? "ok"
+      : row.toStatus === "IN_PROGRESS" || row.toStatus === "ASSIGNED" ? "wn"
+        : "no",
+    action: row.toStatus ? `${ticketStatusLabel(row.toStatus)} 처리` : "상태 변경",
+    from: row.fromStatus,
+    to: row.toStatus,
+    at: formatClock(row.changedAt),
+    by: row.changedBy?.name || "",
+    note: row.note || "",
+  }
+}
+
+async function openTicketTransition(fault, toStatus) {
+  const fallbackHistories = ticketHistory(fault)
+  ticketModal.value = { fault, toStatus, note: "", error: "", histories: fallbackHistories, historyLoading: false }
+  const ticketId = ticketIdFor(fault)
+  if (!ticketId) return
+  ticketModal.value.historyLoading = true
+  try {
+    const rows = await listMaintenanceTicketHistories(ticketId)
+    if (ticketModal.value?.fault === fault) {
+      ticketModal.value.histories = Array.isArray(rows) && rows.length
+        ? rows.map(toTicketHistoryEntry)
+        : fallbackHistories
+    }
+  } catch {
+    if (ticketModal.value?.fault === fault) {
+      ticketModal.value.histories = fallbackHistories
+    }
+  } finally {
+    if (ticketModal.value?.fault === fault) {
+      ticketModal.value.historyLoading = false
+    }
+  }
 }
 function closeTicketModal() { ticketModal.value = null }
 function legacySubmitTicketTransition() {
@@ -3777,10 +3932,9 @@ function legacySubmitTicketTransition() {
 const anomalyModal = ref(null)
 
 // ─── 담당자 배정 모달 ───
-const assignees = [
+const assignees = ref([
   { id: 2, name: "관리자", role: "ADMIN" },
-  { id: 1, name: "이용자", role: "USER" },
-]
+])
 const assignModal = ref(null)
 function legacyOpenAssignModalBase(target) {
   assignModal.value = { target, assigneeId: "", note: "", error: "" }
@@ -3882,7 +4036,7 @@ async function submitTicketTransition() {
 }
 
 function openAssignModal(target) {
-  assignModal.value = { target: linkedTicket(target) || target, assigneeId: assignees[0]?.id || "", note: "", error: "" }
+  assignModal.value = { target: linkedTicket(target) || target, assigneeId: assignees.value[0]?.id || "", note: "", error: "" }
 }
 
 async function submitAssignModal() {
@@ -4468,6 +4622,29 @@ function minutesUntil(value) {
   return Math.round((d.getTime() - Date.now()) / 60000)
 }
 
+function shadowTopFeatures(shadowModel) {
+  const rows = shadowModel?.topFeatures
+    || shadowModel?.featureContributions
+    || shadowModel?.featureErrors
+    || []
+  if (!Array.isArray(rows)) return []
+  return rows.map((row) => {
+    if (typeof row === "string") return { name: row, value: 0 }
+    const value = numberOrNull(row.value ?? row.score ?? row.error ?? row.contribution)
+    return {
+      name: row.name || row.feature || row.metric || "-",
+      value: Math.max(0, Math.min(1, value ?? 0)),
+    }
+  }).filter((row) => row.name && row.name !== "-")
+}
+
+function ticketDueByStatus(ticket) {
+  if (!ticket) return null
+  if (ticket.status === "OPEN") return ticket.dueAckAt || ticket.dueStartAt || null
+  if (ticket.status === "ASSIGNED") return ticket.dueStartAt || ticket.dueAckAt || null
+  return null
+}
+
 function formatElapsedFrom(value) {
   if (!value) return "-"
   const d = new Date(value)
@@ -4526,7 +4703,10 @@ function toEvidence(row) {
     observed: numberOrNull(row.observedValue),
     baseline: numberOrNull(row.baselineValue),
     threshold: numberOrNull(row.thresholdValue),
+    score: numberOrNull(row.metricScore),
     unit: row.unit || "",
+    sampledAt: row.sampledAt || null,
+    context: row.context || {},
   }
 }
 
@@ -4534,7 +4714,7 @@ function toOpsAnomaly(summary, detail, ticket) {
   const event = detail || summary || {}
   const linked = ticket || event.ticket || null
   const ticketStatus = linked?.status || "OPEN"
-  const ticketDue = ticket?.dueStartAt || ticket?.dueAckAt || null
+  const ticketDue = ticketDueByStatus(linked)
   const slaRemainingMin = minutesUntil(ticketDue)
   const detector = event.detector
     ? {
@@ -4551,7 +4731,7 @@ function toOpsAnomaly(summary, detail, ticket) {
       warningThreshold: numberOrNull(event.shadowModel.warningThreshold) ?? 0,
       criticalThreshold: numberOrNull(event.shadowModel.criticalThreshold) ?? 0,
       predictedSeverity: event.shadowModel.predictedSeverity || "-",
-      topFeatures: [],
+      topFeatures: shadowTopFeatures(event.shadowModel),
     }
     : null
 
@@ -4581,6 +4761,14 @@ function toOpsAnomaly(summary, detail, ticket) {
     slaOverdue: Boolean(ticket?.ackOverdue || ticket?.startOverdue || (slaRemainingMin != null && slaRemainingMin < 0)),
     slaRemainingMin,
     evidence: Array.isArray(event.evidence) ? event.evidence.map(toEvidence) : [],
+    baseline: event.baseline
+      ? {
+        source: event.baseline.source || "",
+        from: event.baseline.from || null,
+        to: event.baseline.to || null,
+        sampleCount: event.baseline.sampleCount,
+      }
+      : null,
     suspectedCauses: Array.isArray(event.suspectedCauses) && event.suspectedCauses.length
       ? event.suspectedCauses
       : ["UNKNOWN"],
@@ -4604,10 +4792,18 @@ async function loadPredictiveOperations() {
   predictiveOpsLoadState.value = "loading"
   predictiveOpsLoadError.value = ""
   try {
-    const [eventPage, ticketPage] = await Promise.all([
+    const [eventPage, ticketPage, assigneeRows] = await Promise.all([
       listAnomalyEvents({ dataSource: pmDataSource.value, page: 0, size: 20, sort: "firstDetectedAt,desc" }),
       listMaintenanceTickets({ page: 0, size: 20, sort: "createdAt,desc" }),
+      listAssignees().catch(() => assignees.value),
     ])
+    if (Array.isArray(assigneeRows) && assigneeRows.length) {
+      assignees.value = assigneeRows.map((row) => ({
+        id: row.memberId ?? row.id,
+        name: row.name || row.email || "-",
+        role: row.role || "-",
+      })).filter((row) => row.id)
+    }
     const events = Array.isArray(eventPage?.content) ? eventPage.content : []
     const tickets = Array.isArray(ticketPage?.content) ? ticketPage.content : []
     const ticketsByEvent = ticketByEventId(tickets)
@@ -5107,6 +5303,53 @@ const servers = Object.freeze([
   background: linear-gradient(90deg, #ea580c, transparent);
   border-radius: 2px 2px 0 0;
 }
+.ops-shell .pm-anom-primary {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(360px, 1.35fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.ops-shell .pm-primary-device,
+.ops-shell .pm-primary-issue {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  padding: 15px 16px;
+  border: 1px solid #dbe5f2;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+.ops-shell .pm-primary-issue {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+.ops-shell .pm-primary-device span,
+.ops-shell .pm-primary-issue span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+}
+.ops-shell .pm-primary-device strong,
+.ops-shell .pm-primary-issue strong {
+  color: #0c1f40;
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+.ops-shell .pm-primary-issue strong {
+  color: #9a3412;
+  font-size: 22px;
+}
+.ops-shell .pm-primary-device em,
+.ops-shell .pm-primary-issue em {
+  color: #526179;
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.35;
+}
 .ops-shell .pm-selected-context {
   display: grid;
   grid-template-columns: auto auto minmax(220px, 1fr) auto;
@@ -5140,6 +5383,32 @@ const servers = Object.freeze([
   font-weight: 800;
 }
 @media (max-width: 1200px) {
+  .ops-shell .pm-anom-primary {
+    grid-template-columns: 1fr;
+  }
+  .ops-shell .pm-anom-head {
+    grid-template-columns: 1fr;
+  }
+  .ops-shell .pm-anom-time {
+    justify-self: start;
+  }
+  .ops-shell .pm-time-flow {
+    grid-template-columns: 1fr;
+  }
+  .ops-shell .pm-time-arrow {
+    width: 1px;
+    height: 18px;
+    justify-self: center;
+  }
+  .ops-shell .pm-time-arrow::after {
+    right: -4px;
+    top: auto;
+    bottom: -1px;
+    border-top: 7px solid #cbd5e1;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 0;
+  }
   .ops-shell .pm-selected-context {
     grid-template-columns: auto 1fr;
   }
@@ -5150,13 +5419,16 @@ const servers = Object.freeze([
   }
 }
 .ops-shell .pm-anom-head {
-  display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: 12px;
-  margin-bottom: 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 .ops-shell .pm-anom-titles {
   display: grid;
   gap: 10px;
+  min-width: 0;
   font-size: 15px;
 }
 .ops-shell .pm-anom-title-line {
@@ -5191,31 +5463,78 @@ const servers = Object.freeze([
 .ops-shell .sev-bdg.no, .ops-shell .sev-bdg.rd { background: #fef2f2; color: #dc2626; }
 .ops-shell .sev-bdg.wn, .ops-shell .sev-bdg.yl { background: #fffbeb; color: #d97706; }
 .ops-shell .pm-anom-badges {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: stretch;
   gap: 8px;
-  flex-wrap: wrap;
 }
 .ops-shell .pm-meta-chip {
   display: inline-grid;
   grid-template-columns: auto auto;
   align-items: baseline;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: 7px;
+  gap: 7px;
+  grid-column: span 2;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 8px;
   border: 1px solid #e2e8f0;
   background: #f8fafc;
+  justify-content: start;
+  align-content: center;
+  white-space: nowrap;
 }
 .ops-shell .pm-meta-chip em {
   font-style: normal;
   color: #64748b;
-  font-size: 11px;
-  font-weight: 850;
+  font-size: 12px;
+  font-weight: 900;
 }
 .ops-shell .pm-meta-chip strong {
   color: #0c1f40;
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 900;
+}
+.ops-shell .pm-meta-chip-wide {
+  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-column: span 4;
+  max-width: 100%;
+}
+.ops-shell .pm-meta-chip-wide small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 1200px) {
+  .ops-shell .pm-anom-badges {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .ops-shell .pm-meta-chip {
+    grid-column: span 3;
+  }
+  .ops-shell .pm-meta-chip-wide {
+    grid-column: span 6;
+  }
+}
+@media (max-width: 520px) {
+  .ops-shell .pm-anom-badges {
+    grid-template-columns: 1fr;
+  }
+  .ops-shell .pm-meta-chip,
+  .ops-shell .pm-meta-chip-wide {
+    grid-column: auto;
+  }
+  .ops-shell .pm-ev-time-head {
+    grid-template-columns: 1fr;
+  }
+  .ops-shell .pm-ev-time-head em {
+    justify-self: start;
+  }
+  .ops-shell .pm-ev-time-summary {
+    grid-template-columns: 1fr;
+  }
 }
 .ops-shell .pm-meta-chip.no strong,
 .ops-shell .pm-meta-chip.rd strong { color: #dc2626; }
@@ -5247,6 +5566,66 @@ const servers = Object.freeze([
 }
 .ops-shell .pm-anom-time > i { color: #ea580c; }
 .ops-shell .pm-anom-time > strong { color: #ea580c; font-weight: 600; }
+.ops-shell .pm-time-flow {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 28px minmax(180px, 1fr) 28px minmax(180px, 1fr);
+  align-items: stretch;
+  gap: 8px;
+  margin: 0 0 18px;
+}
+.ops-shell .pm-time-step {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #f8fafc;
+}
+.ops-shell .pm-time-step.now {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+.ops-shell .pm-time-step.forecast {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+.ops-shell .pm-time-step span {
+  display: block;
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 900;
+}
+.ops-shell .pm-time-step strong {
+  display: block;
+  margin-top: 4px;
+  color: #0c1f40;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.ops-shell .pm-time-step em {
+  display: block;
+  margin-top: 3px;
+  color: #526179;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 750;
+}
+.ops-shell .pm-time-arrow {
+  align-self: center;
+  height: 1px;
+  background: #cbd5e1;
+  position: relative;
+}
+.ops-shell .pm-time-arrow::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: -4px;
+  border-left: 7px solid #cbd5e1;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
 
 /* 관측값 테이블 — 미니멀 */
 .ops-shell .pm-evidence-tbl {
@@ -5351,8 +5730,9 @@ const servers = Object.freeze([
 }
 .ops-shell .pm-ev-title strong {
   color: #0c1f40;
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
 }
 .ops-shell .pm-ev-title span {
   padding: 3px 8px;
@@ -5367,7 +5747,7 @@ const servers = Object.freeze([
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 .ops-shell .pm-ev-scope span {
   color: #64748b;
@@ -5388,6 +5768,63 @@ const servers = Object.freeze([
   padding: 3px 8px;
   font-size: 12px;
   font-weight: 800;
+}
+.ops-shell .pm-ev-timeline {
+  margin-top: 10px;
+  padding: 10px 12px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.ops-shell .pm-ev-time-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.ops-shell .pm-ev-time-head span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+}
+.ops-shell .pm-ev-time-head strong {
+  color: #0c1f40;
+  font-size: 13px;
+  font-weight: 900;
+}
+.ops-shell .pm-ev-time-head em {
+  color: #9a3412;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 850;
+}
+.ops-shell .pm-ev-time-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.ops-shell .pm-ev-time-summary span {
+  display: grid;
+  gap: 3px;
+  padding: 8px 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: #ffffff;
+}
+.ops-shell .pm-ev-time-summary strong {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+}
+.ops-shell .pm-ev-time-summary em {
+  color: #0c1f40;
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 900;
+}
+.ops-shell .pm-ev-time-summary span:nth-child(3) em {
+  color: #dc2626;
 }
 .ops-shell .pm-ev-help {
   margin-top: 8px;
@@ -6039,11 +6476,6 @@ const servers = Object.freeze([
 .ops-shell .pm-stat-v.gy { color: #94a3b8; }
 .ops-shell .pm-stat-s {
   font-size: 11px; color: #64748b;
-}
-.ops-shell .pm-stat-det .pm-stat-det-name {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px; font-weight: 600; color: #0c1f40;
-  word-break: break-word; line-height: 1.3;
 }
 @media (max-width: 1200px) {
   .ops-shell .pm-stats-row { grid-template-columns: repeat(2, 1fr); }

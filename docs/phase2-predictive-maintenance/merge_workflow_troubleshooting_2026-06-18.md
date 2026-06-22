@@ -1451,3 +1451,79 @@ Invoke-RestMethod `
 - 현재 DB 보정 SQL은 로컬 개발 DB 복구용이다. 새 DB에서는 migration 적용 순서가 정상이라면 같은 보정이 필요 없어야 한다.
 - Hibernate DDL 경고 중 `congestion_score numeric(5,2) default 0.00` alter 문 syntax warning이 남아 있으나 앱 기동과 이번 E2E에는 영향이 없었다.
 - LSTM/ONNX 또는 PyTorch artifact를 실제로 시연하려면 `/app/models/predictive` 모델 파일과 artifact validation 시나리오가 별도로 필요하다.
+
+### 2026-06-22 `/admin/ops` 예지보전 운영 UI 보완
+
+배경:
+
+- 이상 목록에서 항목을 선택하면 상세 카드가 화면 위쪽으로 이동해 목록과 상세의 연결성이 떨어졌다.
+- 우선조치 이상 상세 카드에서 지표명이 먼저 보이면서 운영자가 “어떤 장비에 어떤 문제가 있는지”를 늦게 인지하는 문제가 있었다.
+- `MTTA`, `MTTR` 영문 약어는 관리자 화면에서 의미가 직관적이지 않았다.
+- 예지보전/시계열 데이터 활용 주제인데 판단 근거가 원인 목록처럼 보여 시계열 흐름이 약하게 전달됐다.
+
+주요 변경:
+
+1. 목록에서 선택한 이상 컨텍스트를 이상/정비 목록 근처로 이동했다.
+   - 선택한 이상 ID, 장비명, 이상 유형, 조치 지표 요약을 목록 바로 위에서 확인하게 했다.
+   - 상세 카드 자동 스크롤은 `.pm-selected-context` 기준 `block: "nearest"`로 조정했다.
+2. `MTTA`, `MTTR` KPI 문구를 한국어로 변경했다.
+   - `평균 응답 시간`: 이상 발생 후 확인까지.
+   - `평균 복구 시간`: 정비 생성 후 해결까지.
+3. 우선조치 이상 상세 카드를 장비 중심으로 재구성했다.
+   - 상단에 `문제 장비`, `인지된 문제`를 크게 표시했다.
+   - 지표명 중심 제목 대신 `영상 흐림 증가`, `처리 속도 저하`처럼 운영자가 바로 이해할 수 있는 문제 문구를 추가했다.
+4. 상태 배지 영역을 가로 그리드로 정리했다.
+   - 이상 상태, 정비 상태, 탐지 방식, 우선순위, 탐지기를 `2 + 2 + 2 + 2 + 4` 비율로 배치했다.
+   - 글자 크기와 카드 높이를 키우고 오른쪽 빈 공간이 생기지 않도록 12칸 그리드로 맞췄다.
+5. `조치 판단 지표`를 `시계열 판단 근거 요약`으로 변경했다.
+   - 첫 항목은 `핵심 원인`, 나머지는 `보조 근거`로 구분했다.
+   - 각 근거는 `문제 지표`, `시계열 흐름`, `권장 조치`, 현재/정상 범위/조치 기준/판정 값으로 읽히게 했다.
+6. 시계열 흐름을 텍스트 중심으로 표현했다.
+   - 상세 카드 상단에 `기준선 학습 -> 최근 관측 -> 예측/조치 시점` 흐름을 추가했다.
+   - 각 지표 근거에는 `과거 기준`, `최근 관측`, `조치 기준선` 텍스트 요약만 남겼다.
+   - 실제 시계열 배열이 API에 없으므로 그래프성 sparkline은 제거했다.
+7. API 응답 매핑을 보강했다.
+   - `sampledAt`, `metricScore`, `context`, `baseline`을 프론트 모델에 포함했다.
+   - 현재 화면은 전체 시계열이 아니라 기준선/최근 관측/임계값 기반의 시계열 요약을 표시한다.
+8. 담당자/정비 이력/API 연동 작업을 반영했다.
+   - 담당자 후보 API와 정비 티켓 변경 이력 API를 연결했다.
+   - USER 역할은 정비 배정 대상에서 제외하는 정책을 반영했다.
+   - 기존 티켓 이력 backfill migration을 추가했다.
+
+검증:
+
+```powershell
+npm test -- --run tests/predictiveApi.test.js tests/usePredictivePerm.test.js
+node -e "const fs=require('fs'); const { parse, compileTemplate }=require('@vue/compiler-sfc'); const file='src/views/admin/OpsView.vue'; const source=fs.readFileSync(file,'utf8'); const parsed=parse(source,{filename:file}); if(parsed.errors.length){console.error(parsed.errors); process.exit(1);} const tpl=compileTemplate({source:parsed.descriptor.template.content,filename:file,id:'ops'}); if(tpl.errors.length){console.error(tpl.errors); process.exit(1);} console.log('OpsView.vue SFC parse ok');"
+git diff --check
+```
+
+결과:
+
+- Vitest 2 files / 30 tests 통과.
+- `OpsView.vue` SFC parse 통과.
+- `git diff --check` 통과. Windows CRLF 경고만 확인.
+- 사용자 요청에 따라 frontend/backend build는 실행하지 않았다.
+
+후속 인계 문서:
+
+- 다음 컨텍스트용 별도 문서 `next_context_todo_2026-06-22_ops_ui.md`에 분리했다.
+
+GitHub 커밋 한 줄 메시지:
+
+```text
+Improve predictive ops detail readability and time-series evidence summary
+```
+
+작업일지용 번호 요약:
+
+1. `/admin/ops` 이상 목록 선택 컨텍스트를 목록 근처로 이동해 상세 카드와 목록 간 이동 부담을 줄였다.
+2. `MTTA`, `MTTR` KPI를 `평균 응답 시간`, `평균 복구 시간`으로 한국어화했다.
+3. 우선조치 이상 상세 카드 상단을 `문제 장비`와 `인지된 문제` 중심으로 재구성했다.
+4. 상태/정비/탐지/우선순위/탐지기 배지 영역을 12칸 그리드로 정리하고 글자와 카드 크기를 키웠다.
+5. `조치 판단 지표`를 `시계열 판단 근거 요약`으로 바꾸고 핵심 원인/보조 근거 구분을 추가했다.
+6. 상세 카드에 `기준선 학습 -> 최근 관측 -> 예측/조치 시점` 흐름을 추가했다.
+7. 지표별 시계열 흐름은 그래프 없이 `과거 기준`, `최근 관측`, `조치 기준선` 텍스트 요약으로 정리했다.
+8. `sampledAt`, `metricScore`, `context`, `baseline`을 프론트 모델에 포함해 시계열 요약 표현 근거를 보강했다.
+9. 담당자 후보 API, 정비 변경 이력 API, 정비 이력 backfill, USER 배정 차단 정책을 반영했다.
+10. 다음 컨텍스트용 별도 TODO 문서에 실제 시계열 샘플 API 확장, 화면 폭별 검수, SHADOW 비교 영역 유지 항목을 분리했다.
