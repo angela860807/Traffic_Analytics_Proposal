@@ -32,7 +32,8 @@ public class PredictiveDatabaseBootstrapRunner implements ApplicationRunner {
             "classpath:db/migration/006_speed_violation_reviews.sql",
             "classpath:db/migration/007_predictive_maintenance_schema.sql",
             "classpath:db/migration/008_predictive_seed_policies.sql",
-            "classpath:db/migration/009_predictive_ticket_history_backfill.sql"
+            "classpath:db/migration/009_predictive_ticket_history_backfill.sql",
+            "classpath:db/migration/010_anomaly_events_active_index_datasource.sql"
     );
 
     private static final List<String> SEED_LOCATIONS = List.of(

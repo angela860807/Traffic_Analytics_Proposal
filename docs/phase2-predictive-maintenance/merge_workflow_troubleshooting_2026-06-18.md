@@ -1545,11 +1545,13 @@ Improve predictive ops detail readability and time-series evidence summary
   -InternalApiKey "traffic-ai-internal-key-2026"
 ```
 
-현재 CSV는 `bad_fps_1` ~ `bad_fps_4` 4개 샘플을 `REAL` 데이터소스로 넣는다. 따라서 화면에서 확인할 때는 `/admin/ops` 상단 데이터소스를 `실데이터(REAL)` 기준으로 전환해야 한다.
+현재 CSV는 `normal`, `blur`, `dropout`, `low_fps` 각 4건, 총 16개 health sample을 `REAL` 데이터소스로 넣는다. 따라서 화면에서 확인할 때는 `/admin/ops`의 장비현황 상단 데이터소스를 `실데이터(REAL)` 기준으로 전환한 뒤 `장애 이상 관리` 화면으로 이동해야 한다.
+
+`장애 주입(FAULT_INJECTED)`의 전체 이상 21건은 seed 데이터이므로, REAL health sample을 주입해도 그 값은 바뀌지 않는다. 현재 검증 기준으로는 REAL 전체 이상이 6건에서 9건으로 증가한다.
 
 ### 기존 데이터가 있을 때 확인 포인트
 
-전체 이상 건수가 그대로여도 실패가 아니다. 기존 활성 이벤트가 있으면 건수는 유지되고 아래 값이 바뀐다.
+`실데이터(REAL)` 기준에서도 전체 이상 건수가 그대로일 수 있다. 기존 활성 이벤트가 있으면 새 이벤트를 계속 만들지 않고 아래 값이 갱신된다.
 
 - `anomaly_events.last_detected_at`
 - `anomaly_event_evidence` row 수
@@ -1582,54 +1584,49 @@ Invoke-RestMethod `
 DB에서 직접 확인:
 
 ```powershell
-docker exec traffic-postgres psql -U postgres -d traffic -c "select id, target_camera_id, anomaly_type, severity, status, data_source, first_detected_at, last_detected_at from anomaly_events where data_source='REAL' and target_camera_id=1 order by last_detected_at desc;"
+docker exec traffic-postgres psql -U postgres -d traffic -c "select id, target_camera_id, anomaly_type, severity, status, data_source, first_detected_at, last_detected_at from anomaly_events where data_source='REAL' and target_camera_id in (5,10,11,17) order by last_detected_at desc;"
 
-docker exec traffic-postgres psql -U postgres -d traffic -c "select ae.id, ae.anomaly_type, count(ev.id) as evidence_count, max(ev.sampled_at) as latest_evidence from anomaly_events ae left join anomaly_event_evidence ev on ev.anomaly_event_id=ae.id where ae.data_source='REAL' and ae.target_camera_id=1 group by ae.id, ae.anomaly_type order by latest_evidence desc;"
+docker exec traffic-postgres psql -U postgres -d traffic -c "select ae.id, ae.target_camera_id, ae.anomaly_type, count(ev.id) as evidence_count, max(ev.sampled_at) as latest_evidence from anomaly_events ae left join anomaly_event_evidence ev on ev.anomaly_event_id=ae.id where ae.data_source='REAL' and ae.target_camera_id in (5,10,11,17) group by ae.id, ae.target_camera_id, ae.anomaly_type order by latest_evidence desc;"
 ```
 
 ### 처음부터 다시 테스트하고 싶을 때
 
-아래 명령은 발표용 demo 주입분만 지우는 리셋용이다. 운영 seed 전체를 지우는 명령이 아니며, `REAL + camera_id=1 + demo-* idempotency` 기준 샘플과 해당 REAL 이벤트/정비 건만 정리한다.
+아래 명령은 발표용 demo 주입분만 지우는 리셋용이다. 운영 seed 전체를 지우는 명령이 아니며, 현재 CSV의 `REAL + camera_id in (5,10,11,17) + demo-* idempotency` 기준 샘플과 해당 REAL 이벤트/정비 건만 정리한다.
 
 ```powershell
-$resetSql = @"
-BEGIN;
-
-CREATE TEMP TABLE _demo_events AS
-SELECT id
-FROM anomaly_events
-WHERE data_source = 'REAL'
-  AND target_camera_id = 1;
-
-CREATE TEMP TABLE _demo_tickets AS
-SELECT id
-FROM maintenance_tickets
-WHERE anomaly_event_id IN (SELECT id FROM _demo_events);
-
-DELETE FROM maintenance_ticket_histories
-WHERE maintenance_ticket_id IN (SELECT id FROM _demo_tickets);
-
-DELETE FROM maintenance_tickets
-WHERE id IN (SELECT id FROM _demo_tickets);
-
-DELETE FROM anomaly_event_evidence
-WHERE anomaly_event_id IN (SELECT id FROM _demo_events);
-
-DELETE FROM anomaly_events
-WHERE id IN (SELECT id FROM _demo_events);
-
-DELETE FROM camera_health_samples
-WHERE data_source = 'REAL'
-  AND camera_id = 1
-  AND idempotency_key LIKE 'demo-%';
-
-COMMIT;
-"@
-
-$resetSql | docker exec -i traffic-postgres psql -U postgres -d traffic
+.\tools\predictive_demo\reset_health_demo.ps1
 ```
 
-리셋 후 다시 주입 명령을 실행하면 REAL 기준 이상 이벤트 6건과 CRITICAL 정비 건 3건이 다시 생성되는 흐름을 확인할 수 있다.
+리셋 후 다시 주입 명령을 실행하면 `normal`, `blur`, `dropout`, `low_fps` 총 16개 health sample이 다시 들어가고, `normal`을 제외한 이상 시나리오가 REAL 이벤트/정비 흐름으로 연결되는지 확인할 수 있다.
+
+### REAL 주입 후 전체 이상 수가 그대로일 때
+
+증상:
+
+- `import_health_samples.ps1` 출력은 `Created=True`, `Status=Imported`로 정상이다.
+- `/admin/ops`의 `전체 이상` 값이 주입 전후로 변하지 않는다.
+
+먼저 확인할 것:
+
+- 장비현황 상단 데이터소스가 `실데이터(REAL)`인지 확인한다.
+- `장애 주입(FAULT_INJECTED)`을 보고 있으면 seed 기준 전체 이상 21건이 그대로 보이는 것이 정상이다.
+- 이미 같은 REAL 이벤트가 열려 있으면 건수 대신 `lastDetectedAt`과 evidence가 갱신된다.
+
+DB 인덱스 원인:
+
+- 애플리케이션 코드는 같은 카메라와 같은 이상 유형이라도 `dataSource`가 다르면 별도 이벤트로 다룬다.
+- 기존 DB 인덱스가 `target_camera_id + anomaly_type`만 unique로 묶고 있으면, `FAULT_INJECTED`에 이미 열린 이벤트가 있는 카메라 10, 11, 17의 `REAL` 이벤트 생성이 막힌다.
+- 이 경우 Spring Boot 로그에 `duplicate key value violates unique constraint "ux_anomaly_events_active"`가 남는다.
+
+해결:
+
+- `010_anomaly_events_active_index_datasource.sql` migration을 적용해 활성 이벤트 unique 기준을 `target_camera_id + anomaly_type + data_source`로 변경한다.
+- 새 Docker 환경은 bootstrap 과정에서 자동 적용된다.
+- 이미 떠 있는 DB에서 즉시 확인해야 하면 아래 SQL을 1회 실행한다.
+
+```powershell
+docker exec traffic-postgres psql -U postgres -d traffic -c "drop index if exists ux_anomaly_events_active; create unique index if not exists ux_anomaly_events_active on anomaly_events (target_camera_id, anomaly_type, data_source) where status in ('OPEN', 'ACKNOWLEDGED', 'RECOVERED');"
+```
 
 ### 주의 사항
 

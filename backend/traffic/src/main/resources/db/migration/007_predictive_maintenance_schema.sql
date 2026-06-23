@@ -271,7 +271,7 @@ CREATE TABLE IF NOT EXISTS anomaly_events (
 
 -- 동일 카메라·이상유형의 활성 이벤트 중복 방지
 CREATE UNIQUE INDEX IF NOT EXISTS ux_anomaly_events_active
-    ON anomaly_events (target_camera_id, anomaly_type)
+    ON anomaly_events (target_camera_id, anomaly_type, data_source)
     WHERE status IN ('OPEN', 'ACKNOWLEDGED', 'RECOVERED');
 
 CREATE INDEX IF NOT EXISTS idx_anomaly_events_camera_status

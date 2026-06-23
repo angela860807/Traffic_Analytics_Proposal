@@ -78,7 +78,7 @@
 ### 3-2. 시연 명령
 
 발표 중 직접 실행할 명령은 아래 하나로 제한한다.
-이 명령은 누적 운영 데이터 설명을 마친 뒤, 상단 데이터 소스를 `실데이터`로 바꾼 다음 실행한다.
+이 명령은 누적 운영 데이터 설명을 마친 뒤, 장비현황 상단 데이터소스를 `실데이터`로 바꾸고 `장애 이상 관리` 화면으로 이동한 다음 실행한다.
 
 ```powershell
 .\tools\predictive_demo\import_health_samples.ps1 `
@@ -89,7 +89,7 @@
 
 확인 포인트:
 
-- `bad_fps_1` ~ `bad_fps_4`
+- `normal_1` ~ `normal_4`, `blur_1` ~ `blur_4`, `dropout_1` ~ `dropout_4`, `low_fps_1` ~ `low_fps_4`
 - `Created : True`
 - `Status : Imported`
 
@@ -97,10 +97,10 @@
 
 1. `http://localhost:5174/admin/ops` 접속
 2. `admin@email.com / 1234` 로그인
-3. 상단 KPI 확인
+3. 데이터소스가 `장애 주입`인 상태에서 상단 KPI 확인
    - 전체 카메라 20대
-   - 열린 이상 이벤트 15건
-   - 정비 건 21건
+   - 이상 탐지 15건
+   - 전체 이상 21건
    - 예측 위험 3건
 4. 이상 이벤트 목록에서 `LATENCY_DEGRADATION`, `NETWORK_INSTABILITY`, `FPS_DEGRADATION` 중 1건 상세 클릭
 5. 상단 `우선 조치 이상 상세` 확인
@@ -116,6 +116,10 @@
    - `ASSIGNED -> IN_PROGRESS`
    - `IN_PROGRESS -> RESOLVED`
    - `RESOLVED -> CLOSED`
+10. 장비현황 상단 데이터소스를 `실데이터`로 전환
+11. `장애 이상 관리` 화면으로 이동
+12. PowerShell에서 health sample 주입 명령 실행
+13. 화면을 새로고침하거나 데이터소스를 다시 선택해 REAL 기준 이상 이벤트 증가 확인
 
 ## 4. 시연 멘트 초안
 
@@ -139,8 +143,9 @@ KPI 화면:
 
 ```text
 초기 화면은 장애 주입 데이터 기준으로 운영 현황을 보여줍니다.
-현재 전체 카메라 20대, 열린 이상 이벤트 15건, 정비 건 21건이 확인됩니다.
-이후 실데이터 필터로 전환해 샘플을 주입하면 방금 들어온 상태 샘플 기반의 이벤트 흐름도 확인할 수 있습니다.
+현재 전체 카메라 20대, 이상 탐지 15건, 전체 이상 21건이 확인됩니다.
+이 값은 발표용 누적 seed 데이터이고, 실시간 주입 결과는 실데이터 필터로 전환한 뒤 확인하겠습니다.
+실데이터로 전환한 상태에서 상태 샘플을 주입하면 방금 들어온 health sample 기반의 이벤트 흐름을 확인할 수 있습니다.
 ```
 
 시계열 판단 근거:
@@ -246,13 +251,15 @@ KPI 화면:
   -InternalApiKey "traffic-ai-internal-key-2026"
 ```
 
-현재 CSV는 `bad_fps_1` ~ `bad_fps_4` 샘플을 `REAL` 데이터소스로 주입한다. 따라서 시연 화면에서는 누적 운영 데이터는 `장애 주입(FAULT_INJECTED)`로 먼저 보여주고, 스크립트 주입 결과는 `실데이터(REAL)`로 전환해서 확인한다.
+현재 CSV는 `normal`, `blur`, `dropout`, `low_fps` 각 4건, 총 16개 health sample을 `REAL` 데이터소스로 주입한다. 따라서 시연 화면에서는 누적 운영 데이터는 `장애 주입(FAULT_INJECTED)`로 먼저 보여주고, 스크립트 주입 결과는 장비현황 상단 데이터소스를 `실데이터(REAL)`로 전환한 뒤 `장애 이상 관리`에서 확인한다.
 
 ### 7-2. 발표에서 설명할 핵심 포인트
 
 - 주입 스크립트는 영상 파일을 직접 분석하는 단계가 아니라, 영상 품질 저하를 health sample 수치로 모델링한 입력이다.
+- `장애 주입(FAULT_INJECTED)`의 전체 이상 21건은 seed 데이터이므로, REAL health sample을 주입해도 그 숫자는 바뀌지 않는다.
+- 주입 결과는 `실데이터(REAL)`로 전환해서 확인한다. 현재 검증 기준으로는 REAL 전체 이상이 6건에서 9건으로 증가한다.
 - 같은 카메라와 같은 이상 유형의 활성 이벤트가 이미 있으면 새 행을 계속 만들지 않고 기존 이벤트를 갱신한다.
-- 따라서 전체 이상 건수가 그대로여도 실패가 아니다.
+- 따라서 REAL에서도 같은 이벤트를 반복 주입하면 전체 이상 건수가 그대로일 수 있다.
 - 발표에서는 "중복 장애를 계속 늘리지 않고 하나의 활성 이벤트에 시계열 근거를 누적한다"라고 설명한다.
 - 새로 들어온 샘플은 `lastDetectedAt` 갱신과 상세 카드의 시계열 판단 근거 증가로 확인한다.
 
@@ -260,11 +267,13 @@ KPI 화면:
 
 1. `/admin/ops` 접속 후 `장애 주입(FAULT_INJECTED)` 데이터소스로 누적 운영 현황을 먼저 보여준다.
 2. 이상 이벤트 및 정비 건 현황에서 기존 이벤트, 정비 상태, 페이지네이션을 보여준다.
-3. PowerShell에서 health sample 주입 명령을 실행한다.
-4. `/admin/ops` 상단 데이터소스를 `실데이터(REAL)`로 바꾼다.
-5. 이상 이벤트 목록을 최신순으로 확인한다.
-6. 카메라 1번 관련 이벤트 상세를 열어 시계열 판단 근거가 쌓였는지 확인한다.
-7. 정비 건이 이미 있으면 이력/상태 변경 모달로 이어서 보여준다.
+3. 장비현황 상단 데이터소스를 `실데이터(REAL)`로 바꾼다.
+4. `장애 이상 관리` 화면으로 이동해 REAL 기준 초기 상태를 확인한다.
+5. PowerShell에서 health sample 주입 명령을 실행한다.
+6. 화면을 새로고침하거나 데이터소스를 다시 선택한다.
+7. 이상 이벤트 목록을 최신순으로 확인한다.
+8. 카메라 10, 11, 17번 관련 이벤트 상세를 열어 시계열 판단 근거가 쌓였는지 확인한다.
+9. 정비 건이 이미 있으면 이력/상태 변경 모달로 이어서 보여준다.
 
 ### 7-4. 테스트 확인 명령어
 
@@ -292,14 +301,24 @@ Invoke-RestMethod `
 DB에서 evidence 누적을 확인할 때:
 
 ```powershell
-docker exec traffic-postgres psql -U postgres -d traffic -c "select ae.id, ae.anomaly_type, count(ev.id) as evidence_count, max(ev.sampled_at) as latest_evidence from anomaly_events ae left join anomaly_event_evidence ev on ev.anomaly_event_id=ae.id where ae.data_source='REAL' and ae.target_camera_id=1 group by ae.id, ae.anomaly_type order by latest_evidence desc;"
+docker exec traffic-postgres psql -U postgres -d traffic -c "select ae.id, ae.target_camera_id, ae.anomaly_type, count(ev.id) as evidence_count, max(ev.sampled_at) as latest_evidence from anomaly_events ae left join anomaly_event_evidence ev on ev.anomaly_event_id=ae.id where ae.data_source='REAL' and ae.target_camera_id in (5,10,11,17) group by ae.id, ae.target_camera_id, ae.anomaly_type order by latest_evidence desc;"
 ```
 
-### 7-5. 예상 질문 대응
+### 7-5. 재시연 전 되돌리기 명령어
+
+같은 환경에서 다시 시연해야 할 때는 먼저 아래 리셋 명령으로 발표용 REAL 주입분을 정리한 뒤, 7-1의 주입 명령을 다시 실행한다.
+
+```powershell
+.\tools\predictive_demo\reset_health_demo.ps1
+```
+
+이 명령은 운영 seed 전체를 지우지 않고, 현재 CSV 시나리오에 해당하는 `camera_id 5, 10, 11, 17`의 demo health sample과 연결된 REAL 이벤트/정비 이력만 정리한다.
+
+### 7-6. 예상 질문 대응
 
 Q. 스크립트를 다시 실행했는데 전체 이상 건수가 늘지 않는 이유는?
 
-A. 같은 카메라와 같은 이상 유형의 활성 이벤트가 있으면 기존 이벤트를 갱신하기 때문이다. 실제 관제에서는 같은 장애를 매번 새 티켓으로 만들면 중복 처리가 생기므로, 하나의 활성 이벤트에 최근 감지 시각과 판단 근거를 누적하는 방식이 더 적절하다.
+A. 먼저 데이터소스가 `실데이터(REAL)`인지 확인해야 한다. `장애 주입(FAULT_INJECTED)`의 21건은 seed 데이터라 REAL 주입으로 바뀌지 않는다. REAL에서도 같은 카메라와 같은 이상 유형의 활성 이벤트가 이미 있으면 기존 이벤트를 갱신한다. 실제 관제에서는 같은 장애를 매번 새 티켓으로 만들면 중복 처리가 생기므로, 하나의 활성 이벤트에 최근 감지 시각과 판단 근거를 누적하는 방식이 더 적절하다.
 
 Q. 준비한 blur, dropout, low_fps, normal 영상은 왜 직접 주입하지 않는가?
 
