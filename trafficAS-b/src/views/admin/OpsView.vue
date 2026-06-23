@@ -1739,6 +1739,12 @@
                     @click="openTicketTransition(f, 'CLOSED')"
                     title="OPERATOR/ADMIN만 처리 가능"
                   >최종 종결</button>
+                  <button
+                    v-if="f.ticketId"
+                    class="pnl-act sm"
+                    @click="openTicketHistory(f)"
+                    title="정비 변경 이력 보기"
+                  >이력</button>
                   <button class="pnl-act sm" @click="selectAnomalyDetail(f)">상세</button>
                 </td>
               </tr>
@@ -1893,7 +1899,7 @@
           <div class="cm-h">
             <div class="cm-title">
               <i class="bi bi-clipboard-check" aria-hidden="true"></i>
-              <span>정비 상태 변경</span>
+              <span>{{ ticketModal.readOnly ? "정비 변경 이력" : "정비 상태 변경" }}</span>
               <span class="stat" :class="ticketModal.fault.tone">{{ ticketModal.fault.sev }}</span>
             </div>
             <button class="cm-x" @click="closeTicketModal" aria-label="닫기"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
@@ -1905,7 +1911,7 @@
             <div class="cm-row">
               <span>현재 상태</span><strong>{{ ticketStatusLabel(ticketModal.fault.ticketStatus) }}</strong>
             </div>
-            <div class="cm-row">
+            <div v-if="!ticketModal.readOnly" class="cm-row">
               <span>전환 상태</span>
               <strong class="rd-txt">→ {{ ticketStatusLabel(ticketModal.toStatus) }}</strong>
             </div>
@@ -1941,7 +1947,7 @@
                 </div>
               </div>
             </div>
-            <div class="pm-ticket-note">
+            <div v-if="!ticketModal.readOnly" class="pm-ticket-note">
               <label>
                 조치 메모
                 <span v-if="ticketModal.toStatus === 'RESOLVED'" class="req">* 필수</span>
@@ -1956,8 +1962,8 @@
               </div>
             </div>
             <div class="pm-ticket-acts">
-              <button class="pnl-act" @click="closeTicketModal">취소</button>
-              <button class="pnl-act gr" @click="submitTicketTransition">
+              <button class="pnl-act" @click="closeTicketModal">{{ ticketModal.readOnly ? "닫기" : "취소" }}</button>
+              <button v-if="!ticketModal.readOnly" class="pnl-act gr" @click="submitTicketTransition">
                 <i class="bi bi-check2"></i> 적용
               </button>
             </div>
@@ -3890,9 +3896,9 @@ function toTicketHistoryEntry(row) {
   }
 }
 
-async function openTicketTransition(fault, toStatus) {
+async function openTicketTransition(fault, toStatus, readOnly = false) {
   const fallbackHistories = ticketHistory(fault)
-  ticketModal.value = { fault, toStatus, note: "", error: "", histories: fallbackHistories, historyLoading: false }
+  ticketModal.value = { fault, toStatus, readOnly, note: "", error: "", histories: fallbackHistories, historyLoading: false }
   const ticketId = ticketIdFor(fault)
   if (!ticketId) return
   ticketModal.value.historyLoading = true
@@ -3912,6 +3918,9 @@ async function openTicketTransition(fault, toStatus) {
       ticketModal.value.historyLoading = false
     }
   }
+}
+function openTicketHistory(fault) {
+  openTicketTransition(fault, null, true)
 }
 function closeTicketModal() { ticketModal.value = null }
 function legacySubmitTicketTransition() {
@@ -4016,6 +4025,7 @@ function ticketIdFor(target) {
 
 async function submitTicketTransition() {
   if (!ticketModal.value) return
+  if (ticketModal.value.readOnly) return
   const { fault, toStatus, note } = ticketModal.value
   if (toStatus === "RESOLVED" && !note.trim()) {
     ticketModal.value.error = "RESOLVED 전환 시 조치 메모가 필요합니다."
@@ -5575,7 +5585,7 @@ const servers = Object.freeze([
 }
 .ops-shell .pm-time-step {
   min-width: 0;
-  padding: 11px 12px;
+  padding: 14px 15px;
   border: 1px solid #e2e8f0;
   border-radius: 9px;
   background: #f8fafc;
@@ -5591,24 +5601,24 @@ const servers = Object.freeze([
 .ops-shell .pm-time-step span {
   display: block;
   color: #64748b;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 900;
 }
 .ops-shell .pm-time-step strong {
   display: block;
-  margin-top: 4px;
+  margin-top: 6px;
   color: #0c1f40;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 900;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
 .ops-shell .pm-time-step em {
   display: block;
-  margin-top: 3px;
+  margin-top: 5px;
   color: #526179;
   font-style: normal;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 750;
 }
 .ops-shell .pm-time-arrow {
@@ -5770,57 +5780,62 @@ const servers = Object.freeze([
   font-weight: 800;
 }
 .ops-shell .pm-ev-timeline {
-  margin-top: 10px;
-  padding: 10px 12px 8px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #f8fafc;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #f8fbff;
 }
 .ops-shell .pm-ev-time-head {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 .ops-shell .pm-ev-time-head span {
-  color: #64748b;
-  font-size: 12px;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12.5px;
   font-weight: 900;
 }
 .ops-shell .pm-ev-time-head strong {
   color: #0c1f40;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 900;
+  overflow-wrap: anywhere;
 }
 .ops-shell .pm-ev-time-head em {
   color: #9a3412;
   font-style: normal;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 850;
 }
 .ops-shell .pm-ev-time-summary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: 10px;
 }
 .ops-shell .pm-ev-time-summary span {
   display: grid;
-  gap: 3px;
-  padding: 8px 9px;
+  gap: 5px;
+  padding: 10px 11px;
   border: 1px solid #e2e8f0;
-  border-radius: 7px;
+  border-radius: 8px;
   background: #ffffff;
 }
 .ops-shell .pm-ev-time-summary strong {
   color: #64748b;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 900;
 }
 .ops-shell .pm-ev-time-summary em {
   color: #0c1f40;
   font-style: normal;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 900;
 }
 .ops-shell .pm-ev-time-summary span:nth-child(3) em {
@@ -5857,29 +5872,33 @@ const servers = Object.freeze([
 .ops-shell .pm-ev-values {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 .ops-shell .pm-ev-value {
   min-height: 94px;
-  padding: 10px 12px;
+  padding: 14px 12px;
   border-radius: 8px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
+  text-align: center;
 }
 .ops-shell .pm-ev-value span {
   display: block;
   color: #64748b;
-  font-size: 12px;
-  font-weight: 800;
-  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 900;
+  margin-bottom: 7px;
 }
 .ops-shell .pm-ev-value strong {
   color: #0c1f40;
-  font-size: 21px;
+  font-size: 24px;
   font-weight: 900;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 .ops-shell .pm-ev-value.current.rd {
   background: #fef2f2;
@@ -5898,19 +5917,21 @@ const servers = Object.freeze([
 .ops-shell .pm-ev-value.judge strong {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 900;
 }
 .ops-shell .pm-ev-value.judge i {
-  font-size: 21px;
+  font-size: 23px;
 }
 .ops-shell .pm-ev-value.judge em {
-  margin-top: 5px;
+  margin-top: 7px;
   font-style: normal;
-  font-size: 12.5px;
+  font-size: 13.5px;
   line-height: 1.35;
   font-weight: 800;
+  max-width: 13em;
 }
 .ops-shell .pm-ev-value.judge.rd {
   background: #fef2f2;

@@ -1,6 +1,7 @@
 # Next Context TODO - `/admin/ops` Predictive Ops UI
 
 작성일: 2026-06-22
+최종 확인: 2026-06-23
 
 ## 1. 현재 반영된 상태
 
@@ -19,31 +20,37 @@
   - `최근 관측`
   - `조치 기준선`
 - 프론트 모델에 `sampledAt`, `metricScore`, `context`, `baseline`을 포함했다.
+- 2026-06-23 사용자가 frontend build 후 `/admin/ops` 화면을 확인했다.
+- 상태 샘플 재주입 후 summary 기준 `criticalCameras=1`, `openAnomalies=6`, `maintenance_tickets=3` 상태를 확인했다.
+- 정비 건 1건을 `OPEN -> ASSIGNED -> IN_PROGRESS -> RESOLVED -> CLOSED`까지 처리하고, `maintenance-tickets/{ticketId}/histories` API에서 변경 이력 4건 저장을 확인했다.
+- `CLOSED` 상태에서도 하단 현황표의 `이력` 버튼으로 정비 변경 이력 timeline을 읽기 전용으로 열 수 있게 보완했다.
+- `시계열 판단 근거 요약` 영역의 시간 흐름과 `현재/정상 범위/조치 기준/판정` 값 카드 가독성을 개선했다.
 
 ## 2. 남은 TODO
 
 ### 2-1. UI 확인
 
-- [ ] 사용자가 직접 frontend build 후 `/admin/ops`를 확인한다.
-- [ ] 상세 카드의 상태 배지 폭, 글자 크기, 말줄임이 데스크톱 화면에서 자연스러운지 확인한다.
-- [ ] 좁은 화면에서 상태 배지, 시계열 흐름, 판단 근거 요약이 겹치지 않는지 확인한다.
-- [ ] `시계열 판단 근거 요약` 문구가 발표/시연 맥락에서 직관적인지 확인한다.
-- [ ] 목록 선택 컨텍스트가 목록과 상세 카드의 연결성을 충분히 보완하는지 운영자 관점에서 확인한다.
+- [x] 사용자가 직접 frontend build 후 `/admin/ops`를 확인한다.
+- [x] 상세 카드의 상태 배지 폭, 글자 크기, 말줄임이 데스크톱 화면에서 자연스러운지 확인한다.
+- [x] 좁은 화면에서 상태 배지, 시계열 흐름, 판단 근거 요약이 겹치지 않는지 확인한다.
+- [x] `시계열 판단 근거 요약` 문구가 발표/시연 맥락에서 직관적인지 확인한다.
+- [x] 목록 선택 컨텍스트가 목록과 상세 카드의 연결성을 충분히 보완하는지 운영자 관점에서 확인한다.
+- [x] `CLOSED` 정비 건에서도 변경 이력 timeline을 다시 조회할 수 있는지 확인한다.
 
 ### 2-2. API 계약 검토
 
 - [ ] 이상 이벤트 상세 응답에 최근 N개 시계열 샘플을 추가할지 결정한다.
   - 현재 상세 카드는 `baseline`, `sampledAt`, `observedValue`, `thresholdValue` 기반의 요약만 표시한다.
   - 실제 sparkline이 필요하면 API 계약에 `series: [{ sampledAt, value }]` 또는 bucket 요약 필드가 필요하다.
-- [ ] 기준선 기간, 최근 관측 시각, 예측/조치 시점이 실제 운영 데이터에서 모두 채워지는지 E2E로 확인한다.
-- [ ] `sampledAt`이 없는 evidence에 대한 fallback 문구가 충분히 자연스러운지 확인한다.
+- [x] 기준선 기간, 최근 관측 시각, 예측/조치 시점이 실제 운영 데이터에서 모두 채워지는지 E2E로 확인한다.
+- [x] `sampledAt`이 없는 evidence에 대한 fallback 문구가 충분히 자연스러운지 확인한다.
 
 ### 2-3. 후속 고도화
 
 - [ ] SHADOW LSTM AutoEncoder 결과는 운영 판단과 혼동되지 않게 별도 비교 영역으로 유지한다.
 - [ ] 실제 시계열 샘플 API가 추가되면 현재 텍스트 요약 아래에 sparkline을 선택적으로 붙일지 재검토한다.
-- [ ] 담당자 후보 API와 정비 변경 이력 API가 운영 DB seed에서도 정상 동작하는지 확인한다.
-- [ ] `USER` 역할이 정비 담당자 후보와 assign API에서 모두 차단되는지 통합 확인한다.
+- [x] 담당자 후보 API와 정비 변경 이력 API가 운영 DB seed에서도 정상 동작하는지 확인한다.
+- [x] `USER` 역할이 정비 담당자 후보와 assign API에서 모두 차단되는지 통합 확인한다.
 
 ### 2-4. 새 PC 시연 준비
 
@@ -88,6 +95,18 @@ cd C:\Users\user\Desktop\Traffic_Analytics_Proposal
 git diff --check
 ```
 
+2026-06-23 확인된 테스트:
+
+```powershell
+cd C:\jwdev\Traffic_Analytics_Proposal\trafficAS-b
+npm test -- --run tests/predictiveApi.test.js tests/usePredictivePerm.test.js
+# Test Files 2 passed, Tests 30 passed
+
+cd C:\jwdev\Traffic_Analytics_Proposal\backend\traffic
+.\gradlew test --tests "*PredictiveOperationsServiceTest"
+# BUILD SUCCESSFUL
+```
+
 ## 4. 관련 문서
 
 - `docs/phase2-predictive-maintenance/merge_workflow_troubleshooting_2026-06-18.md`
@@ -98,5 +117,5 @@ git diff --check
 ## 5. 커밋 메시지 후보
 
 ```text
-Improve predictive ops detail readability and time-series evidence summary
+Improve predictive ops history review and time-series evidence UI
 ```

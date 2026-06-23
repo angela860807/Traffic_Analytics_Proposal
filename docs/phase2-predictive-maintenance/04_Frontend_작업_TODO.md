@@ -81,31 +81,33 @@ PATCH  /api/v1/predictive/policies/{policyCode}
 
 ## 5. 화면별 TODO
 
+2026-06-23 기준 `/admin/ops` 통합 화면에서 예지보전 대시보드, 이상 이벤트 상세, 정비 건 처리, 정책 관리의 핵심 시연 흐름을 확인했다. 최초 계획의 6개 별도 route는 현재 프로젝트 구조상 `/admin/ops` 탭 화면으로 통합 구현되어 있다.
+
 ### 5-1. 예지보전 대시보드
 
-- [ ] 정상·저하·위험·오프라인·기준선 학습 중 카메라 수 표시
-- [ ] 활성 이상, 악화 예측, SLA 초과 티켓 표시
-- [ ] MTTA·MTTR 표시
-- [ ] Health Score 오름차순 카메라 목록 제공
+- [x] 정상·저하·위험·오프라인·기준선 학습 중 카메라 수 표시
+- [x] 활성 이상, 악화 예측, SLA 초과 티켓 표시
+- [x] MTTA·MTTR 표시
+- [x] Health Score 오름차순 카메라 목록 제공
 - [ ] 최근 예측 위험과 CRITICAL 이벤트 우선 표시
-- [ ] `dataSource` 필터 기본값을 `REAL`로 설정
-- [ ] 30초 polling, 탭 비활성 시 중단
-- [ ] `loading`, `empty`, `error`, `stale` 상태 구현
+- [x] `dataSource` 필터 기본값을 `REAL`로 설정
+- [x] 30초 polling, 탭 비활성 시 중단
+- [x] `loading`, `empty`, `error`, `stale` 상태 구현
 
 완료 조건:
 
-- 운영자가 30초 안에 우선 점검 카메라와 미처리 티켓을 식별할 수 있다.
+- 2026-06-23 검증 기준 운영자가 30초 안에 우선 점검 카메라와 미처리 티켓을 식별할 수 있다.
 - 비실제 데이터에 `SIMULATED`, `FAULT_INJECTED`, `MOCK` 배지가 보인다.
 
 ### 5-2. 카메라 상세
 
-- [ ] 카메라 기본 정보와 현재 Health Score 표시
-- [ ] FPS, frame drop, latency, blur, OCR 실패율, CPU·메모리, RTT 시계열 표시
-- [ ] 기준선 median과 WARNING·CRITICAL 임계선 표시
+- [x] 카메라 기본 정보와 현재 Health Score 표시
+- [x] FPS, frame drop, latency, blur, OCR 실패율, CPU·메모리, RTT 시계열 표시
+- [x] 기준선 median과 WARNING·CRITICAL 임계선 표시
 - [ ] 최근 15분과 향후 10분 예측선을 구분 표시
-- [ ] `BASELINE_LEARNING`이면 현재·필요 표본 수 표시
+- [x] `BASELINE_LEARNING`이면 현재·필요 표본 수 표시
 - [ ] 동일 시간대 교통 맥락과 인접 카메라 차량 수 표시
-- [ ] 활성 이상 이벤트와 티켓으로 이동 링크 제공
+- [x] 활성 이상 이벤트와 티켓으로 이동 링크 제공
 
 차트 정책:
 
@@ -115,48 +117,54 @@ PATCH  /api/v1/predictive/policies/{policyCode}
 
 ### 5-3. 이상 이벤트 목록
 
-- [ ] 카메라, 유형, 심각도, 상태, 탐지 방식, 출처, 시간 필터
+- [x] 카메라, 유형, 심각도, 상태, 탐지 방식, 출처, 시간 필터
 - [ ] 페이지·정렬 상태를 URL query와 동기화
-- [ ] `TREND_PROJECTION` 이벤트에 `악화 예측` 표시
-- [ ] 예상 임계치 도달까지 남은 시간 표시
-- [ ] unknown Enum fallback 구현
-- [ ] 필터 초기화 제공
+- [x] `TREND_PROJECTION` 이벤트에 `악화 예측` 표시
+- [x] 예상 임계치 도달까지 남은 시간 표시
+- [x] unknown Enum fallback 구현
+- [x] 필터 초기화 제공
 
 ### 5-4. 이상 이벤트 상세
 
-- [ ] 관측값·기준값·임계값 비교
-- [ ] robust z-score와 추세 기울기·신뢰도 표시
-- [ ] 예상 임계치 도달 시각과 예측 구간 표시
-- [ ] detector 이름·버전·정책 코드 표시
-- [ ] SHADOW LSTM AutoEncoder 재구성 오차·threshold·판정 결과를 별도 비교 영역에 표시
-- [ ] SHADOW 결과가 운영 이벤트를 생성한 것으로 오해되지 않도록 `비교 모델` 배지 표시
+- [x] 관측값·기준값·임계값 비교
+- [x] robust z-score와 추세 기울기·신뢰도 표시
+- [x] 예상 임계치 도달 시각과 예측 구간 표시
+- [x] detector 이름·버전·정책 코드 표시
+- [x] SHADOW LSTM AutoEncoder 재구성 오차·threshold·판정 결과를 별도 비교 영역에 표시
+- [x] SHADOW 결과가 운영 이벤트를 생성한 것으로 오해되지 않도록 `비교 모델` 배지 표시
 - [ ] 교통 맥락 교차검증 결과 표시
-- [ ] 원인 후보와 운영자 확정 원인 구분
-- [ ] 이벤트 확인, 해결, 오탐 종료 modal 구현
-- [ ] 연결된 정비 티켓 표시
+- [x] 원인 후보와 운영자 확정 원인 구분
+- [x] 이벤트 확인, 해결, 오탐 종료 modal 구현
+- [x] 연결된 정비 티켓 표시
 
 오탐 종료와 해결은 사유·조치 내용이 없으면 제출할 수 없다.
 
 ### 5-5. 정비 티켓
 
-- [ ] P1·P2·P3, 상태, 담당자 필터
-- [ ] SLA 초과와 남은 시간 표시
-- [ ] 담당자 배정
-- [ ] 허용 상태 전이만 노출
-- [ ] `RESOLVED` 전환 시 조치 메모 필수
-- [ ] 변경 이력 timeline 표시
-- [ ] MTTA·MTTR 표시
+- [x] P1·P2·P3, 상태, 담당자 필터
+- [x] SLA 초과와 남은 시간 표시
+- [x] 담당자 배정
+- [x] 허용 상태 전이만 노출
+- [x] `RESOLVED` 전환 시 조치 메모 필수
+- [x] 변경 이력 timeline 표시
+- [x] MTTA·MTTR 표시
+
+2026-06-23 검증:
+
+- 정비 건 1건을 `OPEN -> ASSIGNED -> IN_PROGRESS -> RESOLVED -> CLOSED`까지 처리했다.
+- `GET /api/v1/predictive/maintenance-tickets/{ticketId}/histories`에서 변경 이력 4건 저장을 확인했다.
+- `CLOSED` 상태에서도 `이력` 버튼으로 timeline을 읽기 전용 조회할 수 있게 보완했다.
 
 Kanban은 목록과 상태 전이가 완성된 뒤 선택 구현한다.
 
 ### 5-6. 정책 관리
 
-- [ ] 정책 코드, 이상 유형, 탐지 방식, 임계치, 활성 상태 표시
-- [ ] 숫자 범위와 필수값 validation
-- [ ] Rule, z-score, 추세 정책별 입력 항목 분리
-- [ ] 수정 전 확인 modal
-- [ ] 성공 후 서버 데이터를 재조회
-- [ ] `ADMIN` 외 수정 UI 비활성화
+- [x] 정책 코드, 이상 유형, 탐지 방식, 임계치, 활성 상태 표시
+- [x] 숫자 범위와 필수값 validation
+- [x] Rule, z-score, 추세 정책별 입력 항목 분리
+- [x] 수정 전 확인 modal
+- [x] 성공 후 서버 데이터를 재조회
+- [x] `ADMIN` 외 수정 UI 비활성화
 
 ## 6. 공통 상태·오류 정책
 
@@ -171,9 +179,21 @@ Kanban은 목록과 상태 전이가 완성된 뒤 선택 구현한다.
 
 파트 테스트는 다음 3개만 수행하고 전체 E2E는 최종 병합 담당이 수행한다.
 
-- [ ] API client의 URL·query·payload 및 오류 응답 매핑 단위 테스트
+- [x] API client의 URL·query·payload 및 오류 응답 매핑 단위 테스트
 - [ ] 대시보드의 loading·empty·error와 `LSTM_AUTOENCODER`·`SHADOW` 배지 렌더링 단위 테스트
 - [ ] Spring Boot mock API로 이상 상세 조회부터 티켓 상태 변경까지 인계 스모크 테스트
+
+2026-06-23 실행:
+
+```powershell
+npm test -- --run tests/predictiveApi.test.js tests/usePredictivePerm.test.js
+```
+
+결과:
+
+- `tests/predictiveApi.test.js`: 16 tests passed
+- `tests/usePredictivePerm.test.js`: 14 tests passed
+- 총 2 files, 30 tests passed
 
 ## 8. 일정
 
@@ -191,10 +211,10 @@ Kanban은 목록과 상태 전이가 완성된 뒤 선택 구현한다.
 ## 9. 완료 조건
 
 - [ ] 6개 route가 동작한다.
-- [ ] 모든 API 호출이 공유 client를 통한다.
+- [x] 모든 API 호출이 공유 client를 통한다.
 - [ ] URL query, 권한, loading·empty·error 상태가 명시적이다.
 - [ ] 교통 맥락이 CCTV 판단 보조 정보로 표현된다.
 - [ ] 혼잡 상황이 정비 장애처럼 표시되지 않는다.
-- [ ] Rule·통계·추세 이벤트의 근거가 구분된다.
-- [ ] 학습 모델 결과가 운영 판단과 분리되어 표시된다.
-- [ ] 이벤트부터 티켓 종료까지 시연할 수 있다.
+- [x] Rule·통계·추세 이벤트의 근거가 구분된다.
+- [x] 학습 모델 결과가 운영 판단과 분리되어 표시된다.
+- [x] 이벤트부터 티켓 종료까지 시연할 수 있다.
