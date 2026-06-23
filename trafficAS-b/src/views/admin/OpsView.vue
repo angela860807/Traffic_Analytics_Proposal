@@ -1280,52 +1280,36 @@
           </div>
         </div>
 
-        <!-- KPI 8박스 (예지 통합: 악화 예측 / SLA 초과 강조) -->
-        <div class="pnl-summary nd-kpi nd-kpi-8">
+        <!-- KPI 6박스 — 발표 시연용 핵심 지표만 강조 -->
+        <div class="pnl-summary nd-kpi nd-kpi-6 pm-fault-kpis">
           <div class="ps-box rd">
-            <div class="ps-l">열린 이상</div>
+            <div class="ps-l">이상 탐지</div>
             <div class="ps-v">{{ pmOpenAnomalyCount }}</div>
-            <div class="ps-sub">조치 필요 이벤트</div>
           </div>
           <div class="ps-box yl">
-            <div class="ps-l">미해결 정비</div>
+            <div class="ps-l">미해결</div>
             <div class="ps-v">{{ pmUnresolvedTicketCount }}</div>
-            <div class="ps-sub">배정/진행 포함</div>
           </div>
           <div class="ps-box gr">
-            <div class="ps-l">완료 정비</div>
+            <div class="ps-l">완료</div>
             <div class="ps-v">{{ pmResolvedTicketCount }}</div>
-            <div class="ps-sub">해결/종결 완료</div>
-          </div>
-          <div class="ps-box pm-alert" :class="{ alert: pmPredictedCount2 > 0 }">
-            <div class="ps-l"><i class="bi bi-graph-up-arrow"></i> 악화 예측</div>
-            <div class="ps-v">{{ pmPredictedCount2 }}<span>건</span></div>
-            <div class="ps-sub">임계 도달 예상</div>
           </div>
           <div class="ps-box pm">
             <div class="ps-l"><i class="bi bi-bullseye"></i> 전체 이상</div>
             <div class="ps-v">{{ pmAnomalyCount }}<span>건</span></div>
-            <div class="ps-sub">예지 탐지</div>
           </div>
           <div class="ps-box pm">
             <div class="ps-l"><i class="bi bi-hourglass-split"></i> 평균 응답 시간</div>
             <div class="ps-v">{{ pmMtta }}<span>분</span></div>
-            <div class="ps-sub">이상 발생 후 확인까지</div>
           </div>
           <div class="ps-box">
             <div class="ps-l">평균 복구 시간</div>
             <div class="ps-v">{{ pmMttr }}<span>분</span></div>
-            <div class="ps-sub">정비 생성 후 해결까지</div>
-          </div>
-          <div class="ps-box pm-alert" :class="{ alert: pmSlaOverdueCount > 0 }">
-            <div class="ps-l"><i class="bi bi-stopwatch"></i> 대응 지연</div>
-            <div class="ps-v">{{ pmSlaOverdueCount }}<span>건</span></div>
-            <div class="ps-sub">조치 지연 정비 건</div>
           </div>
         </div>
 
         <!-- ===== 우선 조치 이상 상세 (예지 탐지) ===== -->
-        <div class="nd-block" v-if="activeAnomaly">
+        <div class="nd-block pm-priority-detail" v-if="activeAnomaly">
           <div class="nd-h">
             <h4>
               <i class="bi bi-bullseye"></i> 우선 조치 이상 상세
@@ -1345,6 +1329,11 @@
                 <strong>{{ activeAnomaly.dev }}</strong>
                 <em>카메라 ID {{ activeAnomaly.cameraId || '-' }}</em>
               </div>
+              <div class="pm-primary-risk" :class="activeAnomaly.tone">
+                <span>위험도</span>
+                <strong>{{ activeAnomaly.sev }}</strong>
+                <em>{{ activeAnomaly.priority }} · {{ ticketStatusLabel(activeAnomaly.ticketStatus) }}</em>
+              </div>
               <div class="pm-primary-issue">
                 <span>인지된 문제</span>
                 <strong>{{ anomalyTypeLabelKo(activeAnomaly.anomalyType) }}</strong>
@@ -1355,13 +1344,6 @@
             <!-- 헤더: 유형 / 심각도 / 탐지 방식 / SLA -->
             <div class="pm-anom-head">
               <div class="pm-anom-titles">
-                <div class="pm-anom-title-line">
-                  <span class="sev-bdg" :class="activeAnomaly.tone">
-                    <em>위험도</em>
-                    <strong>{{ activeAnomaly.sev }}</strong>
-                  </span>
-                  <strong>{{ anomalyTypeLabelKo(activeAnomaly.anomalyType) }}</strong>
-                </div>
                 <div class="pm-anom-badges">
                   <span class="pm-meta-chip" :class="activeAnomaly.stTone">
                     <em>이상 상태</em><strong>{{ activeAnomaly.st }}</strong>
@@ -1413,32 +1395,11 @@
               </div>
             </div>
 
-            <div class="pm-time-flow">
-              <div class="pm-time-step">
-                <span>기준선 학습</span>
-                <strong>{{ baselineWindowLabel(activeAnomaly.baseline) }}</strong>
-                <em>{{ baselineSampleLabel(activeAnomaly.baseline) }}</em>
-              </div>
-              <div class="pm-time-arrow"></div>
-              <div class="pm-time-step now">
-                <span>최근 관측</span>
-                <strong>{{ latestEvidenceTime(activeAnomaly) }}</strong>
-                <em>{{ evidenceRows(activeAnomaly.evidence).length }}개 지표가 기준 이탈</em>
-              </div>
-              <div class="pm-time-arrow"></div>
-              <div class="pm-time-step forecast">
-                <span>예측/조치 시점</span>
-                <strong>{{ activeAnomaly.projectedAt || activeAnomaly.slaDeadline || '확인 필요' }}</strong>
-                <em>{{ trendFlowLabel(activeAnomaly.trend) }}</em>
-              </div>
-            </div>
-
             <!-- 조치 기준: 운영자가 바로 이해할 수 있도록 지표명/단위/판정을 한글화 -->
             <div class="pm-evidence-panel">
               <div class="pm-evidence-panel-h">
                 <div>
                   <strong>시계열 판단 근거 요약</strong>
-                  <span>기준선 대비 최근 관측값이 어떻게 벗어났는지 요약한 시계열 근거입니다.</span>
                 </div>
                 <span class="pm-evidence-count">근거 {{ evidenceRows(activeAnomaly.evidence).length }}개</span>
               </div>
@@ -1451,14 +1412,8 @@
                 >
                   <div class="pm-ev-main">
                     <div class="pm-ev-title">
-                      <span>{{ index === 0 ? '핵심 원인' : '보조 근거' }}</span>
-                      <strong>{{ metricProblemTitle(e.metric) }}</strong>
+                      <strong :title="metricHelpText(e.metric)">{{ metricProblemTitle(e.metric) }}</strong>
                       <span v-if="e.count > 1">{{ e.count }}회 연속 감지</span>
-                    </div>
-                    <div class="pm-ev-scope">
-                      <span>문제 지표</span>
-                      <strong>{{ metricLabelKo(e.metric) }}</strong>
-                      <em>{{ metricDeviceScope(e.metric) }}</em>
                     </div>
                     <div class="pm-ev-timeline">
                       <div class="pm-ev-time-head">
@@ -1472,7 +1427,6 @@
                         <span><strong>조치 기준선</strong><em>{{ formatEvidenceValue(e.threshold, e.unit) }}</em></span>
                       </div>
                     </div>
-                    <div class="pm-ev-help">{{ metricHelpText(e.metric) }}</div>
                     <div class="pm-ev-action">
                       <strong>권장 조치</strong>
                       <span>{{ metricActionText(e.metric) }}</span>
@@ -1598,7 +1552,7 @@
 
 
         <!-- 이상 이벤트 및 정비 건 현황 -->
-        <div class="nd-block">
+        <div class="nd-block pm-fault-overview">
           <div class="nd-h">
             <h4>이상 이벤트 및 정비 건 현황</h4>
             <span class="nd-h-cnt">{{ filteredFaults.length }} / {{ faults.length }}건 · 상태는 이상/정비를 분리 표시</span>
@@ -1611,7 +1565,7 @@
             <i class="bi bi-check-circle-fill"></i>
             <span>선택한 이상</span>
             <strong>{{ selectedAnomaly.id }} · {{ selectedAnomaly.dev }} · {{ anomalyTypeLabelKo(selectedAnomaly.anomalyType) }}</strong>
-            <em>상단 상세 카드 반영 · 조치 지표: {{ evidenceMetricSummary(selectedAnomaly.evidence) }}</em>
+            <em>아래 상세 카드 반영 · 조치 지표: {{ evidenceMetricSummary(selectedAnomaly.evidence) }}</em>
           </div>
 
           <!-- 필터 -->
@@ -1670,7 +1624,7 @@
             </thead>
             <tbody>
               <tr
-                v-for="f in filteredFaults"
+                v-for="f in paginatedFaults"
                 :key="f.id"
                 :class="{ selected: String(f.eventId) === String(selectedAnomalyEventId) }"
               >
@@ -1724,17 +1678,17 @@
                     @click="openAssignModal(f)"
                   >배정</button>
                   <button
-                    v-if="canTransitionTicket(f.ticketStatus, 'IN_PROGRESS')"
+                    v-if="f.ticketId && f.ticketStatus === 'ASSIGNED' && canTransitionTicket(f.ticketStatus, 'IN_PROGRESS')"
                     class="pnl-act sm"
                     @click="openTicketTransition(f, 'IN_PROGRESS')"
                   >작업 시작</button>
                   <button
-                    v-if="canTransitionTicket(f.ticketStatus, 'RESOLVED')"
+                    v-if="f.ticketId && f.ticketStatus === 'IN_PROGRESS' && canTransitionTicket(f.ticketStatus, 'RESOLVED')"
                     class="pnl-act sm gr"
                     @click="openTicketTransition(f, 'RESOLVED')"
                   >해결</button>
                   <button
-                    v-if="canTransitionTicket(f.ticketStatus, 'CLOSED')"
+                    v-if="f.ticketId && f.ticketStatus === 'RESOLVED' && canTransitionTicket(f.ticketStatus, 'CLOSED')"
                     class="pnl-act sm"
                     @click="openTicketTransition(f, 'CLOSED')"
                     title="OPERATOR/ADMIN만 처리 가능"
@@ -1748,8 +1702,25 @@
                   <button class="pnl-act sm" @click="selectAnomalyDetail(f)">상세</button>
                 </td>
               </tr>
+              <tr v-if="!paginatedFaults.length">
+                <td colspan="12" class="pm-fault-empty">조건에 맞는 이상 이벤트 또는 정비 건이 없습니다.</td>
+              </tr>
             </tbody>
           </table>
+          <div class="pm-list-pager" v-if="filteredFaults.length > FAULT_PAGE_SIZE">
+            <span>
+              {{ faultPageStart }}-{{ faultPageEnd }} / {{ filteredFaults.length }}건
+            </span>
+            <div class="pm-list-pager-actions">
+              <button class="pnl-act sm" :disabled="faultPage === 1" @click="goFaultPage(faultPage - 1)">
+                <i class="bi bi-chevron-left"></i> 이전
+              </button>
+              <strong>{{ faultPage }} / {{ faultTotalPages }}</strong>
+              <button class="pnl-act sm" :disabled="faultPage === faultTotalPages" @click="goFaultPage(faultPage + 1)">
+                다음 <i class="bi bi-chevron-right"></i>
+              </button>
+            </div>
+          </div>
         </div>
 
       </section>
@@ -3395,6 +3366,8 @@ const faultFilter = ref({
   status:         pick(ALLOWED_TS,   route.query.ts),
   slaOverdueOnly: route.query.overdue === "1",
 })
+const FAULT_PAGE_SIZE = 5
+const faultPage = ref(1)
 
 function resetFaultFilter() {
   faultFilter.value = { kind: "", priority: "", detectionMethod: "", status: "", slaOverdueOnly: false }
@@ -3402,6 +3375,7 @@ function resetFaultFilter() {
 
 // fault 필터 변경 → URL
 watch(faultFilter, (v) => {
+  faultPage.value = 1
   syncToQuery({
     kind:     v.kind,
     priority: v.priority,
@@ -3421,6 +3395,23 @@ const filteredFaults = computed(() => {
     return true
   })
 })
+const faultTotalPages = computed(() => Math.max(1, Math.ceil(filteredFaults.value.length / FAULT_PAGE_SIZE)))
+const paginatedFaults = computed(() => {
+  const start = (faultPage.value - 1) * FAULT_PAGE_SIZE
+  return filteredFaults.value.slice(start, start + FAULT_PAGE_SIZE)
+})
+const faultPageStart = computed(() => filteredFaults.value.length ? (faultPage.value - 1) * FAULT_PAGE_SIZE + 1 : 0)
+const faultPageEnd = computed(() => Math.min(faultPage.value * FAULT_PAGE_SIZE, filteredFaults.value.length))
+
+watch(filteredFaults, () => {
+  if (faultPage.value > faultTotalPages.value) {
+    faultPage.value = faultTotalPages.value
+  }
+})
+
+function goFaultPage(nextPage) {
+  faultPage.value = Math.min(Math.max(1, nextPage), faultTotalPages.value)
+}
 
 // 우선순위 색상
 const pmPriorityTone = (p) => p === "P1" ? "rd" : p === "P2" ? "yl" : "gy"
@@ -3733,7 +3724,7 @@ function unitLabelKo(unit) {
   const key = String(unit || "").toLowerCase()
   if (key === "pct" || key === "percent" || key === "%") return "%"
   if (key === "ratio" || key === "rate") return "%"
-  if (key === "ms") return "밀리초"
+  if (key === "ms") return "ms"
   if (key === "fps") return "프레임/초"
   if (key === "score") return "%"
   if (key === "count") return "건"
@@ -3782,7 +3773,11 @@ function evidenceRows(items = []) {
       rows.set(key, { ...item, key, count: 1 })
     }
   }
-  return Array.from(rows.values())
+  return Array.from(rows.values()).sort((a, b) => {
+    const at = a.sampledAt ? new Date(a.sampledAt).getTime() : 0
+    const bt = b.sampledAt ? new Date(b.sampledAt).getTime() : 0
+    return at - bt
+  })
 }
 function evidenceMetricSummary(items = []) {
   const labels = [...new Set(evidenceRows(items).map((e) => metricLabelKo(e.metric)))]
@@ -3849,7 +3844,7 @@ function evRiskText(e) {
 
   const unit = String(e.unit || "").toLowerCase()
   if (unit === "pct" || unit === "percent" || unit === "%" || unit === "ratio" || unit === "rate") return `조치 기준보다 ${diff.toFixed(0)}%p 초과`
-  if (unit === "ms") return `조치 기준보다 ${diff.toFixed(0)}밀리초 초과`
+  if (unit === "ms") return `조치 기준보다 ${diff.toFixed(0)}ms 초과`
   if (unit === "fps") return `조치 기준보다 ${diff.toFixed(1)}프레임/초 부족`
   if (unit === "score") return `조치 기준보다 ${diff.toFixed(0)}%p 초과`
   if (unit === "count") return `조치 기준보다 ${diff.toFixed(0)}건 초과`
@@ -4503,7 +4498,7 @@ const pmNormalRate = computed(() => {
 })
 
 // dataSource 필터 (status 탭) — 백엔드 호출 시 query parameter로 전달
-const pmDataSource = ref("REAL")
+const pmDataSource = ref("FAULT_INJECTED")
 function pmDataSourceLabel(v) {
   return { REAL: "실데이터", OPEN_DATA: "공개데이터", SIMULATED: "시뮬레이션", FAULT_INJECTED: "장애 주입", MOCK: "목업" }[v] || v
 }
@@ -5297,6 +5292,39 @@ const servers = Object.freeze([
 }
 
 /* ============ fault 탭 — 활성 이상 카드 (세련된 톤) ============ */
+.ops-shell .pm-fault-scroll {
+  display: flex;
+  flex-direction: column;
+}
+.ops-shell .pm-fault-overview { order: 2; }
+.ops-shell .pm-priority-detail {
+  order: 3;
+  margin-top: 18px;
+}
+.ops-shell .pm-fault-kpis {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+.ops-shell .pm-fault-kpis .ps-box {
+  min-height: 104px;
+  padding: 18px 20px;
+  justify-content: center;
+}
+.ops-shell .pm-fault-kpis .ps-l {
+  font-size: 15px;
+  font-weight: 900;
+  color: #334155;
+}
+.ops-shell .pm-fault-kpis .ps-v {
+  margin-top: 8px;
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 950;
+}
+.ops-shell .pm-fault-kpis .ps-v span {
+  font-size: 15px;
+  margin-left: 3px;
+}
 .ops-shell .pm-anom-card {
   background: #ffffff;
   border: 1px solid #eaeef5;
@@ -5315,48 +5343,79 @@ const servers = Object.freeze([
 }
 .ops-shell .pm-anom-primary {
   display: grid;
-  grid-template-columns: minmax(260px, 0.9fr) minmax(360px, 1.35fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 18px;
 }
 .ops-shell .pm-primary-device,
+.ops-shell .pm-primary-risk,
 .ops-shell .pm-primary-issue {
   display: grid;
-  align-content: start;
-  gap: 7px;
+  align-content: center;
+  gap: 8px;
   min-width: 0;
-  padding: 15px 16px;
+  min-height: 132px;
+  padding: 22px 24px;
   border: 1px solid #dbe5f2;
-  border-radius: 10px;
+  border-radius: 12px;
   background: #f8fafc;
+}
+.ops-shell .pm-primary-risk.no,
+.ops-shell .pm-primary-risk.rd {
+  background: #fee2e2;
+  border-color: #ef4444;
+  box-shadow: inset 0 0 0 1px rgba(185, 28, 28, 0.16);
+}
+.ops-shell .pm-primary-risk.wn,
+.ops-shell .pm-primary-risk.yl {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+.ops-shell .pm-primary-risk.ok,
+.ops-shell .pm-primary-risk.gr {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
 }
 .ops-shell .pm-primary-issue {
   border-color: #fed7aa;
   background: #fff7ed;
 }
 .ops-shell .pm-primary-device span,
+.ops-shell .pm-primary-risk span,
 .ops-shell .pm-primary-issue span {
   color: #64748b;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 900;
 }
 .ops-shell .pm-primary-device strong,
+.ops-shell .pm-primary-risk strong,
 .ops-shell .pm-primary-issue strong {
   color: #0c1f40;
-  font-size: 24px;
+  font-size: 29px;
   font-weight: 900;
   line-height: 1.18;
   overflow-wrap: anywhere;
 }
+.ops-shell .pm-primary-risk.no span,
+.ops-shell .pm-primary-risk.no em,
+.ops-shell .pm-primary-risk.rd span,
+.ops-shell .pm-primary-risk.rd em { color: #991b1b; }
+.ops-shell .pm-primary-risk.no strong,
+.ops-shell .pm-primary-risk.rd strong { color: #b91c1c; }
+.ops-shell .pm-primary-risk.wn strong,
+.ops-shell .pm-primary-risk.yl strong { color: #d97706; }
+.ops-shell .pm-primary-risk.ok strong,
+.ops-shell .pm-primary-risk.gr strong { color: #059669; }
 .ops-shell .pm-primary-issue strong {
   color: #9a3412;
-  font-size: 22px;
+  font-size: 26px;
 }
 .ops-shell .pm-primary-device em,
+.ops-shell .pm-primary-risk em,
 .ops-shell .pm-primary-issue em {
   color: #526179;
   font-style: normal;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 750;
   line-height: 1.35;
 }
@@ -5474,39 +5533,36 @@ const servers = Object.freeze([
 .ops-shell .sev-bdg.wn, .ops-shell .sev-bdg.yl { background: #fffbeb; color: #d97706; }
 .ops-shell .pm-anom-badges {
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: stretch;
-  gap: 8px;
+  gap: 10px;
 }
 .ops-shell .pm-meta-chip {
-  display: inline-grid;
-  grid-template-columns: auto auto;
-  align-items: baseline;
-  gap: 7px;
-  grid-column: span 2;
-  min-height: 40px;
-  padding: 8px 12px;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-content: center;
+  gap: 6px;
+  min-height: 82px;
+  padding: 14px 16px;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
   background: #f8fafc;
-  justify-content: start;
-  align-content: center;
-  white-space: nowrap;
+  min-width: 0;
 }
 .ops-shell .pm-meta-chip em {
   font-style: normal;
   color: #64748b;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 900;
 }
 .ops-shell .pm-meta-chip strong {
   color: #0c1f40;
-  font-size: 14px;
+  font-size: 19px;
   font-weight: 900;
+  overflow-wrap: anywhere;
 }
 .ops-shell .pm-meta-chip-wide {
-  grid-template-columns: auto auto minmax(0, 1fr);
-  grid-column: span 4;
+  grid-template-columns: 1fr;
   max-width: 100%;
 }
 .ops-shell .pm-meta-chip-wide small {
@@ -5519,13 +5575,7 @@ const servers = Object.freeze([
 }
 @media (max-width: 1200px) {
   .ops-shell .pm-anom-badges {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
-  .ops-shell .pm-meta-chip {
-    grid-column: span 3;
-  }
-  .ops-shell .pm-meta-chip-wide {
-    grid-column: span 6;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 520px) {
@@ -5678,7 +5728,7 @@ const servers = Object.freeze([
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 16px 18px 18px;
+  padding: 18px 20px 20px;
   margin-bottom: 22px;
 }
 .ops-shell .pm-evidence-panel-h {
@@ -5691,7 +5741,7 @@ const servers = Object.freeze([
 .ops-shell .pm-evidence-panel-h strong {
   display: block;
   color: #0c1f40;
-  font-size: 19px;
+  font-size: 22px;
   font-weight: 800;
 }
 .ops-shell .pm-evidence-panel-h span {
@@ -5716,14 +5766,14 @@ const servers = Object.freeze([
 }
 .ops-shell .pm-evidence-row {
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(680px, 1.7fr);
+  grid-template-columns: minmax(360px, 1fr) minmax(680px, 1.55fr);
   align-items: stretch;
   gap: 16px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-left: 5px solid #cbd5e1;
   border-radius: 10px;
-  padding: 16px 18px;
+  padding: 18px 20px;
 }
 .ops-shell .pm-evidence-row.rd {
   border-left-color: #dc2626;
@@ -5740,16 +5790,17 @@ const servers = Object.freeze([
 }
 .ops-shell .pm-ev-title strong {
   color: #0c1f40;
-  font-size: 20px;
+  font-size: 25px;
   font-weight: 900;
   overflow-wrap: anywhere;
+  cursor: help;
 }
 .ops-shell .pm-ev-title span {
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: 999px;
   background: #fff7ed;
   color: #ea580c;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
 }
 .ops-shell .pm-ev-scope {
@@ -5780,8 +5831,8 @@ const servers = Object.freeze([
   font-weight: 800;
 }
 .ops-shell .pm-ev-timeline {
-  margin-top: 14px;
-  padding: 14px;
+  margin-top: 16px;
+  padding: 16px;
   border: 1px solid #bfdbfe;
   border-radius: 10px;
   background: #f8fbff;
@@ -5804,7 +5855,7 @@ const servers = Object.freeze([
 }
 .ops-shell .pm-ev-time-head strong {
   color: #0c1f40;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 900;
   overflow-wrap: anywhere;
 }
@@ -5822,20 +5873,20 @@ const servers = Object.freeze([
 .ops-shell .pm-ev-time-summary span {
   display: grid;
   gap: 5px;
-  padding: 10px 11px;
+  padding: 12px 13px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #ffffff;
 }
 .ops-shell .pm-ev-time-summary strong {
   color: #64748b;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 900;
 }
 .ops-shell .pm-ev-time-summary em {
   color: #0c1f40;
   font-style: normal;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 900;
 }
 .ops-shell .pm-ev-time-summary span:nth-child(3) em {
@@ -5851,21 +5902,21 @@ const servers = Object.freeze([
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 8px;
-  margin-top: 10px;
-  padding: 9px 10px;
+  margin-top: 12px;
+  padding: 11px 12px;
   border-radius: 8px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
 }
 .ops-shell .pm-ev-action strong {
   color: #0c1f40;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 900;
   white-space: nowrap;
 }
 .ops-shell .pm-ev-action span {
   color: #334155;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.35;
 }
@@ -5875,8 +5926,8 @@ const servers = Object.freeze([
   gap: 10px;
 }
 .ops-shell .pm-ev-value {
-  min-height: 94px;
-  padding: 14px 12px;
+  min-height: 112px;
+  padding: 16px 14px;
   border-radius: 8px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
@@ -5889,13 +5940,13 @@ const servers = Object.freeze([
 .ops-shell .pm-ev-value span {
   display: block;
   color: #64748b;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 900;
   margin-bottom: 7px;
 }
 .ops-shell .pm-ev-value strong {
   color: #0c1f40;
-  font-size: 24px;
+  font-size: 29px;
   font-weight: 900;
   line-height: 1.15;
   overflow-wrap: anywhere;
@@ -5919,7 +5970,7 @@ const servers = Object.freeze([
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-size: 24px;
+  font-size: 27px;
   font-weight: 900;
 }
 .ops-shell .pm-ev-value.judge i {
@@ -6425,6 +6476,42 @@ const servers = Object.freeze([
   border: 1px solid #c9d4e3; cursor: pointer;
 }
 .ops-shell .pm-fault-flag input { cursor: pointer; }
+.ops-shell .pm-fault-empty {
+  text-align: center;
+  padding: 22px 12px !important;
+  color: #64748b;
+  font-weight: 700;
+  background: #f8fafc;
+}
+.ops-shell .pm-list-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e3e9f1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #4a5b78;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.ops-shell .pm-list-pager-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ops-shell .pm-list-pager-actions > strong {
+  min-width: 54px;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  color: #0c1f40;
+}
+.ops-shell .pm-list-pager .pnl-act:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
 
 /* cams 탭 정렬 셀렉트 */
 .ops-shell .pnl-sort {

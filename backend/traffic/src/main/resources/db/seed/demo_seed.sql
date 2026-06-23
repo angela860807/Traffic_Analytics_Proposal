@@ -6,8 +6,7 @@
 --
 -- 전제조건 (실행 전 확인):
 --   - 007 / 008 migration 완료
---   - cameras: camera_id 1~5 존재
---   - zones:   zone_id 1 존재
+--   - 깨끗한 로컬 DB에서도 zone/camera/member 기준 데이터 자동 보강
 --
 -- 출처 정책 (요구사항 5-3절):
 --   - 정상 기준선: SIMULATED (데모 예외 허용)
@@ -35,12 +34,16 @@ ON CONFLICT (zone_code) DO NOTHING;
 
 INSERT INTO cameras (camera_id, zone_id, camera_code, camera_name, stream_url, direction_type, is_active, created_at)
 VALUES
-    (1, 1, 'CAM_001', 'Entry Camera 1', NULL, 'IN', TRUE, NOW()),
-    (2, 1, 'CAM_002', 'Predictive Demo Camera 2', NULL, 'IN', TRUE, NOW()),
-    (3, 1, 'CAM_003', 'Predictive Demo Camera 3', NULL, 'OUT', TRUE, NOW()),
-    (4, 1, 'CAM_004', 'Predictive Demo Camera 4', NULL, 'IN', TRUE, NOW()),
-    (5, 1, 'CAM_005', 'Predictive Demo Camera 5', NULL, 'OUT', TRUE, NOW())
-ON CONFLICT (camera_code) DO NOTHING;
+    (1, 1, 'CAM_001', '정문 진입 관제 카메라', NULL, 'IN', TRUE, NOW()),
+    (2, 1, 'CAM_002', '예지보전 FPS 저하 카메라', NULL, 'IN', TRUE, NOW()),
+    (3, 1, 'CAM_003', '후문 출차 오프라인 카메라', NULL, 'OUT', TRUE, NOW()),
+    (4, 1, 'CAM_004', '번호판 인식 품질저하 카메라', NULL, 'IN', TRUE, NOW()),
+    (5, 1, 'CAM_005', '신규 설치 학습중 카메라', NULL, 'OUT', TRUE, NOW())
+ON CONFLICT (camera_code) DO UPDATE
+SET camera_name = EXCLUDED.camera_name,
+    zone_id = EXCLUDED.zone_id,
+    direction_type = EXCLUDED.direction_type,
+    is_active = TRUE;
 
 SELECT setval(pg_get_serial_sequence('zones', 'zone_id'), GREATEST((SELECT MAX(zone_id) FROM zones), 1));
 SELECT setval(pg_get_serial_sequence('cameras', 'camera_id'), GREATEST((SELECT MAX(camera_id) FROM cameras), 5));
@@ -52,6 +55,12 @@ SELECT setval(pg_get_serial_sequence('cameras', 'camera_id'), GREATEST((SELECT M
 -- ============================================================
 INSERT INTO members (name, email, phone, password, role, status, created_at)
 VALUES
+    ('이용자', 'user1@email.com', '010-0000-0001',
+     '$2a$10$ycTu6wBS5/pbCrL23CJlbuAMZluVx9jSoqS0Z9TB3e10q5r6lvE6K',
+     'USER', 'ACTIVE', NOW()),
+    ('관리자', 'admin@email.com', '010-0000-0002',
+     '$2a$10$ycTu6wBS5/pbCrL23CJlbuAMZluVx9jSoqS0Z9TB3e10q5r6lvE6K',
+     'ADMIN', 'ACTIVE', NOW()),
     ('운영자', 'operator@tas.com', '010-1111-2222',
      '$2a$10$ycTu6wBS5/pbCrL23CJlbuAMZluVx9jSoqS0Z9TB3e10q5r6lvE6K',
      'OPERATOR', 'ACTIVE', NOW()),

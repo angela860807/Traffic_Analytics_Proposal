@@ -44,3 +44,8 @@ app:
     internal-key: ${INTERNAL_API_KEY:traffic-ai-internal-key-2026}
   fastapi:
     base-url: ${FASTAPI_BASE_URL:http://localhost:8000}
+  db:
+    bootstrap:
+      enabled: ${DB_BOOTSTRAP_ENABLED:false}
+      seed-demo: ${DB_BOOTSTRAP_DEMO_SEED_ENABLED:true}
+      force-seed: ${DB_BOOTSTRAP_FORCE_SEED:false}

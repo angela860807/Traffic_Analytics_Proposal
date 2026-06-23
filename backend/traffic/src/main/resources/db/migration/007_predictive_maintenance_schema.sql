@@ -402,3 +402,35 @@ CREATE TABLE IF NOT EXISTS maintenance_ticket_histories (
 
 CREATE INDEX IF NOT EXISTS idx_maintenance_ticket_histories_ticket_id
     ON maintenance_ticket_histories (maintenance_ticket_id, changed_at DESC);
+
+-- ------------------------------------------------------------
+-- JPA ddl-auto=update may create tables before this migration runs.
+-- CREATE TABLE IF NOT EXISTS then cannot backfill column defaults on those
+-- pre-created tables, so keep SQL seed execution stable by synchronizing
+-- timestamp defaults explicitly.
+-- ------------------------------------------------------------
+ALTER TABLE camera_health_samples
+    ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE traffic_context_samples
+    ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP,
+    ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE camera_links
+    ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP,
+    ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE anomaly_events
+    ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP,
+    ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE anomaly_event_evidence
+    ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE model_prediction_logs
+    ALTER COLUMN feature_schema_version TYPE VARCHAR(100),
+    ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE maintenance_tickets
+    ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP,
+    ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;

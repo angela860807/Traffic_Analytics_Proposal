@@ -23,6 +23,9 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: 1004
       FASTAPI_BASE_URL: http://fastapi-server:8000
+      DB_BOOTSTRAP_ENABLED: "true"
+      DB_BOOTSTRAP_DEMO_SEED_ENABLED: "true"
+      DB_BOOTSTRAP_FORCE_SEED: "false"
     ports:
       - "8080:8080"
 

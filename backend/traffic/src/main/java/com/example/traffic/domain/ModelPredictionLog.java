@@ -77,7 +77,7 @@ public class ModelPredictionLog {
     @Column(name = "quality_status", nullable = false, length = 50)
     private QualityStatus qualityStatus;
 
-    @Column(name = "feature_schema_version", length = 20)
+    @Column(name = "feature_schema_version", length = 100)
     private String featureSchemaVersion;
 
     @JdbcTypeCode(SqlTypes.JSON)
