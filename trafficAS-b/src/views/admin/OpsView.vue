@@ -3762,6 +3762,7 @@ function evidenceRows(items = []) {
   for (const item of items || []) {
     const key = [
       item.metric,
+      item.sampledAt,
       item.observed,
       item.baseline,
       item.threshold,
@@ -4798,8 +4799,8 @@ async function loadPredictiveOperations() {
   predictiveOpsLoadError.value = ""
   try {
     const [eventPage, ticketPage, assigneeRows] = await Promise.all([
-      listAnomalyEvents({ dataSource: pmDataSource.value, page: 0, size: 20, sort: "firstDetectedAt,desc" }),
-      listMaintenanceTickets({ page: 0, size: 20, sort: "createdAt,desc" }),
+      listAnomalyEvents({ dataSource: pmDataSource.value, page: 0, size: 100, sort: "lastDetectedAt,desc" }),
+      listMaintenanceTickets({ page: 0, size: 100, sort: "createdAt,desc" }),
       listAssignees().catch(() => assignees.value),
     ])
     if (Array.isArray(assigneeRows) && assigneeRows.length) {
@@ -4813,7 +4814,7 @@ async function loadPredictiveOperations() {
     const tickets = Array.isArray(ticketPage?.content) ? ticketPage.content : []
     const ticketsByEvent = ticketByEventId(tickets)
     const details = await Promise.all(
-      events.slice(0, 10).map((event) =>
+      events.map((event) =>
         getAnomalyEvent(event.id).catch(() => null),
       ),
     )

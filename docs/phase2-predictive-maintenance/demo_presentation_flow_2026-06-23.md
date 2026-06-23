@@ -232,3 +232,75 @@ KPI 화면:
 이상 이벤트와 정비 건을 생성하며,
 운영자가 어떤 근거를 보고 조치하는지 시연으로 확인해보겠습니다.
 ```
+
+## 7. 2026-06-23 최종 시연 운영 메모
+
+### 7-1. 주입 스크립트 최종 형태
+
+발표 중 직접 실행할 명령어는 아래 하나로 고정한다.
+
+```powershell
+.\tools\predictive_demo\import_health_samples.ps1 `
+  -CsvPath "tools\predictive_demo\camera-health-rule-trigger-samples.csv" `
+  -BaseUrl "http://localhost:8080" `
+  -InternalApiKey "traffic-ai-internal-key-2026"
+```
+
+현재 CSV는 `bad_fps_1` ~ `bad_fps_4` 샘플을 `REAL` 데이터소스로 주입한다. 따라서 시연 화면에서는 누적 운영 데이터는 `장애 주입(FAULT_INJECTED)`로 먼저 보여주고, 스크립트 주입 결과는 `실데이터(REAL)`로 전환해서 확인한다.
+
+### 7-2. 발표에서 설명할 핵심 포인트
+
+- 주입 스크립트는 영상 파일을 직접 분석하는 단계가 아니라, 영상 품질 저하를 health sample 수치로 모델링한 입력이다.
+- 같은 카메라와 같은 이상 유형의 활성 이벤트가 이미 있으면 새 행을 계속 만들지 않고 기존 이벤트를 갱신한다.
+- 따라서 전체 이상 건수가 그대로여도 실패가 아니다.
+- 발표에서는 "중복 장애를 계속 늘리지 않고 하나의 활성 이벤트에 시계열 근거를 누적한다"라고 설명한다.
+- 새로 들어온 샘플은 `lastDetectedAt` 갱신과 상세 카드의 시계열 판단 근거 증가로 확인한다.
+
+### 7-3. 발표자가 화면에서 확인할 순서
+
+1. `/admin/ops` 접속 후 `장애 주입(FAULT_INJECTED)` 데이터소스로 누적 운영 현황을 먼저 보여준다.
+2. 이상 이벤트 및 정비 건 현황에서 기존 이벤트, 정비 상태, 페이지네이션을 보여준다.
+3. PowerShell에서 health sample 주입 명령을 실행한다.
+4. `/admin/ops` 상단 데이터소스를 `실데이터(REAL)`로 바꾼다.
+5. 이상 이벤트 목록을 최신순으로 확인한다.
+6. 카메라 1번 관련 이벤트 상세를 열어 시계열 판단 근거가 쌓였는지 확인한다.
+7. 정비 건이 이미 있으면 이력/상태 변경 모달로 이어서 보여준다.
+
+### 7-4. 테스트 확인 명령어
+
+```powershell
+$login = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:8080/api/auth/login" `
+  -ContentType "application/json" `
+  -Body (@{
+    email = "admin@email.com"
+    password = "1234"
+  } | ConvertTo-Json)
+
+$headers = @{ Authorization = "Bearer $($login.data.accessToken)" }
+
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/summary?dataSource=REAL" `
+  -Headers $headers
+
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/anomaly-events?dataSource=REAL&page=0&size=100&sort=lastDetectedAt,desc" `
+  -Headers $headers
+```
+
+DB에서 evidence 누적을 확인할 때:
+
+```powershell
+docker exec traffic-postgres psql -U postgres -d traffic -c "select ae.id, ae.anomaly_type, count(ev.id) as evidence_count, max(ev.sampled_at) as latest_evidence from anomaly_events ae left join anomaly_event_evidence ev on ev.anomaly_event_id=ae.id where ae.data_source='REAL' and ae.target_camera_id=1 group by ae.id, ae.anomaly_type order by latest_evidence desc;"
+```
+
+### 7-5. 예상 질문 대응
+
+Q. 스크립트를 다시 실행했는데 전체 이상 건수가 늘지 않는 이유는?
+
+A. 같은 카메라와 같은 이상 유형의 활성 이벤트가 있으면 기존 이벤트를 갱신하기 때문이다. 실제 관제에서는 같은 장애를 매번 새 티켓으로 만들면 중복 처리가 생기므로, 하나의 활성 이벤트에 최근 감지 시각과 판단 근거를 누적하는 방식이 더 적절하다.
+
+Q. 준비한 blur, dropout, low_fps, normal 영상은 왜 직접 주입하지 않는가?
+
+A. 이번 시연은 영상 자체를 다시 분석하는 단계가 아니라, 영상 품질 저하가 운영 지표로 변환된 이후의 예지보전 흐름을 보여주는 단계다. 영상은 health sample 지표가 어떤 상황을 의미하는지 설명하는 보조 자료로 사용하고, 실제 시스템 입력은 CSV health sample로 통일한다.

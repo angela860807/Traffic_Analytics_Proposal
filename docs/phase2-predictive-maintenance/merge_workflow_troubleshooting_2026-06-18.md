@@ -1527,3 +1527,112 @@ Improve predictive ops detail readability and time-series evidence summary
 8. `sampledAt`, `metricScore`, `context`, `baseline`을 프론트 모델에 포함해 시계열 요약 표현 근거를 보강했다.
 9. 담당자 후보 API, 정비 변경 이력 API, 정비 이력 backfill, USER 배정 차단 정책을 반영했다.
 10. 다음 컨텍스트용 별도 TODO 문서에 실제 시계열 샘플 API 확장, 화면 폭별 검수, SHADOW 비교 영역 유지 항목을 분리했다.
+
+## 2026-06-23 최종 시연 주입 / Troubleshooting 메모
+
+### 목적
+
+발표 시연용 health sample 주입은 새 이벤트를 무한히 늘리는 기능이 아니다. 같은 카메라, 같은 이상 유형, 같은 데이터소스에 활성 이벤트가 이미 있으면 기존 이벤트의 `last_detected_at`을 갱신하고 `anomaly_event_evidence`를 누적한다.
+
+이 동작은 실제 운영 관점에서 정상이다. 동일 장애를 매번 새 사건으로 만들면 운영자가 중복 장애를 처리해야 하므로, 하나의 활성 이벤트로 묶고 근거 시계열을 계속 쌓는 방식이 더 자연스럽다.
+
+### 시연 주입 명령어
+
+```powershell
+.\tools\predictive_demo\import_health_samples.ps1 `
+  -CsvPath "tools\predictive_demo\camera-health-rule-trigger-samples.csv" `
+  -BaseUrl "http://localhost:8080" `
+  -InternalApiKey "traffic-ai-internal-key-2026"
+```
+
+현재 CSV는 `bad_fps_1` ~ `bad_fps_4` 4개 샘플을 `REAL` 데이터소스로 넣는다. 따라서 화면에서 확인할 때는 `/admin/ops` 상단 데이터소스를 `실데이터(REAL)` 기준으로 전환해야 한다.
+
+### 기존 데이터가 있을 때 확인 포인트
+
+전체 이상 건수가 그대로여도 실패가 아니다. 기존 활성 이벤트가 있으면 건수는 유지되고 아래 값이 바뀐다.
+
+- `anomaly_events.last_detected_at`
+- `anomaly_event_evidence` row 수
+- 상세 카드의 시계열 판단 근거
+- summary의 `openAnomalies`, `criticalCameras` 등 REAL 기준 값
+
+확인 명령어:
+
+```powershell
+$login = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:8080/api/auth/login" `
+  -ContentType "application/json" `
+  -Body (@{
+    email = "admin@email.com"
+    password = "1234"
+  } | ConvertTo-Json)
+
+$headers = @{ Authorization = "Bearer $($login.data.accessToken)" }
+
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/summary?dataSource=REAL" `
+  -Headers $headers
+
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/predictive/anomaly-events?dataSource=REAL&page=0&size=100&sort=lastDetectedAt,desc" `
+  -Headers $headers
+```
+
+DB에서 직접 확인:
+
+```powershell
+docker exec traffic-postgres psql -U postgres -d traffic -c "select id, target_camera_id, anomaly_type, severity, status, data_source, first_detected_at, last_detected_at from anomaly_events where data_source='REAL' and target_camera_id=1 order by last_detected_at desc;"
+
+docker exec traffic-postgres psql -U postgres -d traffic -c "select ae.id, ae.anomaly_type, count(ev.id) as evidence_count, max(ev.sampled_at) as latest_evidence from anomaly_events ae left join anomaly_event_evidence ev on ev.anomaly_event_id=ae.id where ae.data_source='REAL' and ae.target_camera_id=1 group by ae.id, ae.anomaly_type order by latest_evidence desc;"
+```
+
+### 처음부터 다시 테스트하고 싶을 때
+
+아래 명령은 발표용 demo 주입분만 지우는 리셋용이다. 운영 seed 전체를 지우는 명령이 아니며, `REAL + camera_id=1 + demo-* idempotency` 기준 샘플과 해당 REAL 이벤트/정비 건만 정리한다.
+
+```powershell
+$resetSql = @"
+BEGIN;
+
+CREATE TEMP TABLE _demo_events AS
+SELECT id
+FROM anomaly_events
+WHERE data_source = 'REAL'
+  AND target_camera_id = 1;
+
+CREATE TEMP TABLE _demo_tickets AS
+SELECT id
+FROM maintenance_tickets
+WHERE anomaly_event_id IN (SELECT id FROM _demo_events);
+
+DELETE FROM maintenance_ticket_histories
+WHERE maintenance_ticket_id IN (SELECT id FROM _demo_tickets);
+
+DELETE FROM maintenance_tickets
+WHERE id IN (SELECT id FROM _demo_tickets);
+
+DELETE FROM anomaly_event_evidence
+WHERE anomaly_event_id IN (SELECT id FROM _demo_events);
+
+DELETE FROM anomaly_events
+WHERE id IN (SELECT id FROM _demo_events);
+
+DELETE FROM camera_health_samples
+WHERE data_source = 'REAL'
+  AND camera_id = 1
+  AND idempotency_key LIKE 'demo-%';
+
+COMMIT;
+"@
+
+$resetSql | docker exec -i traffic-postgres psql -U postgres -d traffic
+```
+
+리셋 후 다시 주입 명령을 실행하면 REAL 기준 이상 이벤트 6건과 CRITICAL 정비 건 3건이 다시 생성되는 흐름을 확인할 수 있다.
+
+### 주의 사항
+
+- 프론트는 실시간 push가 아니라 API 재조회 방식이다. 스크립트 실행 후 새로고침하거나 데이터소스/탭을 다시 선택한다.
+- `/admin/ops`의 이상 이벤트 목록은 100건까지 조회하고, 화면 내부에서 5건씩 페이지네이션한다.
+- 같은 이벤트가 갱신되는지 보려면 건수보다 `lastDetectedAt`과 상세 evidence 증가를 확인한다.

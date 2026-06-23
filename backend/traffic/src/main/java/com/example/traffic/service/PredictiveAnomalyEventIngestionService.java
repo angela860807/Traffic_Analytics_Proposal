@@ -83,9 +83,10 @@ public class PredictiveAnomalyEventIngestionService {
                 ));
 
         return anomalyEventRepository
-                .findFirstByTargetCamera_CameraIdAndAnomalyTypeAndStatusInOrderByLastDetectedAtDesc(
+                .findFirstByTargetCamera_CameraIdAndAnomalyTypeAndDataSourceAndStatusInOrderByLastDetectedAtDesc(
                         candidate.getCameraId(),
                         candidate.getAnomalyType(),
+                        dataSource,
                         ACTIVE_STATUSES
                 )
                 .map(existing -> {
