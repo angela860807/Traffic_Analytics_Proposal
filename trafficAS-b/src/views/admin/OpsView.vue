@@ -2588,7 +2588,42 @@ const route = useRoute();
 const router = useRouter();
 
 const ALLOWED_TABS = ["status", "cams", "srv", "net", "fault", "settings"];
-const initialTab = ALLOWED_TABS.includes(route.query.tab) ? route.query.tab : "status";
+const ALLOWED_PM_DATA_SOURCES = ["REAL", "OPEN_DATA", "SIMULATED", "FAULT_INJECTED", "MOCK"];
+const OPS_TAB_STORAGE_KEY = "traffic.ops.tab";
+const OPS_DATA_SOURCE_STORAGE_KEY = "traffic.ops.dataSource";
+
+function queryValue(value) {
+  if (Array.isArray(value)) return value[0] || "";
+  return typeof value === "string" ? value : "";
+}
+
+function readOpsStorage(key) {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(key) || "";
+  } catch {
+    return "";
+  }
+}
+
+function writeOpsStorage(key, value) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Storage can be disabled in some kiosk/private-browser setups.
+  }
+}
+
+function pickAllowed(arr, value, fallback) {
+  return arr.includes(value) ? value : fallback;
+}
+
+const initialTab = pickAllowed(
+  ALLOWED_TABS,
+  queryValue(route.query.tab) || readOpsStorage(OPS_TAB_STORAGE_KEY),
+  "status",
+);
 const tab = ref(initialTab);
 
 // 라우터 query를 안전하게 갱신 (history 누적 X)
@@ -2605,15 +2640,31 @@ function syncToQuery(partial) {
   router.replace({ path: route.path, query: next });
 }
 
-// tab 변경 → URL (flush:sync로 suppressSync flag와 동기화)
-watch(tab, (v) => syncToQuery({ tab: v === "status" ? "" : v }), { flush: "sync" });
+function persistOpsUiState() {
+  writeOpsStorage(OPS_TAB_STORAGE_KEY, tab.value);
+  writeOpsStorage(OPS_DATA_SOURCE_STORAGE_KEY, pmDataSource.value);
+}
+
+// tab 변경 → URL/localStorage (flush:sync로 suppressSync flag와 동기화)
+watch(tab, (v) => {
+  writeOpsStorage(OPS_TAB_STORAGE_KEY, v);
+  syncToQuery({ tab: v });
+}, { flush: "sync" });
 
 // URL → state (back/forward 버튼 대응)
 watch(() => route.query, (q) => {
   suppressSync = true
   try {
-    const nextTab = ALLOWED_TABS.includes(q.tab) ? q.tab : "status"
-    if (tab.value !== nextTab) tab.value = nextTab
+    const queryTab = queryValue(q.tab)
+    if (queryTab && ALLOWED_TABS.includes(queryTab) && tab.value !== queryTab) {
+      tab.value = queryTab
+      writeOpsStorage(OPS_TAB_STORAGE_KEY, queryTab)
+    }
+    const queryDataSource = queryValue(q.ds)
+    if (queryDataSource && ALLOWED_PM_DATA_SOURCES.includes(queryDataSource) && pmDataSource.value !== queryDataSource) {
+      pmDataSource.value = queryDataSource
+      writeOpsStorage(OPS_DATA_SOURCE_STORAGE_KEY, queryDataSource)
+    }
     // fault 필터
     if (faultFilter.value.kind !== (q.kind || "")) faultFilter.value.kind = pick(ALLOWED_KIND, q.kind)
     if (faultFilter.value.priority !== (q.priority || "")) faultFilter.value.priority = pick(ALLOWED_PRI, q.priority)
@@ -4348,15 +4399,21 @@ function onGlobalKeydown(e) {
   if (alarmModal.value) { alarmModal.value = null; return }
 }
 
+function onGlobalWheel(e) {
+  if (e.ctrlKey) persistOpsUiState()
+}
+
 onMounted(() => {
   nowTimer = setInterval(() => {
     nowSec.value += 1;
   }, 1000);
   document.addEventListener("keydown", onGlobalKeydown)
+  document.addEventListener("wheel", onGlobalWheel, { passive: true })
 });
 onBeforeUnmount(() => {
   if (nowTimer) clearInterval(nowTimer);
   document.removeEventListener("keydown", onGlobalKeydown)
+  document.removeEventListener("wheel", onGlobalWheel)
 });
 
 function alarmSec(t) {
@@ -4499,7 +4556,11 @@ const pmNormalRate = computed(() => {
 })
 
 // dataSource 필터 (status 탭) — 백엔드 호출 시 query parameter로 전달
-const pmDataSource = ref("FAULT_INJECTED")
+const pmDataSource = ref(pickAllowed(
+  ALLOWED_PM_DATA_SOURCES,
+  queryValue(route.query.ds) || readOpsStorage(OPS_DATA_SOURCE_STORAGE_KEY),
+  "FAULT_INJECTED",
+))
 function pmDataSourceLabel(v) {
   return { REAL: "실데이터", OPEN_DATA: "공개데이터", SIMULATED: "시뮬레이션", FAULT_INJECTED: "장애 주입", MOCK: "목업" }[v] || v
 }
@@ -4863,6 +4924,8 @@ async function loadPredictiveDashboard() {
 }
 
 watch(pmDataSource, () => {
+  writeOpsStorage(OPS_DATA_SOURCE_STORAGE_KEY, pmDataSource.value)
+  syncToQuery({ ds: pmDataSource.value })
   loadPredictiveDashboard()
   loadPredictiveOperations()
 })
