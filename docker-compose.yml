@@ -16,8 +16,6 @@ services:
       context: .
       dockerfile: backend/traffic/Dockerfile
     container_name: traffic-spring-backend
-    depends_on:
-      - postgres-db
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/traffic
       SPRING_DATASOURCE_USERNAME: postgres
@@ -34,8 +32,6 @@ services:
       context: .
       dockerfile: fastapi-server/Dockerfile
     container_name: traffic-fastapi-server
-    depends_on:
-      - spring-backend
     environment:
       SPRING_BACKEND_BASE_URL: http://spring-backend:8080
       SPRING_DETECTION_PATH: /api/v1/detection-logs
@@ -120,9 +116,6 @@ services:
         VITE_API_BASE_URL: ""
         VITE_FASTAPI_BASE_URL: ""
     container_name: traffic-frontend
-    depends_on:
-      - spring-backend
-      - fastapi-server
     ports:
       - "5174:80"
 

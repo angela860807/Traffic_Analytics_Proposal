@@ -121,6 +121,15 @@
             <option value="FAULT_INJECTED">장애 주입</option>
             <option value="MOCK">목업</option>
           </select>
+          <button
+            class="pm-ds-refresh"
+            type="button"
+            title="운영 데이터 새로고침"
+            aria-label="운영 데이터 새로고침"
+            @click="refreshPredictiveData"
+          >
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
           <span v-if="pmDataSource !== 'REAL'" class="pm-ds-bdg" :class="pmDataSourceTone(pmDataSource)">
             <i class="bi bi-exclamation-triangle-fill"></i>
             {{ pmDataSourceLabel(pmDataSource) }} 모드 — 실제 운영 데이터 아님
@@ -140,11 +149,11 @@
               <div class="pm-kpi-l">평균 Health Score <span class="pm-sub">{{ pmSloOk ? '운영 양호' : '하향 추세' }}</span></div>
             </div>
           </div>
-          <div class="pm-kpi" :class="{ alert: pmPredictedCount > 0 }">
-            <i class="bi bi-graph-up-arrow"></i>
+          <div class="pm-kpi" :class="{ alert: pmDetectedAnomalyCount > 0 }">
+            <i class="bi bi-bullseye"></i>
             <div class="pm-kpi-b">
-              <div class="pm-kpi-v">{{ pmPredictedCount }}<small>건</small></div>
-              <div class="pm-kpi-l">악화 예측 <span class="pm-sub">10분 내 임계 도달</span></div>
+              <div class="pm-kpi-v">{{ pmDetectedAnomalyCount }}<small>건</small></div>
+              <div class="pm-kpi-l">이상 탐지 <span class="pm-sub">열린 이상 이벤트</span></div>
             </div>
           </div>
           <div class="pm-kpi" :class="{ alert: pmCriticalCount > 0 }">
@@ -298,7 +307,7 @@
                   <span class="tl-who">{{ a.who }}</span>
                   <i class="bi bi-chevron-right tl-arrow"></i>
                 </div>
-                <div v-if="!filteredAlarms.length" class="tl-empty">해당 분류 없음</div>
+                <div v-if="!filteredAlarms.length" class="tl-empty">표시할 예지보전 알람 없음</div>
               </div>
               <div class="tl-foot" style="justify-content: flex-end;">
                 <a class="ch-link" @click="tab = 'alarm'">전체 알람 보기 ›</a>
@@ -309,46 +318,47 @@
             <div class="card fail-card">
               <div class="ch">
                 <h3>
-                  장애 상세 <span class="b-rd">진행 중</span>
-                  <span class="ch-kpi rd">1건 장애 · 2건 처리 대기</span>
+                  장애 상세 <span class="b-rd">{{ activeAnomaly ? activeAnomaly.st : '대기' }}</span>
+                  <span class="ch-kpi rd">열린 이상 {{ pmOpenAnomalyCount }} · 미해결 정비 {{ pmUnresolvedTicketCount }}</span>
                 </h3>
                 <a class="ch-link" @click="tab = 'fault'">전체 보기 ›</a>
               </div>
-              <div class="fl-head">
-                <div class="fl-title">
-                  정릉터널_입구_B1 <span class="fl-tag">장애</span>
+              <template v-if="activeAnomaly">
+                <div class="fl-head">
+                  <div class="fl-title">
+                    {{ activeAnomaly.dev }} <span class="fl-tag">{{ activeAnomaly.sev }}</span>
+                  </div>
                 </div>
-              </div>
-              <div class="fl-rows">
-                <div class="fl-row"><span><i class="bi bi-hdd-network"></i> 장비 ID</span><strong>NSN-N-0023</strong></div>
-                <div class="fl-row">
-                  <span><i class="bi bi-geo-alt"></i> 위치</span><strong>내부순환로 03K+150</strong>
+                <div class="fl-rows">
+                  <div class="fl-row"><span><i class="bi bi-hdd-network"></i> 이벤트 ID</span><strong>{{ activeAnomaly.id }}</strong></div>
+                  <div class="fl-row">
+                    <span><i class="bi bi-camera-video"></i> 대상 카메라</span><strong>{{ activeAnomaly.cameraId || '-' }}</strong>
+                  </div>
+                  <div class="fl-row">
+                    <span><i class="bi bi-clock-history"></i> 최근 감지</span><strong>{{ activeAnomaly.time || '-' }} <em>{{ activeAnomaly.elapsed }}</em></strong>
+                  </div>
+                  <div class="fl-row">
+                    <span><i class="bi bi-exclamation-triangle"></i> 증상</span><strong>{{ activeAnomaly.symp }}</strong>
+                  </div>
                 </div>
-                <div class="fl-row">
-                  <span><i class="bi bi-clock-history"></i> 최초 감지</span><strong>10:24:17 <em>(8분 전)</em></strong>
+                <h4><i class="bi bi-list-check"></i> 처리 흐름</h4>
+                <div class="hst">
+                  <div v-for="row in statusActionHistory" :key="row.key">
+                    <i class="bi bi-circle-fill hst-i"></i><span class="hst-t">{{ row.time }}</span> {{ row.text }}
+                  </div>
                 </div>
-                <div class="fl-row">
-                  <span><i class="bi bi-exclamation-triangle"></i> 증상</span><strong>RTSP 스트림 타임아웃</strong>
+                <div class="act-row">
+                  <button class="ab bl" @click="goActiveAnomalyDetail"><i class="bi bi-search"></i> 상세 보기</button>
+                  <button class="ab gy" v-if="activeAnomaly.ticketId" @click="openTicketHistory(activeAnomaly)"><i class="bi bi-clock-history"></i> 정비 이력</button>
+                  <button class="ab gr" disabled><i class="bi bi-link-45deg"></i> 정비 {{ ticketStatusLabel(activeAnomaly.ticketStatus) }}</button>
                 </div>
-              </div>
-              <h4><i class="bi bi-list-check"></i> 조치 이력</h4>
-              <div class="hst">
-                <div><i class="bi bi-circle-fill hst-i"></i><span class="hst-t">10:24:17</span> 장애 자동 감지</div>
-                <div>
-                  <i class="bi bi-circle-fill hst-i"></i><span class="hst-t">10:28:11</span> 김기사(IT) 상황 확인 — 현장 출동 예정
+                <div class="resp-row">
+                  <span><i class="bi bi-person-badge"></i> 담당자</span><strong>{{ activeAnomaly.who || '-' }}</strong
+                  ><button class="ab-sm" @click="tab = 'fault'">이동</button>
                 </div>
-              </div>
-              <div class="act-row">
-                <button class="ab bl"><i class="bi bi-arrow-repeat"></i> 재연결</button>
-                <button class="ab rd"><i class="bi bi-exclamation-octagon"></i> 장애 등록</button>
-                <button class="ab gy"><i class="bi bi-tools"></i> 점검 요청</button>
-                <button class="ab gr"><i class="bi bi-check2-circle"></i> 복구 완료</button>
-              </div>
-              <div class="resp-row">
-                <span><i class="bi bi-person-badge"></i> 담당자</span><strong>김기사 (IT)</strong
-                ><button class="ab-sm">변경</button>
-              </div>
-              <div class="memo-row">
+              </template>
+              <div v-else class="tl-empty">현재 데이터소스에 표시할 예지보전 이상이 없습니다.</div>
+              <div v-if="activeAnomaly" class="memo-row">
                 <span><i class="bi bi-pencil-square"></i> 메모</span
                 ><input v-model="failMemo" placeholder="메모를 입력하세요..." /><button
                   class="ab-sm"
@@ -374,8 +384,13 @@
                 <span class="cf yl">수집 중 {{ pmBaselineLearning }}</span>
                 <span class="cf rd">위험 {{ pmCriticalCount }}</span>
                 <div class="cf-r">
-                  <input placeholder="카메라명 검색" /><select>
-                    <option>전체 위치</option>
+                  <input v-model="camQuery" placeholder="카메라명 검색" /><select v-model="camSt">
+                    <option value="all">전체 상태</option>
+                    <option value="정상">정상</option>
+                    <option value="저하">저하</option>
+                    <option value="위험">위험</option>
+                    <option value="오프라인">오프라인</option>
+                    <option value="수집 중">수집 중</option>
                   </select>
                 </div>
               </div>
@@ -391,14 +406,22 @@
                 </thead>
                 <tbody>
                   <tr
-                    v-for="(c, i) in cams.slice(0, 4)"
-                    :key="i"
+                    v-for="c in paginatedStatusCams"
+                    :key="c.cameraId || c.id"
                     :class="{ bad: c.st === '장애' }"
                     @click="openCam(c)"
                     style="cursor: pointer"
                   >
                     <td>
                       <i class="bi bi-camera-video"></i> {{ c.name }}
+                      <span
+                        v-if="c.activeAnomalyCount > 0"
+                        class="pm-pred-bdg"
+                        :class="cameraAnomalyBadgeTone(c)"
+                        :title="cameraAnomalyBadgeTitle(c)"
+                      >
+                        <i class="bi bi-bullseye"></i> {{ cameraAnomalyBadgeText(c) }}
+                      </span>
                       <span
                         v-if="c.predictedRisk > 0"
                         class="pm-pred-bdg"
@@ -408,7 +431,7 @@
                       </span>
                     </td>
                     <td>
-                      <span class="stat" :class="c.stTone">{{ c.st }}</span>
+                      <span class="stat" :class="cameraEffectiveStatusTone(c)">{{ cameraEffectiveStatusLabel(c) }}</span>
                     </td>
                     <td class="num mono">
                       <span v-if="c.healthScore != null" class="pm-hs" :class="pmScoreTone(c.healthScore)">{{ c.healthScore.toFixed(1) }}</span>
@@ -420,16 +443,34 @@
                     <td class="mono">{{ c.lat }}</td>
                     <td class="mono">{{ c.ts }}</td>
                   </tr>
+                  <tr v-if="!paginatedStatusCams.length">
+                    <td colspan="5" class="pnl-empty">표시할 카메라가 없습니다.</td>
+                  </tr>
                 </tbody>
               </table>
               <div class="cam-foot">
-                <span>총 {{ pmTotalCameras }}개</span>
+                <span>{{ statusCamPageStart }}-{{ statusCamPageEnd }} / {{ filteredCams.length }}개</span>
                 <div class="pg-row">
-                  <button><i class="bi bi-chevron-double-left"></i></button>
-                  <button><i class="bi bi-chevron-left"></i></button>
-                  <button class="on">1</button>
-                  <button><i class="bi bi-chevron-right"></i></button>
-                  <button><i class="bi bi-chevron-double-right"></i></button>
+                  <button :disabled="statusCamPage === 1" @click="goStatusCamPage(1)">
+                    <i class="bi bi-chevron-double-left"></i>
+                  </button>
+                  <button :disabled="statusCamPage === 1" @click="goStatusCamPage(statusCamPage - 1)">
+                    <i class="bi bi-chevron-left"></i>
+                  </button>
+                  <button
+                    v-for="p in statusCamVisiblePages"
+                    :key="p"
+                    :class="{ on: p === statusCamPage }"
+                    @click="goStatusCamPage(p)"
+                  >
+                    {{ p }}
+                  </button>
+                  <button :disabled="statusCamPage === statusCamTotalPages" @click="goStatusCamPage(statusCamPage + 1)">
+                    <i class="bi bi-chevron-right"></i>
+                  </button>
+                  <button :disabled="statusCamPage === statusCamTotalPages" @click="goStatusCamPage(statusCamTotalPages)">
+                    <i class="bi bi-chevron-double-right"></i>
+                  </button>
                 </div>
               </div>
             </div>
@@ -544,8 +585,8 @@
             </thead>
             <tbody>
               <tr
-                v-for="(c, i) in filteredCams"
-                :key="i"
+                v-for="(c, i) in paginatedCams"
+                :key="c.cameraId || c.id"
                 @click="openCam(c)"
                 style="cursor: pointer"
                 :class="{ bad: c.st === '장애' }"
@@ -553,6 +594,14 @@
                 <td class="mono">{{ c.id }}</td>
                 <td>
                   <i class="bi bi-camera-video"></i> {{ c.name }}
+                  <span
+                    v-if="c.activeAnomalyCount > 0"
+                    class="pm-pred-bdg"
+                    :class="cameraAnomalyBadgeTone(c)"
+                    :title="cameraAnomalyBadgeTitle(c)"
+                  >
+                    <i class="bi bi-bullseye"></i> {{ cameraAnomalyBadgeText(c) }}
+                  </span>
                   <span
                     v-if="c.predictedRisk > 0"
                     class="pm-pred-bdg"
@@ -564,7 +613,7 @@
                 <td>{{ c.loc }}</td>
                 <td class="mono">10.20.{{ 10 + i }}.{{ 100 + i }}</td>
                 <td>
-                  <span class="stat" :class="c.stTone">{{ c.st }}</span>
+                  <span class="stat" :class="cameraEffectiveStatusTone(c)">{{ cameraEffectiveStatusLabel(c) }}</span>
                 </td>
                 <td class="num mono">
                   <span v-if="c.healthScore != null" class="pm-hs" :class="pmScoreTone(c.healthScore)">{{ c.healthScore.toFixed(1) }}</span>
@@ -612,17 +661,24 @@
                 <td class="mono">{{ c.ts }}</td>
                 <td><i class="bi bi-chevron-right" style="opacity: 0.5"></i></td>
               </tr>
-              <tr v-if="!filteredCams.length">
+              <tr v-if="!paginatedCams.length">
                 <td colspan="13" class="pnl-empty">검색 결과 없음</td>
               </tr>
             </tbody>
           </table>
           <div class="pnl-foot">
-            <span>표시 {{ filteredCams.length }} / {{ cams.length }} (전체 {{ pmTotalCameras }})</span>
+            <span>표시 {{ camPageStart }}-{{ camPageEnd }} / {{ filteredCams.length }} (전체 {{ pmTotalCameras }})</span>
             <div class="pg-row">
-              <button>‹</button>
-              <button class="on">1</button><button>2</button><button>3</button>
-              <button>›</button>
+              <button :disabled="camPage === 1" @click="goCamPage(camPage - 1)">‹</button>
+              <button
+                v-for="p in camVisiblePages"
+                :key="p"
+                :class="{ on: p === camPage }"
+                @click="goCamPage(p)"
+              >
+                {{ p }}
+              </button>
+              <button :disabled="camPage === camTotalPages" @click="goCamPage(camPage + 1)">›</button>
             </div>
           </div>
         </div>
@@ -1341,35 +1397,6 @@
               </div>
             </div>
 
-            <!-- 헤더: 유형 / 심각도 / 탐지 방식 / SLA -->
-            <div class="pm-anom-head">
-              <div class="pm-anom-titles">
-                <div class="pm-anom-badges">
-                  <span class="pm-meta-chip" :class="activeAnomaly.stTone">
-                    <em>이상 상태</em><strong>{{ activeAnomaly.st }}</strong>
-                  </span>
-                  <span class="pm-meta-chip" :class="ticketStatusTone(activeAnomaly.ticketStatus)">
-                    <em>정비 상태</em><strong>{{ ticketStatusLabel(activeAnomaly.ticketStatus) }}</strong>
-                  </span>
-                  <span class="pm-meta-chip bl">
-                    <em>탐지 방식</em><strong>{{ detectionMethodLabelKo(activeAnomaly.detectionMethod) }}</strong>
-                  </span>
-                  <span class="pm-meta-chip" :class="pmPriorityTone(activeAnomaly.priority)">
-                    <em>우선순위</em><strong>{{ activeAnomaly.priority }}</strong>
-                  </span>
-                  <span v-if="activeAnomaly.detector" class="pm-meta-chip pm-meta-chip-wide bl">
-                    <em>탐지기</em>
-                    <strong>{{ detectorLabelKo(activeAnomaly.detector.name) }}</strong>
-                    <small>v{{ activeAnomaly.detector.version }} · {{ policyLabelKo(activeAnomaly.detector.policyCode) }}</small>
-                  </span>
-                </div>
-              </div>
-              <div class="pm-anom-time" v-if="activeAnomaly.projectedAt">
-                <i class="bi bi-clock-history"></i>
-                <strong class="rd-txt">{{ activeAnomaly.projectedAt }} 임계 도달 예상</strong>
-              </div>
-            </div>
-
             <!-- 통계 지표 -->
             <div class="pm-stats-row" v-if="activeAnomaly.trend">
               <div v-if="activeAnomaly.trend?.robustZScore != null" class="pm-stat">
@@ -1572,7 +1599,6 @@
           <div class="pm-fault-filter">
             <select v-model="faultFilter.kind">
               <option value="">전체</option>
-              <option value="fault">장애만</option>
               <option value="anomaly">이상 이벤트만</option>
             </select>
             <select v-model="faultFilter.priority">
@@ -1667,9 +1693,7 @@
                   <span class="stat" :class="f.stTone">{{ f.st }}</span>
                 </td>
                 <td>
-                  <span class="stat" :class="ticketStatusTone(f.ticketStatus)">
-                    {{ f.ticketId ? ticketStatusLabel(f.ticketStatus) : "미발행" }}
-                  </span>
+                  <span class="stat ticket-status" :class="ticketStatusTone(f.ticketId ? f.ticketStatus : 'UNISSUED')">{{ f.ticketId ? ticketStatusLabel(f.ticketStatus) : "미발행" }}</span>
                 </td>
                 <td class="pm-fault-acts">
                   <button
@@ -2705,7 +2729,11 @@ function goHome() {
 // 카메라 상세 모달 + 카메라 탭 필터
 const camModal = ref(null);
 function openCam(c) {
-  camModal.value = c;
+  camModal.value = {
+    ...c,
+    st: cameraEffectiveStatusLabel(c),
+    stTone: cameraEffectiveStatusTone(c),
+  };
 }
 
 // 알람 상세 모달
@@ -2741,7 +2769,20 @@ const camSortLabel = computed(() => ({
   "latestSampledAt,desc": "최근 응답순",
 }[camSort.value] || ""));
 
+function camOperationalRank(cam) {
+  if (Number(cam.activeAnomalyCount || 0) > 0) return 0
+  if (cam.healthStatus === "CRITICAL" || cam.healthStatus === "OFFLINE") return 1
+  if (cam.healthStatus === "DEGRADED") return 2
+  if (isBaselineLearningCamera(cam)) return 3
+  return 4
+}
+
 function compareCams(a, b, key) {
+  const ar = camOperationalRank(a)
+  const br = camOperationalRank(b)
+  if (ar !== br) return ar - br
+  const anomalyDiff = Number(b.activeAnomalyCount || 0) - Number(a.activeAnomalyCount || 0)
+  if (anomalyDiff !== 0) return anomalyDiff
   if (key === "healthScore,asc") {
     // BASELINE_LEARNING (healthScore null) / OFFLINE(0) 정렬 안정화
     const av = a.healthScore == null ? 100 : a.healthScore;  // 학습 중은 끝으로
@@ -2761,7 +2802,7 @@ function compareCams(a, b, key) {
 const filteredCams = computed(() => {
   const q = camQuery.value.trim().toLowerCase();
   const filtered = cams.value.filter((c) => {
-    if (camSt.value !== "all" && c.st !== camSt.value) return false;
+    if (camSt.value !== "all" && cameraEffectiveStatusLabel(c) !== camSt.value) return false;
     if (!q) return true;
     return (
       c.name.toLowerCase().includes(q) ||
@@ -2772,6 +2813,54 @@ const filteredCams = computed(() => {
   // 정렬 적용 (기본: 위험 카메라 우선)
   return [...filtered].sort((a, b) => compareCams(a, b, camSort.value));
 });
+
+const STATUS_CAM_PAGE_SIZE = 4
+const statusCamPage = ref(1)
+const statusCamTotalPages = computed(() => Math.max(1, Math.ceil(filteredCams.value.length / STATUS_CAM_PAGE_SIZE)))
+const paginatedStatusCams = computed(() => {
+  const start = (statusCamPage.value - 1) * STATUS_CAM_PAGE_SIZE
+  return filteredCams.value.slice(start, start + STATUS_CAM_PAGE_SIZE)
+})
+const statusCamPageStart = computed(() => filteredCams.value.length ? (statusCamPage.value - 1) * STATUS_CAM_PAGE_SIZE + 1 : 0)
+const statusCamPageEnd = computed(() => Math.min(statusCamPage.value * STATUS_CAM_PAGE_SIZE, filteredCams.value.length))
+const statusCamVisiblePages = computed(() => {
+  const total = statusCamTotalPages.value
+  const current = statusCamPage.value
+  const start = Math.max(1, Math.min(current - 2, total - 4))
+  const end = Math.min(total, start + 4)
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i)
+})
+
+function goStatusCamPage(nextPage) {
+  statusCamPage.value = Math.min(Math.max(1, nextPage), statusCamTotalPages.value)
+}
+
+const CAM_PAGE_SIZE = 5
+const camPage = ref(1)
+const camTotalPages = computed(() => Math.max(1, Math.ceil(filteredCams.value.length / CAM_PAGE_SIZE)))
+const paginatedCams = computed(() => {
+  const start = (camPage.value - 1) * CAM_PAGE_SIZE
+  return filteredCams.value.slice(start, start + CAM_PAGE_SIZE)
+})
+const camPageStart = computed(() => filteredCams.value.length ? (camPage.value - 1) * CAM_PAGE_SIZE + 1 : 0)
+const camPageEnd = computed(() => Math.min(camPage.value * CAM_PAGE_SIZE, filteredCams.value.length))
+const camVisiblePages = computed(() => {
+  const total = camTotalPages.value
+  const current = camPage.value
+  const start = Math.max(1, Math.min(current - 2, total - 4))
+  const end = Math.min(total, start + 4)
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i)
+})
+
+function goCamPage(nextPage) {
+  camPage.value = Math.min(Math.max(1, nextPage), camTotalPages.value)
+}
+
+watch([camQuery, camSt, camSort], () => {
+  statusCamPage.value = 1
+  camPage.value = 1
+})
+
 if (typeof window !== "undefined") {
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
@@ -3221,166 +3310,92 @@ const filteredAlarmExt = computed(() =>
   alarmSev.value === "all" ? alarmsExt : alarmsExt.filter((a) => a.sev === alarmSev.value)
 );
 
-// 장애·이상 통합 목록 — 기존 운영 필드 + 예지보전 필드(priority/방식/SLA/원인 등)
-// kind: 'fault' (전통적 장애) | 'anomaly' (예지보전 탐지)
-const demoFaults = Object.freeze([
-  {
-    id: "FLT-2026-00342",
-    time: "10:24:17",
-    dev: "NSN-N-0023",
-    symp: "RTSP 스트림 응답 없음",
-    sev: "CRIT",
-    tone: "no",
-    who: "김기사",
-    elapsed: "00:08:15",
-    st: "진행 중",
-    stTone: "no",
-    ticketStatus: "IN_PROGRESS",
-    kind: "fault",
-    priority: "P1",
-    detectionMethod: "RULE",
-    anomalyType: "CAMERA_OFFLINE",
-    slaDeadline: "14:39",
-    slaOverdue: false,
-    slaRemainingMin: 5,
-  },
-  {
-    id: "ANM-2026-00118",
-    time: "10:32:00",
-    dev: "OLP-W-0041",
-    symp: "FPS 11.2 → 10분 후 임계 도달 예상",
-    sev: "WARN",
-    tone: "yl",
-    who: "—",
-    elapsed: "00:00:32",
-    st: "탐지",
-    stTone: "wn",
-    ticketStatus: "OPEN",
-    kind: "anomaly",
-    priority: "P2",
-    detectionMethod: "TREND_PROJECTION",
-    anomalyType: "FPS_DEGRADATION",
-    projectedAt: "10:44",
-    slaDeadline: "10:42",
-    slaOverdue: false,
-    slaRemainingMin: 10,
-    evidence: [
-      { metric: "FPS",        observed: 11.2,  baseline: 24.1, threshold: 10.0, unit: "fps" },
-      { metric: "CPU 사용률", observed: 91.3,  baseline: 45.0, threshold: 85.0, unit: "%"   },
-      { metric: "지연 P95",   observed: 1600,  baseline: 540,  threshold: 2000, unit: "ms"  },
-    ],
-    suspectedCauses: ["분석 프로세스 과부하 (CPU 91.3%)", "RTSP 입력 일시 jitter"],
-    confirmedCause: null,
-    // 운영 detector 정보 (계약 §3-6)
-    detector: {
-      name: "camera-trend-projection",
-      version: "1.0.0",
-      policyCode: "CAMERA_TREND_PROJECTION_V1",
-    },
-    // 통계 지표 (계약 §3-6 trend)
-    trend: {
-      slope: -0.73,            // 분당 -0.73 fps (하향)
-      confidence: 0.81,         // 추세 신뢰도
-      robustZScore: -4.2,       // robust z-score (관측-기준선) / mad
-      predictionHorizonMinutes: 10,
-    },
-    // 교통 맥락 교차검증 — 인접 카메라는 정상이면 이 카메라 자체 문제일 가능성 ↑
-    trafficContext: {
-      currentVehicleCount: 8,
-      currentAvgSpeed: 42.3,
-      adjacentCameras: [
-        { id: "OLP-W-0040", name: "잠실대교 남단", vehicleCount: 43, avgSpeed: 41.8, qualityStatus: "COMPLETE" },
-        { id: "OLP-W-0042", name: "올림픽대로 잠실", vehicleCount: 39, avgSpeed: 39.5, qualityStatus: "COMPLETE" },
-      ],
-      crossValidation: "ABNORMAL_LOCAL",  // 인접 정상 / 본 카메라만 비정상
-      crossValidationLabel: "본 카메라 단독 이상 — 인접 카메라는 정상 트래픽 유지",
-    },
-    shadowModel: {
-      name: "camera-lstm-autoencoder",
-      version: "1.0.0",
-      score: 0.91,
-      warningThreshold: 0.72,
-      criticalThreshold: 0.82,
-      predictedSeverity: "CRITICAL",
-      topFeatures: [
-        { name: "fpsAvg",      value: 0.38 },
-        { name: "cpuUsagePct", value: 0.24 },
-        { name: "latencyP95",  value: 0.17 },
-      ],
-    },
-  },
-  {
-    id: "FLT-2026-00341",
-    time: "09:42:05",
-    dev: "GBG-S-0077",
-    symp: "지연 286ms 초과 지속",
-    sev: "HIGH",
-    tone: "wn",
-    who: "자동",
-    elapsed: "00:50:27",
-    st: "처리 중",
-    stTone: "wn",
-    ticketStatus: "IN_PROGRESS",
-    kind: "fault",
-    priority: "P2",
-    detectionMethod: "RULE",
-    anomalyType: "LATENCY_DEGRADATION",
-    slaDeadline: "10:12",
-    slaOverdue: false,
-    slaRemainingMin: 30,
-  },
-  {
-    id: "ANM-2026-00117",
-    time: "09:21:48",
-    dev: "GBN-W-0019",
-    symp: "OCR 실패율 추세 상승 (5.2% → 18.5%)",
-    sev: "WARN",
-    tone: "yl",
-    who: "박엔지",
-    elapsed: "01:10:30",
-    st: "확인",
-    stTone: "wn",
-    ticketStatus: "ASSIGNED",
-    kind: "anomaly",
-    priority: "P3",
-    detectionMethod: "TREND_PROJECTION",
-    anomalyType: "OCR_QUALITY_DEGRADATION",
-    projectedAt: "10:51",
-    slaDeadline: "11:21",
-    slaOverdue: false,
-    slaRemainingMin: 49,
-  },
-  {
-    id: "FLT-2026-00340",
-    time: "08:11:33",
-    dev: "search-srv",
-    symp: "디스크 78% 초과",
-    sev: "MED",
-    tone: "wn",
-    who: "이대리",
-    elapsed: "02:14:00",
-    st: "처리 중",
-    stTone: "wn",
-    ticketStatus: "IN_PROGRESS",
-    kind: "fault",
-    priority: "P3",
-    detectionMethod: "RULE",
-    anomalyType: "RESOURCE_SATURATION",
-    slaDeadline: "09:11",
-    slaOverdue: true,
-    slaRemainingMin: -180,
-  },
-]);
+// 예지보전 이상 이벤트 목록은 Spring Boot API 응답으로만 구성한다.
 const faults = ref([]);
 const selectedAnomalyEventId = ref(null)
+
+const CLOSED_ANOMALY_STATUSES = ["RESOLVED", "DISMISSED"]
+const PRIORITY_RANK = { P1: 1, P2: 2, P3: 3 }
+const SEVERITY_RANK = { "\uC2EC\uAC01": 1, "\uACBD\uACE0": 2 }
+
+function compareAnomalySeverity(a, b) {
+  const ap = PRIORITY_RANK[a.priority] ?? 99
+  const bp = PRIORITY_RANK[b.priority] ?? 99
+  if (ap !== bp) return ap - bp
+  return (SEVERITY_RANK[a.sev] ?? 99) - (SEVERITY_RANK[b.sev] ?? 99)
+}
+
+const cameraAnomalySummaries = computed(() => {
+  const map = new Map()
+  faults.value
+    .filter((f) => f.kind === "anomaly" && !CLOSED_ANOMALY_STATUSES.includes(f.anomalyStatus))
+    .forEach((f) => {
+      const key = f.cameraId == null ? "" : String(f.cameraId)
+      if (!key) return
+      const prev = map.get(key) || { count: 0, top: null }
+      prev.count += 1
+      if (!prev.top || compareAnomalySeverity(f, prev.top) < 0) {
+        prev.top = f
+      }
+      map.set(key, prev)
+    })
+  return map
+})
+
+function cameraAnomalySummary(cam) {
+  const key = cam?.cameraId == null ? "" : String(cam.cameraId)
+  const linked = key ? cameraAnomalySummaries.value.get(key) : null
+  if (linked) return linked
+  const fallbackCount = Number(cam?.activeAnomalyCount || 0)
+  return fallbackCount > 0 ? { count: fallbackCount, top: null } : { count: 0, top: null }
+}
+
+function cameraAnomalyBadgeTone(cam) {
+  const top = cameraAnomalySummary(cam).top
+  if (top?.priority === "P1" || top?.sev === "\uC2EC\uAC01") return "rd"
+  if (top?.priority === "P2" || top?.sev === "\uACBD\uACE0") return "yl"
+  return "rd"
+}
+
+function cameraAnomalyBadgeText(cam) {
+  const summary = cameraAnomalySummary(cam)
+  if (!summary.count) return ""
+  const top = summary.top
+  if (!top) return `\uC774\uC0C1 ${summary.count}`
+  return `\uC774\uC0C1 ${summary.count} \u00B7 ${top.priority} ${top.sev}`
+}
+
+function cameraAnomalyBadgeTitle(cam) {
+  const summary = cameraAnomalySummary(cam)
+  if (!summary.count) return ""
+  const top = summary.top
+  if (!top) return `\uC5F4\uB9B0 \uC774\uC0C1 ${summary.count}\uAC74`
+  return `\uC5F4\uB9B0 \uC774\uC0C1 ${summary.count}\uAC74 \u00B7 \uCD5C\uACE0 \uC6B0\uC120\uC21C\uC704 ${top.priority} \u00B7 \uC2EC\uAC01\uB3C4 ${top.sev}`
+}
+
+function cameraEffectiveStatusLabel(cam) {
+  const top = cameraAnomalySummary(cam).top
+  if (top?.priority === "P1" || top?.sev === "\uC2EC\uAC01") return "\uC704\uD5D8"
+  if (top?.priority === "P2" || top?.sev === "\uACBD\uACE0") return "\uC800\uD558"
+  return cam?.st || cameraStatusLabel(cam?.healthStatus, cam?.baselineStatus)
+}
+
+function cameraEffectiveStatusTone(cam) {
+  const label = cameraEffectiveStatusLabel(cam)
+  if (label === "\uC704\uD5D8" || label === "\uC624\uD504\uB77C\uC778") return "no"
+  if (label === "\uC800\uD558" || label === "\uC218\uC9D1 \uC911") return "wn"
+  if (label === "\uC815\uC0C1") return "ok"
+  return cam?.stTone || "gy"
+}
 
 // 집계 (헤더/KPI용)
 const pmAnomalyCount   = computed(() => faults.value.filter((f) => f.kind === "anomaly").length)
 const pmPredictedCount2 = computed(() => faults.value.filter((f) => f.detectionMethod === "TREND_PROJECTION").length)
 const pmSlaOverdueCount = computed(() => faults.value.filter((f) => f.slaOverdue).length)
 const pmOpenAnomalyCount = computed(() =>
-  faults.value.filter((f) => f.kind === "anomaly" && !["RESOLVED", "DISMISSED"].includes(f.anomalyStatus)).length,
+  faults.value.filter((f) => f.kind === "anomaly" && !CLOSED_ANOMALY_STATUSES.includes(f.anomalyStatus)).length,
 )
+const pmDetectedAnomalyCount = computed(() => pmSummary.value?.openAnomalies ?? pmOpenAnomalyCount.value)
 const pmTicketRows = computed(() => faults.value.filter((f) => f.ticketId))
 const pmUnresolvedTicketCount = computed(() =>
   new Set(pmTicketRows.value
@@ -3392,7 +3407,6 @@ const pmResolvedTicketCount = computed(() =>
     .filter((f) => ["RESOLVED", "CLOSED"].includes(f.ticketStatus))
     .map((f) => f.ticketId)).size,
 )
-
 const pmMtta = computed(() => {
   const value = numberOrNull(pmSummary.value?.mttaMinutes)
   return value == null ? "0.0" : value.toFixed(1)
@@ -3403,7 +3417,7 @@ const pmMttr = computed(() => {
 })
 
 // ─── fault 필터 (URL query 동기화) ───
-const ALLOWED_KIND = ["", "fault", "anomaly"]
+const ALLOWED_KIND = ["", "anomaly"]
 const ALLOWED_PRI = ["", "P1", "P2", "P3"]
 const ALLOWED_DM = ["", "RULE", "TREND_PROJECTION", "ROBUST_Z_SCORE", "CROSS_VALIDATION", "LSTM_AUTOENCODER"]
 const ALLOWED_TS = ["", "OPEN", "ASSIGNED", "IN_PROGRESS", "RESOLVED", "CLOSED"]
@@ -3422,6 +3436,15 @@ const faultPage = ref(1)
 
 function resetFaultFilter() {
   faultFilter.value = { kind: "", priority: "", detectionMethod: "", status: "", slaOverdueOnly: false }
+}
+
+function compareFaultRisk(a, b) {
+  const risk = compareAnomalySeverity(a, b)
+  if (risk !== 0) return risk
+  const at = String(a.time || "")
+  const bt = String(b.time || "")
+  if (at !== bt) return bt.localeCompare(at)
+  return Number(b.eventId || 0) - Number(a.eventId || 0)
 }
 
 // fault 필터 변경 → URL
@@ -3444,7 +3467,7 @@ const filteredFaults = computed(() => {
     if (f.status && it.ticketStatus !== f.status) return false
     if (f.slaOverdueOnly && !it.slaOverdue) return false
     return true
-  })
+  }).sort(compareFaultRisk)
 })
 const faultTotalPages = computed(() => Math.max(1, Math.ceil(filteredFaults.value.length / FAULT_PAGE_SIZE)))
 const paginatedFaults = computed(() => {
@@ -3483,6 +3506,60 @@ const activeAnomaly = computed(() => {
     || null
 })
 
+function alarmSeverityForFault(fault) {
+  if (fault?.priority === "P1" || fault?.tone === "rd" || fault?.tone === "no") return "CRIT"
+  if (fault?.priority === "P2" || fault?.tone === "yl") return "HIGH"
+  return "MED"
+}
+
+const statusAlarmTimeline = computed(() =>
+  faults.value
+    .filter((f) => f.kind === "anomaly")
+    .slice(0, 5)
+    .map((f, index) => ({
+      id: `pm-${f.eventId || index}`,
+      time: f.time || "-",
+      kind: "event",
+      sev: alarmSeverityForFault(f),
+      dev: f.dev,
+      msg: `${anomalyTypeLabelKo(f.anomalyType)} · ${f.st}`,
+      who: f.who || "자동",
+      rawFault: f,
+    })),
+)
+
+const statusActionHistory = computed(() => {
+  const a = activeAnomaly.value
+  if (!a) return []
+  const rows = [
+    {
+      key: "detected",
+      time: a.time || "-",
+      text: `${anomalyTypeLabelKo(a.anomalyType)} 감지`,
+    },
+  ]
+  if (a.ticketId) {
+    rows.push({
+      key: "ticket",
+      time: a.slaDeadline || "-",
+      text: `정비 건 연결 · ${ticketStatusLabel(a.ticketStatus)}`,
+    })
+  }
+  if (a.who && a.who !== "-") {
+    rows.push({
+      key: "assignee",
+      time: a.slaDeadline || "-",
+      text: `${a.who} 담당자 지정`,
+    })
+  }
+  return rows
+})
+
+function goActiveAnomalyDetail() {
+  if (activeAnomaly.value) selectAnomalyDetail(activeAnomaly.value)
+  tab.value = "fault"
+}
+
 function selectAnomalyDetail(fault) {
   if (!fault?.eventId) return
   selectedAnomalyEventId.value = fault.eventId
@@ -3491,11 +3568,10 @@ function selectAnomalyDetail(fault) {
   })
 }
 
-// 이상 이벤트에 연결된 정비 건 (현재 mock: 같은 장비의 fault kind 항목)
 function linkedTicket(anom) {
   if (!anom) return null
   if (anom.ticketId) return anom
-  return faults.value.find((f) => f.kind === "fault" && f.dev === anom.dev) || null
+  return null
 }
 
 // 교통 맥락 헬퍼
@@ -4449,10 +4525,11 @@ function slaClass(a) {
 }
 
 const filteredAlarms = computed(() => {
-  if (tlFilter.value === "ALL") return alarmsTimeline;
+  const rows = statusAlarmTimeline.value
+  if (tlFilter.value === "ALL") return rows;
   if (tlFilter.value === "INFO")
-    return alarmsTimeline.filter((a) => a.kind === "info" || a.kind === "recovered");
-  return alarmsTimeline.filter((a) => a.sev === tlFilter.value);
+    return rows.filter((a) => a.kind === "info" || a.kind === "recovered");
+  return rows.filter((a) => a.sev === tlFilter.value);
 });
 const nav = [
   { id: "status", icon: "bi bi-grid-3x3", label: "장비 현황" },
@@ -4545,11 +4622,11 @@ const pmHealthAvg = computed(() => {
 })
 const pmSummary = ref(null)
 const pmPredictedCount = computed(() => pmSummary.value?.predictedRisks ?? cams.value.filter((c) => c.predictedRisk > 0).length)
-const pmCriticalCount = computed(() => pmSummary.value?.criticalCameras ?? cams.value.filter((c) => c.healthStatus === "CRITICAL").length)
+const pmCriticalCount = computed(() => cams.value.filter((c) => cameraEffectiveStatusLabel(c) === "\uC704\uD5D8").length)
 const pmBaselineLearning = computed(() => pmSummary.value?.baselineLearningCameras ?? cams.value.filter((c) => c.healthStatus === "BASELINE_LEARNING" || c.healthStatus === "INSUFFICIENT_DATA").length)
 const pmOverdueTickets = computed(() => pmSummary.value?.overdueTickets ?? 0)
 const pmTotalCameras = computed(() => pmSummary.value?.totalCameras ?? cams.value.length)
-const pmNormalCount = computed(() => pmSummary.value?.normalCameras ?? cams.value.filter((c) => c.healthStatus === "NORMAL").length)
+const pmNormalCount = computed(() => cams.value.filter((c) => cameraEffectiveStatusLabel(c) === "\uC815\uC0C1").length)
 const pmNormalRate = computed(() => {
   if (!pmTotalCameras.value) return "0.0"
   return ((pmNormalCount.value / pmTotalCameras.value) * 100).toFixed(1)
@@ -4619,6 +4696,7 @@ function toOpsCamera(row) {
   const baselineStatus = row.baselineStatus
   const healthScore = numberOrNull(row.healthScore)
   const cameraId = row.cameraId ?? row.id
+  const activeAnomalyCount = Number(row.activeAnomalyCount || 0)
   return {
     cameraId,
     zoneId: row.zoneId,
@@ -4633,7 +4711,7 @@ function toOpsCamera(row) {
     healthStatus,
     baselineStatus,
     predictedRisk: Number(row.predictedRiskCount || 0),
-    activeAnomalyCount: Number(row.activeAnomalyCount || 0),
+    activeAnomalyCount,
     baselineSamples: 0,
     baselineRequired: 4,
     dataSource: row.dataSource,
@@ -4752,9 +4830,14 @@ function anomalyStatusTone(status) {
 }
 
 function ticketStatusTone(status) {
-  if (status === "RESOLVED" || status === "CLOSED") return "ok"
-  if (status === "IN_PROGRESS" || status === "ASSIGNED") return "wn"
-  return "no"
+  return {
+    UNISSUED: "ticket-none",
+    OPEN: "ticket-open",
+    ASSIGNED: "ticket-assigned",
+    IN_PROGRESS: "ticket-progress",
+    RESOLVED: "ticket-resolved",
+    CLOSED: "ticket-closed",
+  }[status] || "ticket-none"
 }
 
 function scoreText(score) {
@@ -4921,6 +5004,11 @@ async function loadPredictiveDashboard() {
     predictiveLoadError.value = err?.normalized?.message || err?.message || "\uC608\uC9C0\uBCF4\uC804 \uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4."
     console.warn("[predictive dashboard load failed]", predictiveLoadError.value)
   }
+}
+
+function refreshPredictiveData() {
+  loadPredictiveDashboard()
+  loadPredictiveOperations()
 }
 
 watch(pmDataSource, () => {
@@ -5174,7 +5262,19 @@ const servers = Object.freeze([
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
+.ops-shell .pm-pred-bdg.rd {
+  background: rgba(220,38,38,0.12);
+  color: #dc2626;
+}
+.ops-shell .pm-pred-bdg.yl {
+  background: rgba(217,119,6,0.14);
+  color: #b45309;
+}
 .ops-shell .pm-pred-bdg > i { font-size: 9px; }
+.ops-shell .pg-row button:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
 
 @media (max-width: 1400px) {
   .ops-shell .pm-strip { grid-template-columns: repeat(3, 1fr); }
@@ -5667,6 +5767,36 @@ const servers = Object.freeze([
 .ops-shell .pm-meta-chip.ok strong,
 .ops-shell .pm-meta-chip.gr strong { color: #059669; }
 .ops-shell .pm-meta-chip.bl strong { color: #2563eb; }
+.ops-shell .pm-meta-chip.ticket-none {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+.ops-shell .pm-meta-chip.ticket-open {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+.ops-shell .pm-meta-chip.ticket-assigned {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+.ops-shell .pm-meta-chip.ticket-progress {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+.ops-shell .pm-meta-chip.ticket-resolved {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+}
+.ops-shell .pm-meta-chip.ticket-closed {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.ops-shell .pm-meta-chip.ticket-none strong { color: #64748b; }
+.ops-shell .pm-meta-chip.ticket-open strong { color: #dc2626; }
+.ops-shell .pm-meta-chip.ticket-assigned strong { color: #2563eb; }
+.ops-shell .pm-meta-chip.ticket-progress strong { color: #ea580c; }
+.ops-shell .pm-meta-chip.ticket-resolved strong { color: #059669; }
+.ops-shell .pm-meta-chip.ticket-closed strong { color: #334155; }
 .ops-shell .dm-bdg {
   padding: 5px 11px; border-radius: 6px;
   background: #eff6ff;
@@ -6227,6 +6357,44 @@ const servers = Object.freeze([
 .ops-shell .pm-fault-tbl tr.selected td:first-child {
   box-shadow: inset 3px 0 0 #2563eb;
 }
+.ops-shell .pm-fault-tbl .ticket-status {
+  min-width: 0;
+  justify-content: center;
+  border: 1px solid transparent;
+  font-weight: 900;
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+.ops-shell .pm-fault-tbl .ticket-status.ticket-none {
+  background: #f8fafc !important;
+  color: #64748b !important;
+  border-color: #cbd5e1;
+}
+.ops-shell .pm-fault-tbl .ticket-status.ticket-open {
+  background: #fef2f2 !important;
+  color: #dc2626 !important;
+  border-color: #fecaca;
+}
+.ops-shell .pm-fault-tbl .ticket-status.ticket-assigned {
+  background: #eff6ff !important;
+  color: #2563eb !important;
+  border-color: #bfdbfe;
+}
+.ops-shell .pm-fault-tbl .ticket-status.ticket-progress {
+  background: #fff7ed !important;
+  color: #ea580c !important;
+  border-color: #fed7aa;
+}
+.ops-shell .pm-fault-tbl .ticket-status.ticket-resolved {
+  background: #ecfdf5 !important;
+  color: #059669 !important;
+  border-color: #bbf7d0;
+}
+.ops-shell .pm-fault-tbl .ticket-status.ticket-closed {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: #94a3b8;
+}
 .ops-shell .pnl-act.sm.gr { background: #059669; color: #fff; }
 .ops-shell .pnl-act.sm.gr:hover { background: #047857; }
 
@@ -6602,6 +6770,23 @@ const servers = Object.freeze([
   border: 1px solid #c9d4e3; border-radius: 6px;
   background: #ffffff; color: #0c1f40;
   font-family: inherit; font-size: 12.5px;
+}
+.ops-shell .pm-ds-refresh {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #c9d4e3;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+}
+.ops-shell .pm-ds-refresh:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #eff6ff;
 }
 .ops-shell .pm-ds-bdg {
   display: inline-flex; align-items: center; gap: 6px;
