@@ -10,8 +10,8 @@
 |---|---|
 | 별도 부서야? | **아니. 시설운영팀(OpsView)에 흡수.** /admin/ops 안에서 모든 게 일어남 |
 | 어떤 탭에 뭐가 들어가? | status (KPI 스트립) / cams (KPI+모달 헬스 패널) / fault (이상·티켓) / settings (정책) |
-| 어디까지 됐어? | Step 1·2 완료 (status / cams 탭) — 다음은 Step 3 (fault 탭) |
-| 백엔드 없어도 돼? | OK. mock 폴백 자동 동작. `admin` / `1234`로 로그인 후 /admin/ops |
+| 어디까지 됐어? | `/admin/ops` 통합 화면에서 대시보드, 카메라 상태, 이상·정비, 정책 관리 핵심 시연 흐름까지 구현 완료 |
+| 예지보전 시연 로그인은? | 백엔드 JWT가 필요하므로 `admin@email.com` / `1234` 사용. local fallback 계정은 `/admin/ops` 진입 차단 |
 | 어디 가서 코드 봐야 해? | `src/api/predictiveApi.js` (15개 함수) + `src/views/admin/OpsView.vue` (UI) |
 | 외부 라이브러리 추가? | 0. 차트는 SVG 직접, polling은 자체 composable. |
 
@@ -60,7 +60,7 @@
 ### 현재 라우트 (변경 없음, 흡수형)
 | Path | 화면 | 가드 |
 |---|---|---|
-| `/admin/ops` | OpsView (시설운영 + 예지보전 통합) | ADMIN |
+| `/admin/ops` | OpsView (시설운영 + 예지보전 통합) | OPERATOR / MAINTAINER / ADMIN + 백엔드 JWT |
 | `/admin/predictive/*` (옛) | → `/admin/ops` 308 redirect | — |
 
 ### 권한 매트릭스 (요구사항 정의서 2-4 / 7-2절 기준, DB 협의 2026-06-12 반영)
@@ -169,8 +169,8 @@ const errMap = fieldErrorMap(err.normalized)
 // errMap.toStatus = '허용되지 않은 상태 전이입니다.'
 ```
 
-### 7. mock 폴백 (백엔드 미연동)
-`OpsView.vue` 패턴 — try/catch로 호출하고 catch에서 로컬 더미 사용. `loadError`는 set하지 않아 화면 비지 않음.
+### 7. 예지보전 API 실패 처리
+예지보전 화면은 Spring Boot API 데이터를 기준으로 표시한다. API 실패 시 demo/mock 데이터를 조용히 보여주지 않고 loading/error/empty 상태를 명확히 표시해 실제 시연 데이터와 구분한다.
 
 ---
 
@@ -198,7 +198,7 @@ const errMap = fieldErrorMap(err.normalized)
 
 ---
 
-## 🔌 API 15개 — 한눈에
+## 🔌 예지보전 API — 한눈에
 
 ### 운영 요약 / 카메라
 | 함수 | 메서드 + 경로 | 권한 |
@@ -207,6 +207,8 @@ const errMap = fieldErrorMap(err.normalized)
 | `listCameras()` | GET `/cameras` | OPERATOR+ |
 | `getCameraHealthHistory(id)` | GET `/cameras/{id}/health-history` | OPERATOR+ |
 | `getTrafficContext()` | GET `/traffic-context` | OPERATOR+ |
+| `listAssignees()` | GET `/assignees` | OPERATOR+ |
+| `listMaintenanceTicketHistories(ticketId)` | GET `/maintenance-tickets/{ticketId}/histories` | OPERATOR+ |
 
 ### 이상 이벤트
 | 함수 | 메서드 + 경로 | 권한 |

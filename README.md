@@ -158,6 +158,20 @@ erDiagram
 | 차량 상세/상태 변경 | GET/PATCH | `/api/vehicles/{vehicleId}` |
 | 차량 흐름 통계 | GET | `/api/flow-events/stats/count` |
 
+### 예지보전 운영 API
+
+| 기능 | Method | Endpoint |
+| --- | --- | --- |
+| 운영 요약 | GET | `/api/v1/predictive/summary` |
+| 카메라 운영 상태 | GET | `/api/v1/predictive/cameras` |
+| 카메라 상태 이력 | GET | `/api/v1/predictive/cameras/{cameraId}/health-history` |
+| 이상 이벤트 목록/상세 | GET | `/api/v1/predictive/anomaly-events`, `/api/v1/predictive/anomaly-events/{eventId}` |
+| 이상 이벤트 처리 | POST | `/api/v1/predictive/anomaly-events/{eventId}/acknowledge`, `/resolve`, `/dismiss` |
+| 정비 건 목록/생성 | GET/POST | `/api/v1/predictive/maintenance-tickets` |
+| 정비 담당자 후보 | GET | `/api/v1/predictive/assignees` |
+| 정비 건 상태/이력 | POST/GET | `/api/v1/predictive/maintenance-tickets/{ticketId}/status`, `/histories` |
+| 정책 조회/수정 | GET/PATCH | `/api/v1/predictive/policies`, `/api/v1/predictive/policies/{policyCode}` |
+
 서버 간 내부 호출은 `X-Internal-Api-Key` 헤더로 검증합니다.
 
 ## 8. 실행 방법
@@ -215,7 +229,21 @@ docker compose config --quiet
 docker compose ps
 ```
 
-시연 검증:
+예지보전 단독 시연 검증:
+
+```powershell
+docker compose up -d postgres-db spring-backend fastapi-server frontend
+
+powershell -ExecutionPolicy Bypass -File .\tools\predictive_demo\check_health_demo.ps1
+```
+
+기대 결과:
+
+- reset 직후 `REAL` 기준 이상 이벤트 0건, 정비 건 0건
+- health sample import 후 `REAL` 기준 이상 이벤트 6건, 정비 건 3건
+- `/admin/ops`에서 `admin@email.com / 1234`로 로그인 후 실데이터 기준 이상 이벤트 확인
+
+YOLO/OCR 포함 전체 시연 검증:
 
 - FastAPI Docs에서 stream frame, high-res OCR API 확인
 - Spring Swagger에서 detection log, speed violation 저장/조회 확인

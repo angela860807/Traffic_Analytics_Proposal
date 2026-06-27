@@ -81,7 +81,22 @@ powershell -ExecutionPolicy Bypass -File .\tools\predictive_demo\import_health_s
 - 카메라 14: 리소스 포화
 - 카메라 17: 영상 흐림
 
-### 2-3. 프론트 반영
+
+### 2-3. reset/import 통합 검증
+
+빌드 없이 시연 데이터 재현성만 확인할 때는 아래 명령 하나로 초기화, 주입, API/DB 카운트 확인을 수행한다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\predictive_demo\check_health_demo.ps1
+```
+
+기대 결과:
+
+- reset 후 REAL 기준 이상 이벤트 0건, 정비 건 0건
+- import 후 REAL 기준 이상 이벤트 6건, 정비 건 3건
+- API summary, anomaly-events 조회와 DB 카운트가 일치
+
+### 2-4. 프론트 반영
 
 ```powershell
 docker compose build frontend
