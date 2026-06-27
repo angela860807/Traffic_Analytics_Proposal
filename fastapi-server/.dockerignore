@@ -1,0 +1,15 @@
+.venv
+venv
+__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+storage
+models
+sample.jpg
+capture.jpg
+capture*.jpg
+.env
+*.log
+tests
+examples

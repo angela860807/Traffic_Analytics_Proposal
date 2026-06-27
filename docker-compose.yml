@@ -13,8 +13,8 @@ services:
 
   spring-backend:
     build:
-      context: .
-      dockerfile: backend/traffic/Dockerfile
+      context: ./backend/traffic
+      dockerfile: Dockerfile
     container_name: traffic-spring-backend
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/traffic
@@ -29,8 +29,8 @@ services:
 
   fastapi-server:
     build:
-      context: .
-      dockerfile: fastapi-server/Dockerfile
+      context: ./fastapi-server
+      dockerfile: Dockerfile
     container_name: traffic-fastapi-server
     environment:
       SPRING_BACKEND_BASE_URL: http://spring-backend:8080
@@ -110,8 +110,8 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: trafficAS-b/Dockerfile
+      context: ./trafficAS-b
+      dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ""
         VITE_FASTAPI_BASE_URL: ""
