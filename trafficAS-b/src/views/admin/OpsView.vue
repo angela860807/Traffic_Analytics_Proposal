@@ -415,7 +415,7 @@
                     <td>
                       <i class="bi bi-camera-video"></i> {{ c.name }}
                       <span
-                        v-if="c.activeAnomalyCount > 0"
+                        v-if="cameraAnomalySummary(c).count > 0"
                         class="pm-pred-bdg"
                         :class="cameraAnomalyBadgeTone(c)"
                         :title="cameraAnomalyBadgeTitle(c)"
@@ -434,7 +434,7 @@
                       <span class="stat" :class="cameraEffectiveStatusTone(c)">{{ cameraEffectiveStatusLabel(c) }}</span>
                     </td>
                     <td class="num mono">
-                      <span v-if="c.healthScore != null" class="pm-hs" :class="pmScoreTone(c.healthScore)">{{ c.healthScore.toFixed(1) }}</span>
+                      <span v-if="c.healthScore != null" class="pm-hs" :class="pmScoreTone(c.healthScore, c)">{{ formatPmHealthScore(c) }}</span>
                       <span v-else-if="isBaselineLearningCamera(c)" class="pm-baseline" title="기준선 학습 중">
                         <i class="bi bi-cpu"></i> {{ c.baselineSamples }}/{{ c.baselineRequired }}
                       </span>
@@ -565,6 +565,11 @@
             <h4>카메라 전체 목록</h4>
             <span class="nd-h-cnt">{{ filteredCams.length }} / {{ cams.length }}대</span>
           </div>
+          <div class="pm-demo-callout">
+            <i class="bi bi-info-circle"></i>
+            <span>CSV 주입 후에는 열린 이상과 미완료 정비가 있는 카메라가 먼저 올라옵니다.</span>
+            <strong>정비가 해결·종결된 카메라는 우선 조치 대상에서 내려갑니다.</strong>
+          </div>
           <table class="pnl-tbl nd-tbl">
             <thead>
               <tr>
@@ -595,7 +600,7 @@
                 <td>
                   <i class="bi bi-camera-video"></i> {{ c.name }}
                   <span
-                    v-if="c.activeAnomalyCount > 0"
+                    v-if="cameraAnomalySummary(c).count > 0"
                     class="pm-pred-bdg"
                     :class="cameraAnomalyBadgeTone(c)"
                     :title="cameraAnomalyBadgeTitle(c)"
@@ -616,7 +621,7 @@
                   <span class="stat" :class="cameraEffectiveStatusTone(c)">{{ cameraEffectiveStatusLabel(c) }}</span>
                 </td>
                 <td class="num mono">
-                  <span v-if="c.healthScore != null" class="pm-hs" :class="pmScoreTone(c.healthScore)">{{ c.healthScore.toFixed(1) }}</span>
+                  <span v-if="c.healthScore != null" class="pm-hs" :class="pmScoreTone(c.healthScore, c)">{{ formatPmHealthScore(c) }}</span>
                   <span v-else-if="isBaselineLearningCamera(c)" class="pm-baseline" title="기준선 학습 중">
                     <i class="bi bi-cpu"></i> {{ c.baselineSamples }}/{{ c.baselineRequired }}
                   </span>
@@ -1630,7 +1635,11 @@
               <i class="bi bi-arrow-counterclockwise"></i> 초기화
             </button>
           </div>
-
+          <div class="pm-demo-callout pm-demo-flow">
+            <i class="bi bi-tools"></i>
+            <span>이 표에서 이상 이벤트가 정비 건으로 연결된 상태를 설명합니다.</span>
+            <strong>배정 버튼을 눌러 담당자 배정 시연을 시작하세요.</strong>
+          </div>
           <table class="pnl-tbl nd-tbl pm-fault-tbl">
             <thead>
               <tr>
@@ -2267,8 +2276,8 @@
               <span v-if="camModal.healthStatus === 'BASELINE_LEARNING'" class="cm-pm-baseline-bdg">
                 <i class="bi bi-cpu"></i> 기준선 학습 중
               </span>
-              <span v-else-if="camModal.healthScore != null" class="cm-pm-score" :class="pmScoreTone(camModal.healthScore)">
-                Health {{ camModal.healthScore.toFixed(1) }}
+              <span v-else-if="camModal.healthScore != null" class="cm-pm-score" :class="pmScoreTone(camModal.healthScore, camModal)">
+                Health {{ formatPmHealthScore(camModal) }}
               </span>
               <span v-else class="cm-pm-score gy">Health —</span>
             </h4>
@@ -2770,7 +2779,7 @@ const camSortLabel = computed(() => ({
 }[camSort.value] || ""));
 
 function camOperationalRank(cam) {
-  if (Number(cam.activeAnomalyCount || 0) > 0) return 0
+  if (cameraAnomalySummary(cam).count > 0) return 0
   if (cam.healthStatus === "CRITICAL" || cam.healthStatus === "OFFLINE") return 1
   if (cam.healthStatus === "DEGRADED") return 2
   if (isBaselineLearningCamera(cam)) return 3
@@ -2781,24 +2790,30 @@ function compareCams(a, b, key) {
   const ar = camOperationalRank(a)
   const br = camOperationalRank(b)
   if (ar !== br) return ar - br
-  const anomalyDiff = Number(b.activeAnomalyCount || 0) - Number(a.activeAnomalyCount || 0)
+
+  const aAnomaly = cameraAnomalySummary(a)
+  const bAnomaly = cameraAnomalySummary(b)
+  const anomalyDiff = bAnomaly.count - aAnomaly.count
   if (anomalyDiff !== 0) return anomalyDiff
+
   if (key === "healthScore,asc") {
-    // BASELINE_LEARNING (healthScore null) / OFFLINE(0) 정렬 안정화
-    const av = a.healthScore == null ? 100 : a.healthScore;  // 학습 중은 끝으로
-    const bv = b.healthScore == null ? 100 : b.healthScore;
-    return av - bv;  // 낮을수록 위험 → 위로
+    const avScore = pmDisplayHealthScore(a)
+    const bvScore = pmDisplayHealthScore(b)
+    const av = avScore == null ? 100 : avScore
+    const bv = bvScore == null ? 100 : bvScore
+    return av - bv
   }
   if (key === "healthScore,desc") {
-    const av = a.healthScore == null ? -1 : a.healthScore;
-    const bv = b.healthScore == null ? -1 : b.healthScore;
-    return bv - av;
+    const avScore = pmDisplayHealthScore(a)
+    const bvScore = pmDisplayHealthScore(b)
+    const av = avScore == null ? -1 : avScore
+    const bv = bvScore == null ? -1 : bvScore
+    return bv - av
   }
-  if (key === "cameraName,asc") return a.name.localeCompare(b.name);
-  if (key === "latestSampledAt,desc") return (b.ts || "").localeCompare(a.ts || "");
-  return 0;
+  if (key === "cameraName,asc") return a.name.localeCompare(b.name)
+  if (key === "latestSampledAt,desc") return (b.ts || "").localeCompare(a.ts || "")
+  return 0
 }
-
 const filteredCams = computed(() => {
   const q = camQuery.value.trim().toLowerCase();
   const filtered = cams.value.filter((c) => {
@@ -3315,6 +3330,7 @@ const faults = ref([]);
 const selectedAnomalyEventId = ref(null)
 
 const CLOSED_ANOMALY_STATUSES = ["RESOLVED", "DISMISSED"]
+const COMPLETED_TICKET_STATUSES = ["RESOLVED", "CLOSED"]
 const PRIORITY_RANK = { P1: 1, P2: 2, P3: 3 }
 const SEVERITY_RANK = { "\uC2EC\uAC01": 1, "\uACBD\uACE0": 2 }
 
@@ -3325,10 +3341,16 @@ function compareAnomalySeverity(a, b) {
   return (SEVERITY_RANK[a.sev] ?? 99) - (SEVERITY_RANK[b.sev] ?? 99)
 }
 
+function isActionableAnomaly(f) {
+  return f?.kind === "anomaly"
+    && !CLOSED_ANOMALY_STATUSES.includes(f.anomalyStatus)
+    && !COMPLETED_TICKET_STATUSES.includes(f.ticketStatus)
+}
+
 const cameraAnomalySummaries = computed(() => {
   const map = new Map()
   faults.value
-    .filter((f) => f.kind === "anomaly" && !CLOSED_ANOMALY_STATUSES.includes(f.anomalyStatus))
+    .filter(isActionableAnomaly)
     .forEach((f) => {
       const key = f.cameraId == null ? "" : String(f.cameraId)
       if (!key) return
@@ -3346,6 +3368,7 @@ function cameraAnomalySummary(cam) {
   const key = cam?.cameraId == null ? "" : String(cam.cameraId)
   const linked = key ? cameraAnomalySummaries.value.get(key) : null
   if (linked) return linked
+  if (faults.value.length > 0) return { count: 0, top: null }
   const fallbackCount = Number(cam?.activeAnomalyCount || 0)
   return fallbackCount > 0 ? { count: fallbackCount, top: null } : { count: 0, top: null }
 }
@@ -5024,10 +5047,25 @@ onMounted(() => {
 })
 
 const pmSloOk = computed(() => pmHealthAvg.value >= 75)
-function pmScoreTone(score) {
-  if (score == null) return "gy"
-  if (score < 50) return "rd"
-  if (score < 70) return "yl"
+function pmDisplayHealthScore(cam) {
+  const score = Number(cam?.healthScore)
+  if (!Number.isFinite(score)) return null
+  const top = cameraAnomalySummary(cam).top
+  if (top?.priority === "P1" || top?.sev === "\uC2EC\uAC01") return Math.min(score, 49)
+  if (top?.priority === "P2" || top?.sev === "\uACBD\uACE0") return Math.min(score, 69)
+  return score
+}
+
+function formatPmHealthScore(cam) {
+  const score = pmDisplayHealthScore(cam)
+  return score == null ? "—" : score.toFixed(1)
+}
+
+function pmScoreTone(score, cam = null) {
+  const displayScore = cam ? pmDisplayHealthScore(cam) : score
+  if (displayScore == null) return "gy"
+  if (displayScore < 50) return "rd"
+  if (displayScore < 70) return "yl"
   return "gr"
 }
 
@@ -6341,6 +6379,26 @@ const servers = Object.freeze([
   font-weight: 850;
 }
 
+.ops-shell .pm-demo-callout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 10px;
+  padding: 9px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #334155;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.ops-shell .pm-demo-callout i { color: #2563eb; font-size: 15px; }
+.ops-shell .pm-demo-callout strong { color: #0c1f40; font-weight: 850; }
+.ops-shell .pm-demo-callout.pm-demo-flow {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+.ops-shell .pm-demo-callout.pm-demo-flow i { color: #ea580c; }
 /* fault 목록 표 확장 */
 .ops-shell .pm-fault-tbl .num { text-align: right; }
 .ops-shell .pm-fault-tbl .pm-kind-bdg {
