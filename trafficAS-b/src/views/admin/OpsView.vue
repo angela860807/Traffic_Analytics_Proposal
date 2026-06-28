@@ -7170,4 +7170,144 @@ const servers = Object.freeze([
   background: #ffffff; color: #0c1f40;
   font-family: inherit; font-size: 13px;
 }
+
+/* Demo-size ticket modal overrides */
+.ops-shell .pm-ticket-modal {
+  width: min(760px, 96vw);
+  max-width: 760px;
+  max-height: 94vh;
+}
+.ops-shell .pm-ticket-modal-wide {
+  width: min(900px, 96vw);
+  max-width: 900px;
+}
+.ops-shell .pm-ticket-modal .cm-h {
+  padding: 20px 26px;
+}
+.ops-shell .pm-ticket-modal .cm-title {
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 800;
+}
+.ops-shell .pm-ticket-modal .cm-title i {
+  font-size: 22px;
+}
+.ops-shell .pm-ticket-modal .cm-title .stat {
+  font-size: 16px !important;
+  padding: 5px 12px !important;
+}
+.ops-shell .pm-ticket-modal .cm-x {
+  width: 42px;
+  height: 42px;
+  font-size: 17px;
+}
+.ops-shell .pm-ticket-body {
+  padding: 24px 28px;
+}
+.ops-shell .pm-ticket-modal .cm-row {
+  padding: 12px 0;
+  gap: 24px;
+  font-size: 16px;
+}
+.ops-shell .pm-ticket-modal .cm-row span {
+  font-weight: 700;
+}
+.ops-shell .pm-ticket-modal .cm-row strong {
+  font-size: 16px;
+  text-align: right;
+}
+.ops-shell .pm-ticket-note {
+  margin-top: 18px;
+}
+.ops-shell .pm-ticket-note > label {
+  display: block;
+  margin-bottom: 9px;
+  color: #4a5b78;
+  font-size: 16px;
+  font-weight: 800;
+}
+.ops-shell .pm-ticket-note textarea {
+  width: 100%;
+  min-height: 132px;
+  padding: 14px 16px;
+  border: 1px solid #c9d4e3;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.ops-shell .pm-ticket-note select {
+  width: 100%;
+  padding: 13px 15px;
+  border: 1px solid #c9d4e3;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #0c1f40;
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.ops-shell .pm-ticket-err {
+  margin-top: 12px;
+  color: #dc2626;
+  font-size: 15px;
+}
+.ops-shell .pm-ticket-acts,
+.ops-shell .pm-ticket-modal .pm-ticket-acts {
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 18px;
+}
+.ops-shell .pm-ticket-modal .pnl-act {
+  min-height: 44px;
+  padding: 11px 18px;
+  border-radius: 5px;
+  font-size: 16px;
+  font-weight: 800;
+}
+.ops-shell .pm-ticket-timeline {
+  margin-top: 20px;
+  padding: 18px 20px;
+}
+.ops-shell .pm-tl-h {
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: 17px;
+  font-weight: 800;
+}
+.ops-shell .pm-tl-cnt {
+  padding: 4px 11px;
+  font-size: 14px;
+  font-weight: 800;
+}
+.ops-shell .pm-tl-row {
+  gap: 16px;
+  padding: 10px 0;
+}
+.ops-shell .pm-tl-dot {
+  width: 16px;
+  height: 16px;
+}
+.ops-shell .pm-tl-line {
+  gap: 10px;
+  font-size: 16px;
+  line-height: 1.45;
+}
+.ops-shell .pm-tl-line > strong {
+  font-weight: 800;
+}
+.ops-shell .pm-tl-from-to {
+  padding: 3px 9px;
+  font-size: 14px;
+}
+.ops-shell .pm-tl-meta {
+  margin-top: 4px;
+  font-size: 14px;
+}
+.ops-shell .pm-tl-note {
+  margin-top: 8px;
+  padding: 9px 12px;
+  font-size: 15px;
+}
 </style>
