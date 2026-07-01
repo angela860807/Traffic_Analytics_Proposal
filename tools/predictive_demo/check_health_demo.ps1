@@ -126,7 +126,8 @@ if (-not $SkipImport) {
   & $importScript `
     -CsvPath $CsvPath `
     -BaseUrl $BaseUrl `
-    -InternalApiKey $InternalApiKey
+    -InternalApiKey $InternalApiKey `
+    -DataSourceOverride $DataSource
 
   $headers = Get-AuthHeaders
   $apiCounts = Get-ApiCounts -Headers $headers

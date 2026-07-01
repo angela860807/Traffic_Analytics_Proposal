@@ -8,8 +8,8 @@
         <button
           class="side-toggle"
           @click="sideOpen = !sideOpen"
-          :aria-label="sideOpen ? '사이드바 접기' : '사이드바 펼치기'"
-          :title="sideOpen ? '사이드바 접기' : '사이드바 펼치기'"
+          :aria-label="sideOpen ? 'Collapse sidebar' : 'Expand sidebar'"
+          :title="sideOpen ? 'Collapse sidebar' : 'Expand sidebar'"
         >
           <i :class="sideOpen ? 'bi bi-arrow-left-short' : 'bi bi-arrow-right-short'"></i>
         </button>
@@ -130,6 +130,22 @@
           >
             <i class="bi bi-arrow-clockwise"></i>
           </button>
+          <div class="pm-demo-actions">
+            <button
+              v-for="action in demoScriptActions"
+              :key="action.id"
+              class="pm-demo-btn"
+              type="button"
+              :class="{ running: demoScriptRunning === action.id }"
+              :disabled="Boolean(demoScriptRunning) || !isPmAdmin"
+              @click="runPredictiveDemoScript(action.id)"
+            >
+              <i :class="demoScriptRunning === action.id ? 'bi bi-hourglass-split' : action.icon"></i>
+              <span>{{ action.label }}</span>
+            </button>
+          </div>
+          <span v-if="demoScriptStatus" class="pm-demo-msg ok">{{ demoScriptStatus }}</span>
+          <span v-if="demoScriptError" class="pm-demo-msg err">{{ demoScriptError }}</span>
           <span v-if="pmDataSource !== 'REAL'" class="pm-ds-bdg" :class="pmDataSourceTone(pmDataSource)">
             <i class="bi bi-exclamation-triangle-fill"></i>
             {{ pmDataSourceLabel(pmDataSource) }} 모드 — 실제 운영 데이터 아님
@@ -2594,6 +2610,7 @@ import {
   assignMaintenanceTicket,
   changeTicketStatus,
 } from "@/api/predictiveApi";
+import { runDemoScript } from "@/api/demoScripts";
 
 // 예지보전 권한 헬퍼 (요구사항 정의서 2-4/7-2 + DB 협의 2026-06-12 반영)
 const {
@@ -4505,6 +4522,7 @@ onMounted(() => {
   document.addEventListener("wheel", onGlobalWheel, { passive: true })
 });
 onBeforeUnmount(() => {
+  clearDemoScriptMessageTimer()
   if (nowTimer) clearInterval(nowTimer);
   document.removeEventListener("keydown", onGlobalKeydown)
   document.removeEventListener("wheel", onGlobalWheel)
@@ -4664,6 +4682,31 @@ function pmDataSourceTone(v) {
 }
 const predictiveLoadState = ref("idle")
 const predictiveLoadError = ref("")
+const demoScriptActions = [
+  { id: "CHECK_HEALTH_DEMO", label: "\uB370\uBAA8 \uC900\uBE44", icon: "bi bi-play-fill" },
+  { id: "IMPORT_HEALTH_SAMPLES", label: "\uC0D8\uD50C \uC8FC\uC785", icon: "bi bi-upload" },
+  { id: "RESET_HEALTH_DEMO", label: "\uCD08\uAE30\uD654", icon: "bi bi-arrow-counterclockwise" },
+]
+const demoScriptRunning = ref("")
+const demoScriptStatus = ref("")
+const demoScriptError = ref("")
+let demoScriptMessageTimer = null
+
+function clearDemoScriptMessageTimer() {
+  if (demoScriptMessageTimer) {
+    clearTimeout(demoScriptMessageTimer)
+    demoScriptMessageTimer = null
+  }
+}
+
+function clearDemoScriptMessageLater(delay = 3000) {
+  clearDemoScriptMessageTimer()
+  demoScriptMessageTimer = setTimeout(() => {
+    demoScriptStatus.value = ""
+    demoScriptError.value = ""
+    demoScriptMessageTimer = null
+  }, delay)
+}
 
 function numberOrNull(value) {
   if (value === null || value === undefined || value === "") return null
@@ -5027,6 +5070,36 @@ async function loadPredictiveDashboard() {
 function refreshPredictiveData() {
   loadPredictiveDashboard()
   loadPredictiveOperations()
+}
+
+async function runPredictiveDemoScript(scriptId) {
+  if (demoScriptRunning.value) return
+  clearDemoScriptMessageTimer()
+  const action = demoScriptActions.find((item) => item.id === scriptId)
+  demoScriptRunning.value = scriptId
+  demoScriptStatus.value = `${action?.label || scriptId} running...`
+  demoScriptError.value = ""
+  try {
+    const result = await runDemoScript(scriptId, { dataSource: pmDataSource.value })
+    const tail = Array.isArray(result?.outputLines)
+      ? result.outputLines.filter(Boolean).slice(-1)[0]
+      : ""
+    if (result?.status !== "SUCCESS") {
+      demoScriptStatus.value = ""
+      demoScriptError.value = tail || `${action?.label || scriptId} failed(exit ${result?.exitCode ?? "?"})`
+      clearDemoScriptMessageLater()
+      return
+    }
+    await Promise.all([loadPredictiveDashboard(), loadPredictiveOperations()])
+    demoScriptStatus.value = `${result.label} done (${result.dataSource}, ${result.durationSeconds}s)`
+    clearDemoScriptMessageLater()
+  } catch (err) {
+    demoScriptStatus.value = ""
+    demoScriptError.value = err?.normalized?.message || err?.message || "Demo script failed"
+    clearDemoScriptMessageLater()
+  } finally {
+    demoScriptRunning.value = ""
+  }
 }
 
 watch(pmDataSource, () => {
@@ -6846,6 +6919,61 @@ const servers = Object.freeze([
   border-color: #2563eb;
   color: #2563eb;
   background: #eff6ff;
+}
+.ops-shell .pm-demo-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ops-shell .pm-demo-btn {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid #c9d4e3;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #0c1f40;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ops-shell .pm-demo-btn:hover:not(:disabled) {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #eff6ff;
+}
+.ops-shell .pm-demo-btn.running,
+.ops-shell .pm-demo-btn:disabled {
+  opacity: .65;
+  cursor: wait;
+}
+.ops-shell .pm-demo-msg {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  max-width: min(520px, 100%);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ops-shell .pm-demo-msg.ok {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+.ops-shell .pm-demo-msg.err {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 .ops-shell .pm-ds-bdg {
   display: inline-flex; align-items: center; gap: 6px;

@@ -50,9 +50,6 @@ node scripts\pretty_stream_video_file.js `
 [실데이터 주입 전 상태로 초기화]
 powershell -ExecutionPolicy Bypass -File .\tools\predictive_demo\reset_health_demo.ps1
 
-[백엔드/프론트 재빌드 및 재기동]
-docker compose up -d --build spring-backend frontend
-
 [미리 입력해 놓을 시계열 health sample + AI Shadow 비교 로그 주입 명령어]
 powershell -ExecutionPolicy Bypass -File .\tools\predictive_demo\import_health_samples.ps1 `
   -CsvPath "tools\predictive_demo\camera-health-rule-trigger-samples.csv" `
@@ -80,7 +77,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\predictive_demo\import_health_s
 
 [002_plate-ocr-vue.png 표시]
 
-두 번째 이미지는 단속관리팀에서 과속 단속 결과를 검증하는 화면입니다.
+옆에 있는 프론트 이미지는 단속관리팀에서 과속 단속 결과를 검증하는 화면입니다.
 관리자는 여기서 YOLO와 OCR을 거친 crop 차량 이미지와 원본 차량 이미지를 대조하여,
 실제 과속 차량이 올바르게 매칭되었는지 확인할 수 있습니다.
 
@@ -154,7 +151,7 @@ Rule 판단과 비교하기 위한 검증용 결과로만 사용합니다.
 이상 판단, 이벤트 생성, 정비 처리 흐름이 어떻게 이어지는지 검증하는 방식입니다.
 
 ============================================================
-7. 시계열 health sample 주입 시연 [화면: /admin/ops + PowerShell]
+7. 시계열 health sample 주입 시연 [화면: /admin/ops]
 ============================================================
 
 [/admin/ops 접속]
@@ -168,15 +165,15 @@ http://localhost:5174/admin/ops
 
 현재 실데이터 기준으로는 아직 이상 이벤트가 없습니다.
 
-이제 준비된 데이터를 직접 주입하겠습니다.
+이제 운영 화면에 배치한 버튼을 클릭해 준비된 데이터를 주입하겠습니다.
 
-[명령어 입력 대기]
+[샘플 주입 버튼 클릭 대기]
 
-이 명령으로 FPS 저하, 프레임 드롭, 지연 증가, 영상 흐림처럼 운영자가 놓치면 안 되는 상태 변화를 주입하겠습니다.
+이 버튼에는 시계열 health sample 주입 스크립트 기능을 내장했습니다. 클릭하면 FPS 저하, 프레임 드롭, 지연 증가, 영상 흐림처럼 운영자가 놓치면 안 되는 상태 변화가 주입됩니다.
 또한 같은 시계열 데이터를 기준으로 AI Shadow 비교 로그도 함께 생성해,
 이상 상세 화면에서 Rule 판단과 AI Shadow 시계열 분석 결과를 같이 확인하겠습니다.
 
-[명령어 실행]
+[샘플 주입 버튼 클릭]
 
 [이상 이벤트 및 정비 건 현황 표에 이상 이벤트 표시 확인]
 

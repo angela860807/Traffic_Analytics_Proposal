@@ -7,6 +7,7 @@ param(
   [string]$User = "postgres",
   [string]$ProcessorCode = "predictive-demo-video",
   [string]$RunId = (Get-Date -Format "yyyyMMddHHmmss"),
+  [string]$DataSourceOverride = "",
   [switch]$PreserveCsvTimestamps,
   [switch]$SkipShadowLog,
   [int]$SampleWindowSeconds = 300,
@@ -54,7 +55,7 @@ foreach ($row in $rows) {
     diskUsagePct = [decimal]50
     networkRttMs = [int]$row.network_rtt_ms
     lastFrameAt = $sampledAt
-    dataSource = $row.data_source
+    dataSource = $(if ($DataSourceOverride) { $DataSourceOverride } else { $row.data_source })
     qualityStatus = $row.quality_status
     isImputed = $false
   }

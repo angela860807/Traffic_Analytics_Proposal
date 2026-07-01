@@ -49,3 +49,10 @@ app:
       enabled: ${DB_BOOTSTRAP_ENABLED:false}
       seed-demo: ${DB_BOOTSTRAP_DEMO_SEED_ENABLED:true}
       force-seed: ${DB_BOOTSTRAP_FORCE_SEED:false}
+  demo:
+    scripts:
+      enabled: ${DEMO_SCRIPT_ENABLED:true}
+      dir: ${DEMO_SCRIPT_DIR:tools/predictive_demo}
+      timeout-seconds: ${DEMO_SCRIPT_TIMEOUT_SECONDS:120}
+      powershell: ${DEMO_POWERSHELL:powershell}
+      base-url: ${DEMO_BACKEND_BASE_URL:http://localhost:8080}

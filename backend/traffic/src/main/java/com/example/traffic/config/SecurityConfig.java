@@ -49,6 +49,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/detection-logs").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/speed-violations").permitAll()
                         .requestMatchers("/internal/v1/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/demo/scripts/*/run").hasRole("ADMIN")
 
                         // Predictive maintenance permissions
                         .requestMatchers(HttpMethod.POST, "/api/v1/predictive/anomaly-events/*/acknowledge").hasAnyRole("OPERATOR", "ADMIN")
@@ -109,7 +110,7 @@ public class SecurityConfig {
                 "http://127.0.0.1:5174"
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Internal-Api-Key"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Internal-Api-Key", "X-Request-Id"));
         configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(true);
 
