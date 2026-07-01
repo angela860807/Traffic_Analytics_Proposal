@@ -1609,7 +1609,7 @@
             </select>
             <select v-model="faultFilter.detectionMethod">
               <option value="">탐지 방식 전체</option>
-              <option value="RULE">정책 룰</option>
+              <option value="RULE">기준값 판단</option>
               <option value="TREND_PROJECTION">추세 예측</option>
               <option value="ROBUST_Z_SCORE">기준선 편차</option>
               <option value="CROSS_VALIDATION">교차 검증</option>
@@ -1697,7 +1697,7 @@
                   <span class="stat" :class="f.stTone">{{ f.st }}</span>
                 </td>
                 <td>
-                  <span class="stat ticket-status" :class="ticketStatusTone(f.ticketId ? f.ticketStatus : 'UNISSUED')">{{ f.ticketId ? ticketStatusLabel(f.ticketStatus) : "미발행" }}</span>
+                  <span class="stat ticket-status" :class="ticketStatusTone(f.ticketId ? f.ticketStatus : 'UNISSUED')">{{ f.ticketId ? ticketStatusLabel(f.ticketStatus) : "정비 건 없음" }}</span>
                 </td>
                 <td class="pm-fault-acts">
                   <button
@@ -3727,7 +3727,7 @@ function anomalyTypeLabelKo(t) {
 }
 function detectionMethodLabelKo(m) {
   const map = {
-    RULE: "정책 룰",
+    RULE: "기준값 판단",
     ROBUST_Z_SCORE: "기준선 편차",
     TREND_PROJECTION: "추세 예측",
     CROSS_VALIDATION: "교차 검증",
@@ -6282,22 +6282,22 @@ const servers = Object.freeze([
 }
 .ops-shell .pm-shadow-h {
   display: flex; align-items: center; gap: 10px;
-  font-size: 13px; color: #5b21b6;
-  margin-bottom: 14px; flex-wrap: wrap;
+  font-size: 14px; color: #5b21b6;
+  margin-bottom: 16px; flex-wrap: wrap;
 }
-.ops-shell .pm-shadow-h > i { color: #7c3aed; font-size: 18px; }
-.ops-shell .pm-shadow-h > strong { color: #3b0764; font-size: 16px; font-weight: 800; letter-spacing: 0; }
+.ops-shell .pm-shadow-h > i { color: #7c3aed; font-size: 20px; }
+.ops-shell .pm-shadow-h > strong { color: #3b0764; font-size: 18px; font-weight: 900; letter-spacing: 0; }
 .ops-shell .shadow-bdg {
-  padding: 4px 10px; border-radius: 6px;
+  padding: 5px 11px; border-radius: 6px;
   background: #ede9fe;
-  color: #6d28d9; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
+  color: #6d28d9; font-size: 12px; font-weight: 800; letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 .ops-shell .pm-shadow-note {
-  font-size: 11.5px; color: #4c1d95;
+  font-size: 12.5px; color: #4c1d95;
   margin-left: auto;
   background: #ffffff;
-  padding: 4px 10px;
+  padding: 5px 11px;
   border-radius: 6px;
   border: 1px solid #c4b5fd;
   font-weight: 700;
@@ -6311,7 +6311,7 @@ const servers = Object.freeze([
   border-radius: 8px; padding: 12px 14px;
   display: flex; flex-direction: column; gap: 4px;
 }
-.ops-shell .pm-ss-l { font-size: 11px; font-weight: 700; color: #4a5b78; }
+.ops-shell .pm-ss-l { font-size: 13px; font-weight: 800; color: #334155; }
 .ops-shell .pm-ss-v {
   font-family: 'JetBrains Mono', monospace; font-weight: 800;
   font-size: 34px;
@@ -6321,8 +6321,8 @@ const servers = Object.freeze([
 .ops-shell .pm-ss-v.yl { color: #d97706; }
 .ops-shell .pm-ss-v.rd { color: #dc2626; }
 .ops-shell .pm-ss-v.gy { color: #9aa6b8; }
-.ops-shell .pm-ss-thr { font-size: 10.5px; color: #6b7280; font-family: 'JetBrains Mono', monospace; }
-.ops-shell .pm-ss-pred { font-size: 11.5px; color: #4a5b78; margin-top: 2px; }
+.ops-shell .pm-ss-thr { font-size: 12px; color: #475569; font-family: 'JetBrains Mono', monospace; }
+.ops-shell .pm-ss-pred { font-size: 13px; color: #334155; margin-top: 4px; }
 
 .ops-shell .pm-shadow-feats {
   background: #ffffff;
@@ -6330,16 +6330,16 @@ const servers = Object.freeze([
   border-radius: 8px; padding: 12px 14px;
 }
 .ops-shell .pm-sf-l {
-  font-size: 11px; font-weight: 700; color: #4a5b78; margin-bottom: 8px;
+  font-size: 13px; font-weight: 800; color: #334155; margin-bottom: 10px;
 }
 .ops-shell .pm-sf-l em { font-style: normal; opacity: 0.65; font-weight: 500; margin-left: 4px; }
-.ops-shell .pm-sf-rows { display: flex; flex-direction: column; gap: 5px; }
+.ops-shell .pm-sf-rows { display: flex; flex-direction: column; gap: 7px; }
 .ops-shell .pm-sf-row {
-  display: grid; grid-template-columns: 100px 1fr 40px;
+  display: grid; grid-template-columns: 130px 1fr 46px;
   align-items: center; gap: 8px;
-  font-size: 12px;
+  font-size: 13px;
 }
-.ops-shell .pm-sf-n { color: #4a5b78; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+.ops-shell .pm-sf-n { color: #334155; font-weight: 700; font-size: 12.5px; }
 .ops-shell .pm-sf-bar {
   height: 6px; background: rgba(124,58,237,0.1); border-radius: 100px;
   overflow: hidden;
@@ -6348,7 +6348,7 @@ const servers = Object.freeze([
   height: 100%; background: linear-gradient(90deg, #7c3aed, #ea580c);
   border-radius: 100px;
 }
-.ops-shell .pm-sf-v { text-align: right; color: #4c1d95; font-weight: 700; }
+.ops-shell .pm-sf-v { text-align: right; color: #4c1d95; font-weight: 800; font-size: 12.5px; }
 
 /* 액션 */
 .ops-shell .pm-anom-acts {
