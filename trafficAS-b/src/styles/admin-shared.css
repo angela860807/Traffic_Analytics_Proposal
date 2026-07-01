@@ -2084,12 +2084,20 @@ html .ops-shell .snav-i .snav-bdg {
 .rev-shell .dh h3 { font-size: 16px !important; font-weight: 800 !important; }
 .rev-shell .evt-id { font-size: 12px !important; font-weight: 600 !important; }
 .rev-shell .ocr-h, .rev-shell .ei-h { font-size: 13px !important; font-weight: 800 !important; }
-.rev-shell .ocr-lab { font-size: 12.5px !important; font-weight: 600 !important; }
-.rev-shell .ocr-val { font-size: 24px !important; font-weight: 800 !important; }
-.rev-shell .ocr-conf { font-size: 12.5px !important; }
-.rev-shell .ocr-conf strong { font-size: 14px !important; font-weight: 800 !important; }
-.rev-shell .ei-row { font-size: 12.5px !important; padding: 4px 0 !important; }
-.rev-shell .ei-row > strong { font-size: 13px !important; font-weight: 800 !important; }
+.rev-shell .ocr-lab { font-size: 15px !important; font-weight: 600 !important; }
+.rev-shell .ocr-val { font-size: 34px !important; font-weight: 800 !important; }
+.rev-shell .ocr-conf { font-size: 23px !important; font-weight: 600 !important; margin-top: 4px !important; }
+.rev-shell .ocr-conf strong { font-size: 23px !important; font-weight: 900 !important; }
+.rev-shell .ocr-grid { grid-template-columns: 1fr !important; gap: 14px !important; }
+.rev-shell .ocr-grid > div:first-child { order: 1 !important; }
+.rev-shell .ocr-grid > div:last-child { order: 2 !important; text-align: center !important; }
+.rev-shell .plate-snap { aspect-ratio: 2 / 1 !important; max-width: 100% !important; }
+.rev-shell .ei-row { font-size: 15px !important; padding: 14px 0 !important; display: flex !important; justify-content: space-between !important; align-items: center !important; border-bottom: 1px dashed rgba(12,31,64,0.08) !important; flex: 1 !important; }
+.rev-shell .ei-row:last-child { border-bottom: 0 !important; }
+.rev-shell .ei-row > span { font-size: 15px !important; }
+.rev-shell .ei-row > strong { font-size: 16px !important; font-weight: 800 !important; }
+.rev-shell .ei-row > strong.rd { font-size: 24px !important; font-weight: 900 !important; letter-spacing: -0.3px !important; }
+.rev-shell .ei-grid .ei-row:nth-child(4) > strong { font-size: 24px !important; font-weight: 900 !important; color: #0c1f40 !important; letter-spacing: -0.3px !important; }
 .rev-shell .th-cnt { color: #4a5b78 !important; opacity: 1 !important; font-size: 12.5px !important; font-weight: 600 !important; }
 .rev-shell .th-num { color: #0c1f40 !important; opacity: 1 !important; font-weight: 800 !important; }
 
