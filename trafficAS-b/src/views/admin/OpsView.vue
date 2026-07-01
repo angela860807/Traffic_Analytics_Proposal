@@ -1427,6 +1427,42 @@
               </div>
             </div>
 
+            <!-- AI Shadow 시계열 분석: 운영 판정과 분리된 비교 검증 결과 -->
+            <div class="pm-shadow" v-if="activeAnomaly.shadowModel">
+              <div class="pm-shadow-h">
+                <i class="bi bi-cpu"></i>
+                <strong>AI Shadow 시계열 분석</strong>
+                <span class="shadow-bdg">{{ detectorLabelKo(activeAnomaly.shadowModel.name) }} v{{ activeAnomaly.shadowModel.version }}</span>
+                <span class="pm-shadow-note">Rule 판단과 비교 검증</span>
+              </div>
+              <div class="pm-shadow-body">
+                <div class="pm-shadow-score">
+                  <div class="pm-ss-l">AI 이상 점수</div>
+                  <div class="pm-ss-v" :class="shadowScoreTone(activeAnomaly.shadowModel)">
+                    {{ activeAnomaly.shadowModel.score.toFixed(2) }}
+                  </div>
+                  <div class="pm-ss-thr">
+                    경고 {{ activeAnomaly.shadowModel.warningThreshold }} · 심각 {{ activeAnomaly.shadowModel.criticalThreshold }}
+                  </div>
+                  <div class="pm-ss-pred">
+                    AI 예측 심각도: <strong :class="shadowPredTone(activeAnomaly.shadowModel)">{{ severityLabel(activeAnomaly.shadowModel.predictedSeverity) }}</strong>
+                  </div>
+                </div>
+                <div class="pm-shadow-feats">
+                  <div class="pm-sf-l">AI가 민감하게 본 시계열 지표 <em>재구성 오차 상위</em></div>
+                  <div class="pm-sf-rows">
+                    <div v-for="f in activeAnomaly.shadowModel.topFeatures" :key="f.name" class="pm-sf-row">
+                      <span class="pm-sf-n">{{ metricLabelKo(f.name) }}</span>
+                      <div class="pm-sf-bar">
+                        <div class="pm-sf-fill" :style="{ width: (f.value * 100) + '%' }"></div>
+                      </div>
+                      <span class="pm-sf-v mono">{{ f.value.toFixed(2) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- 조치 기준: 운영자가 바로 이해할 수 있도록 지표명/단위/판정을 한글화 -->
             <div class="pm-evidence-panel">
               <div class="pm-evidence-panel-h">
@@ -1538,47 +1574,6 @@
               </div>
             </div>
 
-            <!-- 비교 모델 — 운영 판정에 직접 사용하지 않는 참고 정보 -->
-            <div class="pm-shadow" v-if="activeAnomaly.shadowModel">
-              <div class="pm-shadow-h">
-                <i class="bi bi-cpu"></i>
-                <strong>비교 모델</strong>
-                <span class="shadow-bdg">참고 모델 · {{ detectorLabelKo(activeAnomaly.shadowModel.name) }} v{{ activeAnomaly.shadowModel.version }}</span>
-                <span class="pm-shadow-note">운영 이벤트 생성에 사용되지 않음 (비교·평가용)</span>
-              </div>
-              <div class="pm-shadow-body">
-                <div class="pm-shadow-score">
-                  <div class="pm-ss-l">재구성 오차</div>
-                  <div class="pm-ss-v" :class="shadowScoreTone(activeAnomaly.shadowModel)">
-                    {{ activeAnomaly.shadowModel.score.toFixed(2) }}
-                  </div>
-                  <div class="pm-ss-thr">
-                    임계 경고 {{ activeAnomaly.shadowModel.warningThreshold }} · 심각 {{ activeAnomaly.shadowModel.criticalThreshold }}
-                  </div>
-                  <div class="pm-ss-pred">
-                    예측 심각도: <strong :class="shadowPredTone(activeAnomaly.shadowModel)">{{ severityLabel(activeAnomaly.shadowModel.predictedSeverity) }}</strong>
-                  </div>
-                </div>
-                <div class="pm-shadow-feats">
-                  <div class="pm-sf-l">영향 지표 <em>(재구성 오차 평균 상위 — 원인 확정값 아님)</em></div>
-                  <div class="pm-sf-rows">
-                    <div v-for="f in activeAnomaly.shadowModel.topFeatures" :key="f.name" class="pm-sf-row">
-                      <span class="pm-sf-n">{{ metricLabelKo(f.name) }}</span>
-                      <div class="pm-sf-bar">
-                        <div class="pm-sf-fill" :style="{ width: (f.value * 100) + '%' }"></div>
-                      </div>
-                      <span class="pm-sf-v mono">{{ f.value.toFixed(2) }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="pm-detail-guide">
-              <i class="bi bi-info-circle"></i>
-              <span>이 영역은 원인과 조치 근거 확인용입니다.</span>
-              <strong>배정, 작업 시작, 해결, 종결 처리는 아래 현황표에서 진행하세요.</strong>
-            </div>
           </div>
         </div>
 
@@ -3736,7 +3731,7 @@ function detectionMethodLabelKo(m) {
     ROBUST_Z_SCORE: "기준선 편차",
     TREND_PROJECTION: "추세 예측",
     CROSS_VALIDATION: "교차 검증",
-    LSTM_AUTOENCODER: "비교 모델",
+    LSTM_AUTOENCODER: "LSTM AutoEncoder",
   }
   return map[m] || m || "—"
 }
@@ -3746,8 +3741,8 @@ function detectorLabelKo(name) {
     "camera-robust-zscore": "기준선 편차 탐지",
     "camera-trend-projection": "악화 추세 예측",
     "camera-context-cross-validator": "교통 맥락 교차검증",
-    "camera-lstm-autoencoder": "비교 모델",
-    "shadow-model": "비교 모델",
+    "camera-lstm-autoencoder": "LSTM AutoEncoder",
+    "shadow-model": "LSTM AutoEncoder",
   }
   return map[name] || name || "—"
 }
@@ -4798,9 +4793,9 @@ function shadowTopFeatures(shadowModel) {
   if (!Array.isArray(rows)) return []
   return rows.map((row) => {
     if (typeof row === "string") return { name: row, value: 0 }
-    const value = numberOrNull(row.value ?? row.score ?? row.error ?? row.contribution)
+    const value = numberOrNull(row.value ?? row.featureValue ?? row.score ?? row.error ?? row.contribution)
     return {
-      name: row.name || row.feature || row.metric || "-",
+      name: row.name || row.featureName || row.feature || row.metric || "-",
       value: Math.max(0, Math.min(1, value ?? 0)),
     }
   }).filter((row) => row.name && row.name !== "-")
@@ -6275,47 +6270,52 @@ const servers = Object.freeze([
   display: inline-flex; align-items: center; gap: 6px;
 }
 
-/* SHADOW 비교 모델 — 부드러운 톤 */
+/* AI Shadow 시계열 분석 */
 .ops-shell .pm-shadow {
-  background: #faf8ff;
-  border: 1px solid #ede9fe;
-  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfaff 100%);
+  border: 2px solid #8b5cf6;
+  border-left-width: 6px;
+  border-radius: 8px;
   padding: 18px 20px;
-  margin-bottom: 20px;
+  margin: 16px 0 20px;
+  box-shadow: 0 10px 24px rgba(76, 29, 149, 0.10);
 }
 .ops-shell .pm-shadow-h {
   display: flex; align-items: center; gap: 10px;
   font-size: 13px; color: #5b21b6;
   margin-bottom: 14px; flex-wrap: wrap;
 }
-.ops-shell .pm-shadow-h > i { color: #7c3aed; font-size: 15px; }
-.ops-shell .pm-shadow-h > strong { color: #4c1d95; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+.ops-shell .pm-shadow-h > i { color: #7c3aed; font-size: 18px; }
+.ops-shell .pm-shadow-h > strong { color: #3b0764; font-size: 16px; font-weight: 800; letter-spacing: 0; }
 .ops-shell .shadow-bdg {
-  padding: 3px 10px; border-radius: 6px;
+  padding: 4px 10px; border-radius: 6px;
   background: #ede9fe;
   color: #6d28d9; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 .ops-shell .pm-shadow-note {
-  font-size: 11px; color: #7c6f9c;
+  font-size: 11.5px; color: #4c1d95;
   margin-left: auto;
   background: #ffffff;
-  padding: 3px 10px;
+  padding: 4px 10px;
   border-radius: 6px;
-  border: 1px solid #ede9fe;
+  border: 1px solid #c4b5fd;
+  font-weight: 700;
 }
 .ops-shell .pm-shadow-body {
-  display: grid; grid-template-columns: 200px 1fr; gap: 14px;
+  display: grid; grid-template-columns: 240px 1fr; gap: 14px;
 }
 .ops-shell .pm-shadow-score {
   background: #ffffff;
-  border-radius: 6px; padding: 10px 12px;
+  border: 1px solid #ede9fe;
+  border-radius: 8px; padding: 12px 14px;
   display: flex; flex-direction: column; gap: 4px;
 }
 .ops-shell .pm-ss-l { font-size: 11px; font-weight: 700; color: #4a5b78; }
 .ops-shell .pm-ss-v {
   font-family: 'JetBrains Mono', monospace; font-weight: 800;
-  font-size: 24px;
+  font-size: 34px;
+  line-height: 1.05;
 }
 .ops-shell .pm-ss-v.gr { color: #059669; }
 .ops-shell .pm-ss-v.yl { color: #d97706; }
@@ -6326,7 +6326,8 @@ const servers = Object.freeze([
 
 .ops-shell .pm-shadow-feats {
   background: #ffffff;
-  border-radius: 6px; padding: 10px 12px;
+  border: 1px solid #ede9fe;
+  border-radius: 8px; padding: 12px 14px;
 }
 .ops-shell .pm-sf-l {
   font-size: 11px; font-weight: 700; color: #4a5b78; margin-bottom: 8px;

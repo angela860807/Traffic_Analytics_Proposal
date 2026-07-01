@@ -88,5 +88,6 @@ public class AnomalyEventDetailResponse {
         private final boolean predictedAnomaly;
         private final AnomalySeverity predictedSeverity;
         private final OffsetDateTime evaluatedAt;
+        private final List<Object> topFeatures;
     }
 }

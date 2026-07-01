@@ -474,6 +474,7 @@ public class PredictiveOperationsService {
                         .predictedAnomaly(shadowModel.isPredictedAnomaly())
                         .predictedSeverity(shadowModel.getPredictedSeverity())
                         .evaluatedAt(toOffset(shadowModel.getEvaluatedAt()))
+                        .topFeatures(shadowModel.getTopFeaturesJson())
                         .build())
                 .build();
     }
